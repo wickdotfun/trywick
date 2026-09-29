@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>WICK — adopt your candle</title>
+  <meta name="description" content="Adopt your own little candle. Feed it and watch it grow: when $WICK goes up, every candle grows faster. Free, no wallet.">
+  <meta property="og:title" content="WICK — adopt your candle">
+  <meta property="og:description" content="A candle for everyone. Keep yours alive and watch it grow.">
+  <meta property="og:image" content="/brand/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="/brand/og.png">
+  <meta name="theme-color" content="#0a0705">
+  <link rel="icon" href="brand/icon-64.png" type="image/png">
+  <link rel="apple-touch-icon" href="brand/apple-touch-icon.png">
+  <link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/geist-mono.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-mood="calme" data-view="home">
+
+  <!-- ================= Mode démo (?demo) ================= -->
+  <div class="demo-bar" id="demo-bar" hidden></div>
+
+  <!-- ================= Bandeau de données ================= -->
+  <div class="ticker" aria-hidden="true"><div class="ticker-track" id="ticker"></div></div>
+
+  <!-- ================= Barre de navigation ================= -->
+  <header class="nav">
+    <a class="brand" href="#/" aria-label="WICK">
+      <img class="brand-logo" src="brand/icon-192.png" alt="">
+      <img class="brand-word" src="brand/wordmark.png" alt="WICK">
+      <span class="brand-tag">v0.8</span>
+    </a>
+    <nav class="tabs" aria-label="Sections">
+      <a href="#/" data-tab="home" data-i18n="tabHome">My candle</a>
+      <a href="#/leaderboard" data-tab="top" data-i18n="tabTop">Leaderboard</a>
+      <a href="#/coin" data-tab="coin"><span data-i18n="tabCoin">The coin</span> <b class="tab-ticker">$WICK</b></a>
+      <a href="#/how" data-tab="how" data-i18n="tabHow">How it works</a>
+    </nav>
+    <div class="nav-right">
+      <span class="status" id="status"><i></i><span id="status-text">live</span></span>
+      <a class="icon-btn" id="x-link" target="_blank" rel="noopener" aria-label="X" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.8 3h3.1l-6.8 7.8L22 21h-6.2l-4.9-6.4L5.3 21H2.2l7.3-8.3L2 3h6.4l4.4 5.8L17.8 3zm-1.1 16.2h1.7L7.4 4.7H5.6l11.1 14.5z"/></svg>
+      </a>
+      <a class="icon-btn" id="tg-link" target="_blank" rel="noopener" aria-label="Telegram" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.9 4.3 18.7 19.5c-.2 1-.9 1.3-1.7.8l-4.7-3.5-2.3 2.2c-.3.3-.5.5-1 .5l.3-4.8 8.8-7.9c.4-.3-.1-.5-.6-.2L6.6 13.4 2 12c-1-.3-1-1 .2-1.5L20.5 3.4c.8-.3 1.6.2 1.4.9z"/></svg>
+      </a>
+      <button class="pill-btn" id="me-btn" hidden><span class="me-dot"></span><span id="me-btn-name"></span></button>
+      <a class="cta soon" id="buy-btn" target="_blank" rel="noopener"><span data-i18n="soon">Soon on pump.fun</span></a>
+    </div>
+  </header>
+
+  <main>
+    <!-- ================= Ma bougie ================= -->
+    <section class="view" data-view="home">
+      <div class="intro">
+        <div class="intro-text">
+          <p class="eyebrow"><i class="pulse-dot"></i><span data-i18n="heroEyebrow"></span></p>
+          <h1>Adopt your <span class="grad">candle.</span></h1>
+          <p class="lead" data-i18n="heroLead"></p>
+        </div>
+        <dl class="kpis" id="kpis"></dl>
+      </div>
+
+      <div class="hero">
+        <div class="main-col">
+          <div class="stage-card">
+            <div class="stage" id="stage"></div>
+            <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+
+            <div class="hud hud-top">
+              <div class="hud-id">
+                <span class="mono-label" id="hud-id"></span>
+                <strong id="hud-name">—</strong>
+                <span class="hud-sub" id="hud-sub"></span>
+              </div>
+              <div class="hud-chips">
+                <span class="chip" id="mood-chip"></span>
+                <span class="chip" id="market-chip"></span>
+                <span class="chip chip-boost" id="boost-chip" hidden></span>
+              </div>
+            </div>
+
+            <div class="bubble" id="bubble" aria-live="polite">
+              <span id="bubble-text">…</span>
+              <small id="bubble-tag" hidden></small>
+            </div>
+
+            <div class="hud hud-bottom">
+              <div class="actions" id="actions"></div>
+            </div>
+          </div>
+
+          <section class="panel feed-card">
+            <header class="panel-head"><span class="mono-label"><em>05</em><span data-i18n="feedTitle">Live log</span></span><span class="live"><i></i>live</span></header>
+            <ol class="feed" id="feed"></ol>
+          </section>
+        </div>
+
+        <aside class="side">
+          <section class="panel me-card" id="vitals"></section>
+          <section class="panel" id="evolution"></section>
+          <section class="panel" id="reward" hidden></section>
+          <section class="panel" id="podium"></section>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ================= Classement ================= -->
+    <section class="view" data-view="top" hidden>
+      <div class="page" id="top-page"></div>
+    </section>
+
+    <!-- ================= Le coin ================= -->
+    <section class="view" data-view="coin" hidden>
+      <div class="page" id="coin-page"></div>
+    </section>
+
+    <!-- ================= How it works ================= -->
+    <section class="view" data-view="how" hidden>
+      <div class="page" id="how-page"></div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="foot-inner">
+      <div class="foot-brand">
+        <img class="brand-word" src="brand/wordmark.png" alt="WICK">
+        <p data-i18n="disclaimer"></p>
+      </div>
+      <nav class="foot-links">
+        <a href="#/" data-i18n="tabHome">My candle</a>
+        <a href="#/leaderboard" data-i18n="tabTop">Leaderboard</a>
+        <a href="#/coin">$WICK</a>
+        <a href="#/how" data-i18n="tabHow">How it works</a>
+      </nav>
+      <p class="foot-meta mono" id="foot-meta"></p>
+    </div>
+  </footer>
+
+  <!-- Barre d'onglets en bas, sur téléphone -->
+  <nav class="tabbar" aria-label="Sections" id="tabbar">
+    <a href="#/" data-tab="home" data-ico="flame"><span data-i18n="tabHome">My candle</span></a>
+    <a href="#/leaderboard" data-tab="top" data-ico="trophy"><span data-i18n="tabTop">Leaderboard</span></a>
+    <a href="#/coin" data-tab="coin" data-ico="chart"><span>$WICK</span></a>
+    <a href="#/how" data-tab="how" data-ico="info"><span data-i18n="tabHowShort">Info</span></a>
+  </nav>
+
+  <!-- Fenêtre : bienvenue, phrase, récupération, photo -->
+  <dialog class="modal" id="modal">
+    <form method="dialog" class="modal-close"><button aria-label="Close">✕</button></form>
+    <div id="modal-body"></div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <script type="module" src="build/app.js"></script>
+</body>
+</html>

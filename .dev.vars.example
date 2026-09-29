@@ -1,0 +1,11 @@
+# Copy to .dev.vars for local development (never committed).
+# ANTHROPIC_API_KEY=sk-ant-...
+# Force a mood: 10 = euphoria, 4 = happy, 0 = calm, -5 = stress, -12 = panic
+DEV_CHANGE=
+# Lift the per-IP limit (every local visitor shares the same IP)
+DEV_NO_IP_LIMIT=
+
+# Weekly reward (optional locally)
+# REWARD_SHARE=20%
+# REWARD_POOL=2.5 SOL
+# ADMIN_KEY=a-long-random-password

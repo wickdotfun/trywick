@@ -1,0 +1,33 @@
+name = "wick"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+# Keep the variables set in the dashboard (TOKEN_MINT, X_URL…) on every deploy.
+keep_vars = true
+# The site is only served on its custom domain (trywick.fun), not on workers.dev.
+workers_dev = false
+preview_urls = false
+
+# The client JavaScript (including the 3D) is bundled into public/build/ before each deploy.
+[build]
+command = "npm run build"
+
+# The site (HTML, CSS, JS) is served as is from public/.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+# The home page goes through the Worker first, which writes the absolute URL of the
+# preview image (X and Telegram require it). Everything else is served directly.
+run_worker_first = ["/", "/index.html"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "wick"
+# D1 database id (Cloudflare → Storage & databases → D1 → wick)
+database_id = "b18af738-eaa4-45f6-811c-55a3ce7a2557"
+
+[observability]
+enabled = true
+
+# Every 10 minutes, candles age, go out or evolve, even when nobody visits the site.
+[triggers]
+crons = ["*/10 * * * *"]

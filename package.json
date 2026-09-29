@@ -1,0 +1,19 @@
+{
+  "name": "wick",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/client/main.js --bundle --minify --format=esm --target=es2022 --outfile=public/build/app.js",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "three": "^0.186.1",
+    "wrangler": "^4.143.0"
+  }
+}

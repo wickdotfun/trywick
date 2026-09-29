@@ -1254,3 +1254,13 @@ body.is-viewing .intro, body.is-viewing .world { display: none; }
   .pf-tiles dd { font-size: 17px; }
 }
 @media (prefers-reduced-motion: reduce) { .stage-card::before, .profile::before { animation: none; } }
+
+/* Le compte X et le GitHub, discrets en bas de page */
+.foot-social { grid-column: 2; display: flex; gap: 8px; justify-content: flex-end; }
+.foot-social a {
+  display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%;
+  color: var(--dim); border: 1px solid var(--line); transition: color .2s, border-color .2s, box-shadow .2s;
+}
+.foot-social a:hover { color: var(--gold); border-color: rgba(255, 170, 90, .45); box-shadow: 0 0 16px rgba(255, 140, 40, .2); }
+.foot-social svg { width: 15px; height: 15px; fill: currentColor; }
+@media (max-width: 820px) { .foot-social { grid-column: 1; justify-content: flex-start; } }

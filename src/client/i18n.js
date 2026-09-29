@@ -11,6 +11,15 @@ export const T = {
   heroEyebrow: 'A candle for everyone · wired to $WICK',
   heroTitle: 'Adopt your candle.',
   heroLead: 'Strike a match, get your own little candle. Feed it twice a day and watch it grow: when $WICK goes up, every candle grows faster. Forget it and it goes out for good.',
+  hey: 'Hey,', introMine: 'Welcome back', introOut: 'Your candle went out',
+  status: {
+    hungry: 'Your candle is hungry. Feed it now, before it goes out.',
+    ready: 'It can eat again. Feed it to keep it bright.',
+    wait: (t) => `All good. Next meal in ${t}.`,
+    boost: (b, t) => `$WICK is pumping: it grows ×${b} faster right now.${t ? ` Next meal in ${t}.` : ' Feed it!'}`,
+    dead: (t) => `It burned for ${t}. Light a new one: new look, fresh start.`,
+  },
+  worldTitle: 'The world right now',
   kpiAlive: 'Candles lit', kpiDied: 'Went out · 24h', kpiBorn: 'Born · 24h', kpiRecord: 'Longest life',
 
   // The stage
@@ -31,12 +40,17 @@ export const T = {
   thoughtTag: 'thinking out loud',
   poke: ['Hey! That tickles!', 'Easy, I\'m made of wax!', 'Yes yes, I see you.', 'One more time and I melt.', 'Want a picture?', 'Hands off the wick!'],
 
-  // 01 · Your candle
-  pMine: 'Your candle', pOther: (n) => `${n}'s candle`,
+  // Your candle
+  pMine: 'Your candle', pVitals: 'Vitals',
   wax: 'wax', age: 'age', lived: 'lived', burnout: 'burnout', meltTitle: 'melt', growthTitle: 'growth', feedsTitle: 'meals', genTitle: 'generation',
   melt: (n) => `-${n} / h`,
   noneText: 'You don\'t have a candle yet. Strike the match: it\'s born with 70 wax and its own look, and keeping it alive is up to you.',
   haveOne: 'I already have a candle',
+  miniSteps: [
+    ['Strike the match', 'it\'s born with its own look'],
+    ['Feed it', 'every 4h at most, twice a day'],
+    ['Watch it grow', 'torch in 7 days, Hall of Fame forever'],
+  ],
   hintLit: (h) => `It melts a little every hour. Without care, out in ~${h}.`,
   hintHungry: 'It\'s hungry! Feed it fast or it will go out.',
   hintBoost: (b) => `$WICK is going up: it grows ×${b} faster right now!`,
@@ -52,14 +66,29 @@ export const T = {
     accessories: { noeud: 'Bow tie', lunettes: 'Glasses', echarpe: 'Scarf', fleur: 'Flower' },
   },
 
-  // 02 · Evolution
+  // Profile of a candle (#/b/12)
+  pf: {
+    eyebrow: (id) => `Candle #${id}`,
+    alive: (t) => `Alive · ${t}`, out: (t) => `Went out after ${t}`,
+    rank: (r) => `#${r} oldest flame`,
+    age: 'Age', lived: 'Lived', meals: 'Meals', lit: 'Candles lit', torches: 'Torches', born: 'Born',
+    story: 'Story', noStory: 'Nothing recorded yet. A quiet candle.',
+    adopt: 'Adopt your own candle', back: 'Back to my candle',
+    ev: {
+      born: 'Was lit', nourrir: 'Got fed', evolved: (s) => `Became a ${s}`,
+      died: (t) => `Went out after ${t}`, reward: (r) => `Won the weekly reward (#${r})`,
+    },
+    ago: (t) => `${t} ago`,
+  },
+
+  // Evolution
   pEvo: 'Evolution',
   stages: { allumette: 'Match', bougie: 'Candle', chandelle: 'Taper', chandelier: 'Candlestick', torche: 'Torch' },
   stageAge: { allumette: 'before', bougie: 'D0', chandelle: '≤ D1', chandelier: '≤ D3', torche: '≤ D7' },
   hallBadge: 'Hall of Fame', eternalBadge: 'Eternal flame',
   nextIn: (s, t) => `${s} in ${t}`, finalForm: 'final form',
 
-  // 03 · Oldest flames
+  // Oldest flames
   pTop: 'Oldest flames', seeTop: 'See the full leaderboard',
   you: 'you', aliveNow: (n) => `${n} lit`, died24: (n) => `${n} went out in 24h`,
   emptyTop: 'No candles yet. Be the first.',
@@ -164,7 +193,7 @@ export const T = {
     ['What\'s the link with $WICK?', 'The site is the coin\'s showcase: when $WICK goes up, every candle grows faster. You can play without buying. It is not an investment and there are no promises.'],
     ['How does the weekly reward work?', 'Every Sunday at 20:00 UTC, the 3 oldest living candles whose owner added a Solana payout address win a share of $WICK creator fees, sent manually by the dev. The payment proof is shown on the leaderboard. No purchase needed; amounts vary and the program may change or stop.'],
     ['What do I get for a torch?', 'Your candle enters the Hall of Fame forever, even after it goes out, and all your next candles are born with the eternal flame (gold).'],
-    ['Is my candle worth anything?', 'No. It is not an NFT and can\'t be bought or sold. Rarity is just for style.'],
+    ['Is my candle worth anything?', 'No. It is not an NFT and can\'t be bought or sold. Its look is just for style.'],
     ['Who\'s behind it?', 'A solo builder improving it in public, on X.'],
   ],
 

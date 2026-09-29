@@ -30,7 +30,8 @@ export function createDemo() {
 
   function log(e) {
     feed.push(e);
-      if (feed.length > 30) feed.length = 30;
+    feed.sort((x, y) => y.at - x.at);
+    if (feed.length > 30) feed.length = 30;
   }
 
   // Chaque bougie simulée a un « joueur » qui passe plus ou moins souvent.
@@ -219,7 +220,10 @@ export function createDemo() {
 
     if (url.pathname === '/api/candle') {
       const c = candles.find((x) => x.id === Number(url.searchParams.get('id')));
-      return c ? ok({ candle: candleView(c, now, mood) }) : fail(404, { error: 'not_found' });
+      if (!c) return fail(404, { error: 'not_found' });
+      const rank = c.diedAt ? null : candles.filter((x) => !x.diedAt && x.bornAt < c.bornAt).length + 1;
+      const story = feed.filter((e) => e.candle === c.id).slice(0, 12);
+      return ok({ candle: candleView(c, now, mood), profile: { rank, torches: c.torchAt ? 1 : 0, lit: c.gen, story } });
     }
 
     if (url.pathname === '/api/light') {

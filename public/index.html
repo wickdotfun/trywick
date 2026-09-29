@@ -19,6 +19,15 @@
 </head>
 <body data-mood="calme" data-view="home">
 
+  <!-- ================= Fond : lueurs, braises, grain ================= -->
+  <div class="backdrop" aria-hidden="true">
+    <div class="bd-glow bd-a"></div><div class="bd-glow bd-b"></div><div class="bd-glow bd-c"></div>
+    <div class="bd-mark"></div>
+    <canvas class="bd-embers" id="embers"></canvas>
+    <div class="bd-vignette"></div>
+    <div class="bd-grain"></div>
+  </div>
+
   <!-- ================= Mode démo (?demo) ================= -->
   <div class="demo-bar" id="demo-bar" hidden></div>
 
@@ -30,7 +39,7 @@
     <a class="brand" href="#/" aria-label="WICK">
       <img class="brand-logo" src="brand/icon-192.png" alt="">
       <img class="brand-word" src="brand/wordmark.png" alt="WICK">
-      <span class="brand-tag">v0.8</span>
+      <span class="brand-tag">v0.9</span>
     </a>
     <nav class="tabs" aria-label="Sections">
       <a href="#/" data-tab="home" data-i18n="tabHome">My candle</a>
@@ -52,58 +61,65 @@
   </header>
 
   <main>
-    <!-- ================= Ma bougie ================= -->
+    <!-- ================= Ma bougie (et la page de profil d'une bougie) ================= -->
     <section class="view" data-view="home">
-      <div class="intro">
+      <header class="profile" id="profile" hidden></header>
+
+      <div class="intro" id="intro">
         <div class="intro-text">
-          <p class="eyebrow"><i class="pulse-dot"></i><span data-i18n="heroEyebrow"></span></p>
-          <h1>Adopt your <span class="grad">candle.</span></h1>
-          <p class="lead" data-i18n="heroLead"></p>
+          <p class="eyebrow"><i class="pulse-dot"></i><span id="intro-eyebrow"></span></p>
+          <h1 id="intro-title">Adopt your <span class="grad">candle.</span></h1>
+          <p class="lead" id="intro-lead"></p>
         </div>
         <dl class="kpis" id="kpis"></dl>
       </div>
 
       <div class="hero">
-        <div class="main-col">
-          <div class="stage-card">
-            <div class="stage" id="stage"></div>
-            <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+        <div class="stage-card">
+          <div class="stage" id="stage"></div>
+          <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
 
-            <div class="hud hud-top">
-              <div class="hud-id">
-                <span class="mono-label" id="hud-id"></span>
-                <strong id="hud-name">—</strong>
-                <span class="hud-sub" id="hud-sub"></span>
-              </div>
-              <div class="hud-chips">
-                <span class="chip" id="mood-chip"></span>
-                <span class="chip" id="market-chip"></span>
-                <span class="chip chip-boost" id="boost-chip" hidden></span>
-              </div>
+          <div class="hud hud-top">
+            <div class="hud-id">
+              <span class="mono-label" id="hud-id"></span>
+              <strong id="hud-name">—</strong>
+              <span class="hud-sub" id="hud-sub"></span>
             </div>
-
-            <div class="bubble" id="bubble" aria-live="polite">
-              <span id="bubble-text">…</span>
-              <small id="bubble-tag" hidden></small>
-            </div>
-
-            <div class="hud hud-bottom">
-              <div class="actions" id="actions"></div>
+            <div class="hud-chips">
+              <span class="chip" id="mood-chip"></span>
+              <span class="chip" id="market-chip"></span>
+              <span class="chip chip-boost" id="boost-chip" hidden></span>
             </div>
           </div>
 
-          <section class="panel feed-card">
-            <header class="panel-head"><span class="mono-label"><em>05</em><span data-i18n="feedTitle">Live log</span></span><span class="live"><i></i>live</span></header>
-            <ol class="feed" id="feed"></ol>
-          </section>
+          <div class="bubble" id="bubble" aria-live="polite">
+            <span id="bubble-text">…</span>
+            <small id="bubble-tag" hidden></small>
+          </div>
+
+          <div class="hud hud-bottom">
+            <div class="actions" id="actions"></div>
+          </div>
         </div>
 
         <aside class="side">
           <section class="panel me-card" id="vitals"></section>
           <section class="panel" id="evolution"></section>
-          <section class="panel" id="reward" hidden></section>
-          <section class="panel" id="podium"></section>
         </aside>
+      </div>
+
+      <section class="panel story" id="story" hidden></section>
+
+      <div class="world" id="world">
+        <h2 class="section-title" data-i18n="worldTitle">The world right now</h2>
+        <div class="world-grid">
+          <section class="panel" id="podium"></section>
+          <section class="panel feed-card">
+            <header class="panel-head"><span class="panel-title" id="feed-title"><span data-i18n="feedTitle">Live log</span></span><span class="live"><i></i>live</span></header>
+            <ol class="feed" id="feed"></ol>
+          </section>
+          <section class="panel" id="reward" hidden></section>
+        </div>
       </div>
     </section>
 

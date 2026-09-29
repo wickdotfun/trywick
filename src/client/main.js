@@ -4,6 +4,7 @@ import { idleLine } from '../../lib/lines.js';
 import { isSolanaAddress, shortAddress } from '../../lib/rewards.js';
 import { WORDS, normalizePhrase } from '../../lib/players.js';
 import { makeCard } from './card.js';
+import { startEmbers } from './backdrop.js';
 import { SPEEDS, createDemo } from './demo.js';
 import { renderWick } from './fallback2d.js';
 import { T } from './i18n.js';
@@ -36,6 +37,7 @@ let data = null;          // la dernière réponse du serveur
 let cooldownsAt = 0;
 let viewingId = null;     // #/b/12 : on regarde la bougie de quelqu'un d'autre
 let viewing = null;
+let viewingProfile = null; // rang, torches du joueur, histoire de la bougie regardée
 let thought = null;
 let reactionUntil = 0;
 let bubbleKey = '';
@@ -104,11 +106,44 @@ const timeScale = () => (demo ? demo.speed : 1);
 // ------------------------------------------------------------ scène
 const stageEl = $('stage');
 let scene = null;
-try {
-  scene = createScene(stageEl, { onPoke: poke });
-} catch (err) {
-  console.warn('3D indisponible, dessin 2D', err);
-  stageEl.classList.add('fallback');
+function mountScene() {
+  try {
+    scene = createScene(stageEl, { onPoke: poke });
+  } catch (err) {
+    console.warn('3D indisponible, dessin 2D', err);
+    scene = null;
+    stageEl.classList.add('fallback');
+    return;
+  }
+  // La bulle suit le haut de la bougie.
+  const bubble = $('bubble');
+  const card = stageEl.parentElement;
+  scene.onFrame(() => {
+    const a = scene.anchor();
+    const w = card.clientWidth;
+    const bw = bubble.offsetWidth;
+    const x = Math.max(bw / 2 + 12, Math.min(w - bw / 2 - 12, a.x));
+    const y = Math.max(bubble.offsetHeight + (w < 600 ? 70 : 78), a.y - 10);
+    bubble.style.left = `${x}px`;
+    bubble.style.top = `${y}px`;
+  });
+}
+mountScene();
+
+// Quand on revient sur la bougie : on remet la scène à la bonne taille, et si le
+// navigateur a repris la carte graphique sans la rendre, on reconstruit la scène.
+let lostSince = 0;
+function wakeScene() {
+  if (!scene || view !== 'home' || document.hidden) return;
+  scene.refresh();
+  if (!scene.isLost()) { lostSince = 0; return; }
+  if (!lostSince) lostSince = Date.now();
+  if (Date.now() - lostSince < 1500) { setTimeout(wakeScene, 600); return; }
+  lostSince = 0;
+  scene.dispose();
+  mountScene();
+  flamesKey = '';
+  if (data) drawScene();
 }
 
 function drawScene() {
@@ -135,20 +170,6 @@ function drawScene() {
   }
 }
 
-// La bulle suit le haut de la bougie.
-if (scene) {
-  const bubble = $('bubble');
-  const card = stageEl.parentElement;
-  scene.onFrame(() => {
-    const a = scene.anchor();
-    const w = card.clientWidth;
-    const bw = bubble.offsetWidth;
-    const x = Math.max(bw / 2 + 12, Math.min(w - bw / 2 - 12, a.x));
-    const y = Math.max(bubble.offsetHeight + (w < 600 ? 70 : 78), a.y - 10);
-    bubble.style.left = `${x}px`;
-    bubble.style.top = `${y}px`;
-  });
-}
 
 // ------------------------------------------------------------ rendu : accueil
 function drawHud() {
@@ -167,6 +188,101 @@ function drawHud() {
   boost.hidden = !(c?.alive && c.boost > 1);
   if (!boost.hidden) boost.innerHTML = `${ICONS.pulse}${esc(t().growthChip(fmtBoost(c.boost)))}`;
 
+}
+
+// L'en-tête de l'accueil : pour un nouveau venu, l'invitation ; pour un joueur,
+// son prénom et la seule chose à savoir maintenant (a-t-elle faim ? quand revenir ?).
+function drawIntro() {
+  const c = data.candle;
+  const me = data.me;
+  let eyebrow = t().heroEyebrow;
+  let title = `Adopt your <span class="grad">candle.</span>`;
+  let lead = t().heroLead;
+  let tone = '';
+  if (c && me) {
+    const first = esc(me.name.replace(/\s*#\d+$/, ''));
+    title = `${t().hey} <span class="grad">${first}.</span>`;
+    const left = remaining('nourrir');
+    if (!c.alive) { eyebrow = t().introOut; lead = t().status.dead(dur(c.ageMs)); tone = 'out'; }
+    else {
+      eyebrow = t().introMine;
+      if (c.hungry) { lead = t().status.hungry; tone = 'alert'; }
+      else if (c.boost > 1) { lead = t().status.boost(fmtBoost(c.boost), left > 0 ? dur(left) : ''); tone = 'boost'; }
+      else if (left > 0) lead = t().status.wait(dur(left));
+      else { lead = t().status.ready; tone = 'ready'; }
+    }
+  }
+  setHtml($('intro-eyebrow'), esc(eyebrow));
+  setHtml($('intro-title'), title);
+  const el = $('intro-lead');
+  setHtml(el, esc(lead));
+  el.className = `lead${tone ? ` tone-${tone}` : ''}`;
+}
+
+// La page de profil d'une bougie (#/b/12) : une vraie fiche, avec son look,
+// son rang, ses chiffres et son histoire.
+function drawProfile() {
+  const el = $('profile');
+  const c = viewingId ? viewing : null;
+  document.body.classList.toggle('is-viewing', Boolean(viewingId));
+  if (!c) { el.hidden = true; $('story').hidden = true; return; }
+  el.hidden = false;
+  const p = viewingProfile || {};
+  el.style.setProperty('--flame', c.look.flame.color);
+  el.style.setProperty('--wax', c.look.wax.color);
+  const badges = [
+    c.alive ? `<span class="pf-badge live"><i></i>${t().pf.alive(dur(c.ageMs))}</span>` : `<span class="pf-badge out">${ICONS.skull}${t().pf.out(dur(c.ageMs))}</span>`,
+    `<span class="pf-badge">${stageName(c.stage)}</span>`,
+    p.rank ? `<span class="pf-badge gold">${ICONS.trophy}${t().pf.rank(p.rank)}</span>` : '',
+    c.torchAt ? `<span class="pf-badge gold">${ICONS.trophy}${t().hallBadge}</span>` : '',
+    c.look.legacy ? `<span class="pf-badge gold">${ICONS.flame}${t().eternalBadge}</span>` : '',
+  ].join('');
+  const born = new Date(c.bornAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const tiles = [
+    [c.alive ? t().pf.age : t().pf.lived, dur(c.ageMs)],
+    [t().pf.meals, num(c.feeds)],
+    [t().pf.lit, num(p.lit ?? c.gen)],
+    [t().pf.torches, num(p.torches ?? 0)],
+    [t().pf.born, born],
+  ];
+  const mine = data.candle;
+  const cta = mine?.alive
+    ? `<button class="btn" data-action="back">${ICONS.back}${t().pf.back}</button>`
+    : `<button class="btn primary" data-action="adopt">${ICONS.gratter}${t().pf.adopt}</button>`;
+  setHtml(el, `
+    <div class="pf-main">
+      <div class="pf-avatar${c.alive ? '' : ' out'}"><span>${ICONS.flame}</span></div>
+      <div class="pf-id">
+        <p class="eyebrow">${t().pf.eyebrow(c.id)}</p>
+        <h1>${esc(c.name)}${c.gen > 1 ? ` <small>${ROMAN[c.gen] || c.gen}</small>` : ''}</h1>
+        <div class="pf-badges">${badges}</div>
+        <div class="pf-look">${traitList(c.look).map((x) => `<span class="trait">${esc(x)}</span>`).join('')}</div>
+      </div>
+      <div class="pf-cta">${cta}</div>
+    </div>
+    <dl class="pf-tiles">${tiles.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>`);
+  drawStory(c, p.story || []);
+}
+
+function storyText(e) {
+  const ev = t().pf.ev;
+  if (e.kind === 'born') return ev.born;
+  if (e.kind === 'evolved') return ev.evolved(stageName(e.detail));
+  if (e.kind === 'died') return ev.died(dur(Number(e.detail)));
+  if (e.kind === 'reward') return ev.reward(e.detail);
+  return ev[e.kind] || e.kind;
+}
+
+function drawStory(c, story) {
+  const el = $('story');
+  el.hidden = false;
+  const icon = { born: ICONS.gratter, nourrir: ICONS.nourrir, evolved: ICONS.pulse, died: ICONS.skull, reward: ICONS.trophy };
+  const now = data.now + (Date.now() - cooldownsAt) * timeScale();
+  const rows = story.length
+    ? story.map((e) => `<li class="ev-${e.kind}"><span class="st-ico">${icon[e.kind] || ICONS.flame}</span>
+        <span class="st-txt">${esc(storyText(e))}</span><time>${t().pf.ago(dur(now - e.at))}</time></li>`).join('')
+    : `<li class="st-empty">${t().pf.noStory}</li>`;
+  setHtml(el, `${panelHead(ICONS.book, t().pf.story, esc(fullName(c)))}<ol class="story-list">${rows}</ol>`);
 }
 
 function drawKpis() {
@@ -217,7 +333,8 @@ function remaining(action) {
 
 function actionList() {
   const c = shown();
-  if (viewingId) return [data.candle?.alive ? 'back' : 'adopt', ...(c ? ['photo'] : [])];
+  // Sur la bougie de quelqu'un d'autre : pas de photo à partager, seulement revenir à la sienne.
+  if (viewingId) return [data.candle?.alive ? 'back' : 'adopt'];
   if (!c) return ['light'];
   if (!c.alive) return ['relight', 'photo'];
   return ['nourrir', 'photo'];
@@ -237,6 +354,9 @@ function drawActions() {
   setHtml($('actions'), html);
 }
 
+// L'en-tête d'un panneau : une icône, un titre clair, une info à droite.
+const panelHead = (icon, title, right = '') => `<header class="panel-head"><span class="panel-title">${icon}${esc(title)}</span><span class="muted">${right}</span></header>`;
+
 function segments(frac) {
   const n = 25;
   const on = Math.round(Math.max(0, Math.min(1, frac)) * n);
@@ -247,15 +367,17 @@ function drawVitals() {
   const c = shown();
   const el = $('vitals');
   if (c) el.style.setProperty('--me', c.color); else el.style.removeProperty('--me');
-  const title = viewingId && c ? t().pOther(c.name) : t().pMine;
-  const head = (right) => `<header class="panel-head"><span class="mono-label"><em>01</em>${esc(title)}</span><span class="muted">${right}</span></header>`;
+  const title = viewingId ? t().pVitals : t().pMine;
+  const head = (right) => panelHead(ICONS.flame, title, right);
   if (!c) {
     setHtml(el, `${head('')}
       <div class="me-row"><div class="me-flame">${ICONS.gratter}</div><div><div class="me-name">${t().notLit}</div><div class="me-sub">${t().noneText}</div></div></div>
-      <div class="row-btns" style="margin-top:14px"><button class="link-btn" data-open="recover">${t().haveOne}</button></div>`);
+      <ol class="mini-steps">${t().miniSteps.map(([b, x]) => `<li><b>${b}</b><span>${x}</span></li>`).join('')}</ol>
+      <div class="row-btns vital-foot"><button class="link-btn" data-open="recover">${t().haveOne}</button></div>`);
     return;
   }
-  const identity = `<div class="me-row"><div class="me-flame">${ICONS.flame}</div><div><div class="me-name">${esc(fullName(c))}</div>
+  // Sur une page de profil, le nom est déjà en grand dans l'en-tête.
+  const identity = viewingId ? '' : `<div class="me-row"><div class="me-flame">${ICONS.flame}</div><div><div class="me-name">${esc(fullName(c))}</div>
     <div class="me-sub">${c.alive ? `${stageName(c.stage)} · ${t().age} ${dur(c.ageMs)}` : t().deadAfter(dur(c.ageMs))}</div></div></div>`;
   if (!c.alive) {
     setHtml(el, `${head(`#${c.id}`)}${identity}
@@ -266,7 +388,7 @@ function drawVitals() {
         <div><span>${t().feedsTitle}</span><b>${c.feeds}</b></div>
         <div><span>${t().genTitle}</span><b>${ROMAN[c.gen] || c.gen}</b></div>
       </div>
-      ${lookHtml(c.look, c)}`);
+      ${viewingId ? '' : lookHtml(c.look, c)}`);
     return;
   }
   const scared = mood() === 'panique' || mood() === 'stress';
@@ -281,7 +403,7 @@ function drawVitals() {
       <div><span>${t().growthTitle}</span><b class="${c.boost > 1 ? 'up' : ''}">×${fmtBoost(c.boost)}</b></div>
       <div><span>${t().feedsTitle}</span><b>${c.feeds}</b></div>
     </div>
-    ${lookHtml(c.look, c)}`);
+    ${viewingId ? '' : lookHtml(c.look, c)}`);
 }
 
 const fmtBoost = (b) => String(b);
@@ -315,7 +437,7 @@ function drawEvolution() {
     frac = (c.ageMs - from) / (c.ageMs + c.nextStage.inMs - from);
   } else { label = t().finalForm; frac = 1; }
   setHtml($('evolution'), `
-    <header class="panel-head"><span class="mono-label"><em>02</em>${t().pEvo}</span><span class="muted">${esc(label)}</span></header>
+    ${panelHead(ICONS.pulse, t().pEvo, esc(label))}
     <ol class="stepper">${STAGES.map((k, i) => `<li class="${i < idx ? 'done' : i === idx ? 'current' : ''}">
       <span class="node">${i + 1}</span>${stageName(k)}<small>${t().stageAge[k]}</small></li>`).join('')}</ol>
     <div class="bar"><div class="bar-fill" style="width:${Math.max(2, Math.min(100, frac * 100))}%"></div></div>`);
@@ -335,10 +457,9 @@ function drawPodium() {
   const mineId = data.candle?.id;
   const list = (data.oldest || []).slice(0, 5);
   setHtml($('podium'), `
-    <header class="panel-head"><span class="mono-label"><em>${data.reward ? '04' : '03'}</em>${t().pTop}</span><span class="muted">${ICONS.trophy}</span></header>
+    ${panelHead(ICONS.trophy, t().pTop, `<a class="see-all-top" href="#/leaderboard">${t().seeTop} →</a>`)}
     <div class="podium-stats"><span><i class="dot-live"></i>${t().aliveNow(num(s.alive))}</span><span class="down">${t().died24(num(s.died24h))}</span></div>
-    <div class="rank-list">${list.length ? list.map((c, i) => rankRow(c, i, mineId)).join('') : `<p class="muted">${t().emptyTop}</p>`}</div>
-    <a class="see-all" href="#/leaderboard">${t().seeTop} →</a>`);
+    <div class="rank-list">${list.length ? list.map((c, i) => rankRow(c, i, mineId)).join('') : `<p class="muted">${t().emptyTop}</p>`}</div>`);
 }
 
 // 03 · La récompense de la semaine (seulement si le dev l'a activée).
@@ -356,7 +477,7 @@ function drawReward() {
   else mine = `<div class="reward-me row"><span>${me.rewardRank ? t().rewardYouRank(me.rewardRank) : ''}</span>
     <button class="link-btn" data-open="payout">${esc(shortAddress(me.payout))} · ${t().rewardEdit}</button></div>`;
   setHtml(el, `
-    <header class="panel-head"><span class="mono-label"><em>03</em>${t().pReward}</span><span class="muted">${t().rewardNext(dur(Math.max(0, left)))}</span></header>
+    ${panelHead(ICONS.key, t().pReward, t().rewardNext(dur(Math.max(0, left))))}
     <p class="reward-line">${t().rewardLine(esc(r.share))}</p>
     ${r.pool ? `<p class="reward-pool">${t().rewardPool(esc(r.pool))}</p>` : ''}
     <div class="rank-list">${r.contenders.length ? r.contenders.map((x, i) => rankRow(x, i, c?.id)).join('') : `<p class="muted">${t().rewardEmpty}</p>`}</div>
@@ -560,6 +681,8 @@ function drawDemoBar() {
 function drawAll() {
   if (!data) return;
   drawNav();
+  drawIntro();
+  drawProfile();
   drawScene();
   drawHud();
   drawKpis();
@@ -642,7 +765,7 @@ async function loadState() {
 
 async function loadViewing() {
   const { ok, body } = await api(`/api/candle?id=${viewingId}`).catch(() => ({ ok: false, body: {} }));
-  if (ok) { viewing = body.candle; return; }
+  if (ok) { viewing = body.candle; viewingProfile = body.profile || null; return; }
   toast(t().notFound);
   location.hash = '#/';
 }
@@ -698,7 +821,7 @@ function shareText(c) {
 }
 function postOnX() {
   const c = shown();
-  if (!c) return;
+  if (!c || viewingId) return;
   window.open(`https://x.com/intent/post?text=${encodeURIComponent(shareText(c))}&url=${encodeURIComponent(shareUrl(c))}`, '_blank', 'noopener');
 }
 
@@ -714,7 +837,7 @@ let photoBlob = null;
 
 async function openPhoto() {
   const c = shown();
-  if (!c) return;
+  if (!c || viewingId) return;
   if (!scene) { postOnX(); return; }
   openModal(`<h2>${t().photoTitle}</h2><div class="photo-wait">${t().photoWait}</div>`);
   const shot = scene.capture(1080);
@@ -905,14 +1028,18 @@ function route() {
   if (nextViewing !== viewingId) {
     viewingId = nextViewing;
     viewing = null;
+    viewingProfile = null;
     flamesKey = '';
     bubbleKey = '';
+    reactionUntil = 0;
     if (viewingId && data) loadViewing().then(drawAll);
   }
   document.body.dataset.view = view;
+  document.body.classList.toggle('is-viewing', Boolean(viewingId));
   document.querySelectorAll('.view').forEach((el) => { el.hidden = el.dataset.view !== view; });
   document.querySelectorAll('[data-tab]').forEach((el) => el.classList.toggle('active', el.dataset.tab === view && !viewingId));
   scene?.setActive(view === 'home' && !document.hidden);
+  requestAnimationFrame(wakeScene);
   if (data) {
     if (view === 'home' && !viewingId) drawAll();
     if (view === 'top') drawTop();
@@ -922,7 +1049,10 @@ function route() {
   window.scrollTo({ top: 0 });
 }
 window.addEventListener('hashchange', route);
-document.addEventListener('visibilitychange', () => scene?.setActive(view === 'home' && !document.hidden));
+document.addEventListener('visibilitychange', () => {
+  scene?.setActive(view === 'home' && !document.hidden);
+  if (!document.hidden) requestAnimationFrame(wakeScene);
+});
 
 // ------------------------------------------------------------ clics
 document.addEventListener('click', async (e) => {
@@ -972,13 +1102,15 @@ document.addEventListener('keydown', (e) => {
 
 // ------------------------------------------------------------ démarrage
 document.querySelectorAll('#tabbar [data-ico]').forEach((a) => a.insertAdjacentHTML('afterbegin', ICONS[a.dataset.ico]));
+$('feed-title').insertAdjacentHTML('afterbegin', ICONS.pulse);
+startEmbers($('embers'));
 applyStaticTexts();
 route();
 loadState().then(loadThought);
 // En démo, tout va plus vite : on rafraîchit chaque seconde.
 setInterval(() => { if (!document.hidden) loadState(); }, demo ? 1000 : 15_000);
 setInterval(() => { if (!document.hidden) loadThought(); }, demo ? 20_000 : 90_000);
-setInterval(() => { if (data && view === 'home') { drawActions(); drawReward(); showLine(); } }, 1000);
+setInterval(() => { if (data && view === 'home') { drawActions(); drawReward(); drawIntro(); showLine(); } }, 1000);
 
 // Pour le développement local : accès à la scène depuis la console.
 window.WICK = { get scene() { return scene; }, get data() { return data; } };

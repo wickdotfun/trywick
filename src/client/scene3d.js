@@ -864,9 +864,15 @@ export function createScene(container, { onPoke } = {}) {
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
 
+  // Taille réelle du dessin. On la revérifie à chaque image : quand la page était
+  // cachée (autre onglet du site), la scène mesurait 0 et restait sinon toute petite.
+  let sizeW = 0;
+  let sizeH = 0;
   function resize() {
     const w = container.clientWidth || 1;
     const h = container.clientHeight || 1;
+    sizeW = container.clientWidth;
+    sizeH = container.clientHeight;
     renderer.setSize(w, h, false);
     composer.setSize(w, h);
     bloom.resolution.set(w / 2, h / 2);
@@ -878,6 +884,15 @@ export function createScene(container, { onPoke } = {}) {
   const ro = new ResizeObserver(resize);
   ro.observe(container);
   resize();
+
+  // Le navigateur peut reprendre la carte graphique (onglet en arrière-plan, autre
+  // vidéo…). Au retour, on recrée les images intermédiaires et l'éclairage d'ambiance.
+  function rebuildTargets() {
+    composer.setSize(1, 1);
+    resize();
+    scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+  }
+  renderer.domElement.addEventListener('webglcontextrestored', rebuildTargets);
 
   function onMove(e) {
     const r = container.getBoundingClientRect();
@@ -903,6 +918,7 @@ export function createScene(container, { onPoke } = {}) {
   function frame() {
     raf = requestAnimationFrame(frame);
     if (!running) return;
+    if (container.clientWidth && (container.clientWidth !== sizeW || container.clientHeight !== sizeH)) resize();
     const dt = Math.min(clock.getDelta(), 0.05);
     const t = clock.elapsedTime;
 
@@ -1158,6 +1174,9 @@ export function createScene(container, { onPoke } = {}) {
     setFlammeches,
     onFrame(cb) { onFrameCb = cb; },
     setActive(v) { running = v; if (v) clock.getDelta(); },
+    // Vrai si le navigateur a repris la carte graphique et ne l'a pas encore rendue.
+    isLost() { return renderer.getContext().isContextLost(); },
+    refresh() { resize(); },
     dispose() {
       cancelAnimationFrame(raf);
       ro.disconnect();

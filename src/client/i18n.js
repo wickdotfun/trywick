@@ -41,7 +41,7 @@ export const T = {
   poke: ['Hey! That tickles!', 'Easy, I\'m made of wax!', 'Yes yes, I see you.', 'One more time and I melt.', 'Want a picture?', 'Hands off the wick!'],
 
   // Your candle
-  pMine: 'Your candle', pVitals: 'Vitals',
+  pMine: 'Your candle', pVitals: 'Vitals', journey: 'Journey to the torch', ofTorch: (p) => `${p}% of the way`,
   wax: 'wax', age: 'age', lived: 'lived', burnout: 'burnout', meltTitle: 'melt', growthTitle: 'growth', feedsTitle: 'meals', genTitle: 'generation',
   melt: (n) => `-${n} / h`,
   noneText: 'You don\'t have a candle yet. Strike the match: it\'s born with 70 wax and its own look, and keeping it alive is up to you.',
@@ -135,7 +135,7 @@ export const T = {
     chapter: (n) => `Chapter ${n}`, reward: (h) => `+${h}h growth`,
     locked: 'Finish the quest before to unlock this one.', done: 'Done',
     needCandle: 'Light your candle to start the quests.', needCandleBtn: 'Go to my candle',
-    step1: 'Post your code on X', step2: 'Paste the link of your post', stepReply: 'Reply to the post with your code',
+    step1: 'Share on X that you just claimed it', step2: 'Paste the link of your post', stepReply: 'Reply to the post with your code',
     claimTweet: (code, site) => `Claiming my candle on WICK 🕯️\n\n${code}\n\n@trywickdotfun\n\n${site}`,
     stepAnnounce: 'Reply under the announcement with your code',
     photo1: 'Save the photo of your candle', photo2: 'Post it on X with this text', photo3: 'Paste the link of your post',
@@ -149,7 +149,7 @@ export const T = {
     honorNote: 'We can\'t check this one for free: honor system.',
     xNote: 'Checked for free with X\'s public embed. Your post must stay public.',
     claimNote: 'One X account can only claim one candle.',
-    next: 'Next quest', ready: 'ready', allDone: 'All quests done. New ones are coming, follow the X account.',
+    next: 'Next quest', ready: 'ready', nextMeal: 'next meal', now: 'now', allDone: 'All quests done. New ones are coming, follow the X account.',
     errors: {
       bad_url: 'That is not a link to a post on X.', post_not_found: 'Post not found. Is it public?',
       code_missing: 'Your code is not in this post.', handle_taken: 'This X account already claimed another candle.',

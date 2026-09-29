@@ -258,12 +258,25 @@ function drawProfile() {
         <p class="eyebrow">${t().pf.eyebrow(c.id)}</p>
         <h1>${esc(c.name)}${c.gen > 1 ? ` <small>${ROMAN[c.gen] || c.gen}</small>` : ''}</h1>
         <div class="pf-badges">${badges}</div>
-        <div class="pf-look">${traitList(c.look).map((x) => `<span class="trait">${esc(x)}</span>`).join('')}</div>
+        <div class="pf-look">${traitList(c.look).map((x, i) => `<span class="trait">${i < 2 ? `<i style="background:${esc(i ? c.look.flame.color : c.look.wax.color)}"></i>` : ''}${esc(x)}</span>`).join('')}</div>
       </div>
       <div class="pf-cta">${cta}</div>
     </div>
-    <dl class="pf-tiles">${tiles.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>`);
+    <dl class="pf-tiles">${tiles.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
+    ${journey(c)}`);
   drawStory(c, p.story || []);
+}
+
+// Le chemin vers la torche : la croissance de la bougie, avec ses 4 formes jalonnées.
+function journey(c) {
+  const end = CONFIG.stages.at(-1).age;
+  const pct = Math.min(100, Math.round(((c.growthMs ?? 0) / end) * 100));
+  const marks = CONFIG.stages.map((st) => {
+    const at = (st.age / end) * 100;
+    return `<i class="${(c.growthMs ?? 0) >= st.age ? 'on' : ''}" style="left:${at}%"><em>${stageName(st.key)}</em></i>`;
+  }).join('');
+  return `<div class="pf-journey"><div class="pj-head"><span class="mono-label">${t().journey}</span><b>${t().ofTorch(pct)}</b></div>
+    <div class="pj-track"><div class="pj-fill" style="width:${pct}%"></div>${marks}</div></div>`;
 }
 
 function storyText(e) {
@@ -396,10 +409,15 @@ function drawVitals() {
   }
   const scared = mood() === 'panique' || mood() === 'stress';
   const hint = c.hungry ? t().hintHungry : c.boost > 1 ? t().hintBoost(fmtBoost(c.boost)) : scared ? t().hintScared : t().hintLit(dur(c.burnoutMs));
+  const meal = viewingId ? null : remaining('nourrir');
+  const facts = [
+    [t().burnout, `≈ ${dur(c.burnoutMs)}`],
+    viewingId ? [t().pf.meals, num(c.feeds)] : [t().q.nextMeal, meal > 0 ? dur(meal) : `<em class="now">${t().q.now}</em>`],
+    [t().pEvo, stageName(c.stage)],
+  ];
   setHtml(el, `${head(`#${c.id}`)}${identity}
-    <div class="vital-row" style="margin-top:16px"><div class="vital-big">${Math.round(c.wax)}<small>/ ${c.waxMax} ${t().wax}</small></div>
-      <div class="vital-side">${t().burnout}<b>≈ ${dur(c.burnoutMs)}</b></div></div>
-    <div class="segs">${segments(c.wax / c.waxMax)}</div>
+    <div class="vital-ring-row">${waxRing(c.wax / c.waxMax, Math.round(c.wax), c.hungry)}
+      <dl class="vital-facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl></div>
     <p class="vital-hint${c.hungry ? ' alert' : c.boost > 1 ? ' boost' : ''}">${hint}</p>
     <div class="vital-grid">
       <div><span>${t().meltTitle}</span><b>${t().melt(c.decayPerHour)}</b></div>
@@ -410,6 +428,23 @@ function drawVitals() {
 }
 
 const fmtBoost = (b) => String(b);
+
+// La jauge de cire : un anneau ambré, avec 40 graduations autour, comme un cadran.
+function waxRing(frac, value, alert) {
+  const f = Math.max(0, Math.min(1, frac));
+  const C = 2 * Math.PI * 50;
+  const ticks = Array.from({ length: 40 }, (_, i) => {
+    const a = (i / 40) * Math.PI * 2 - Math.PI / 2;
+    const on = i / 40 < f;
+    return `<line x1="${64 + Math.cos(a) * 60}" y1="${64 + Math.sin(a) * 60}" x2="${64 + Math.cos(a) * (i % 5 ? 57 : 55)}" y2="${64 + Math.sin(a) * (i % 5 ? 57 : 55)}" class="${on ? 'on' : ''}"/>`;
+  }).join('');
+  return `<div class="wax-ring${alert ? ' alert' : ''}"><svg viewBox="0 0 128 128" aria-hidden="true">
+    <defs><linearGradient id="wax-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe09a"/><stop offset=".45" stop-color="#ffa033"/><stop offset="1" stop-color="#e8600c"/></linearGradient></defs>
+    <g class="ticks">${ticks}</g>
+    <circle class="trk" cx="64" cy="64" r="50"/>
+    <circle class="val" cx="64" cy="64" r="50" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C * (1 - f)).toFixed(1)}"/>
+  </svg><div class="wr-in"><b>${value}</b><small>/ 100 ${t().wax}</small></div></div>`;
+}
 
 // Le look unique d'une bougie : sa rareté et ses 4 traits.
 function traitList(look) {

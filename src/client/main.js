@@ -595,6 +595,8 @@ function rewardCard() {
 // ------------------------------------------------------------ rendu : quêtes
 const hours = (ms) => Math.round(ms / 3_600_000);
 const xIntent = (text, replyTo) => `https://x.com/intent/tweet?${replyTo ? `in_reply_to=${replyTo}&` : ''}text=${encodeURIComponent(text)}`;
+// L'adresse du site telle qu'on l'écrit dans un post : « trywick.fun » (sans www).
+const siteName = () => location.hostname.replace(/^www\./, '');
 const statusId = (url) => String(url || '').match(/status(?:es)?\/(\d+)/)?.[1] || null;
 
 // Le rappel sous le titre de l'accueil, et le point sur l'onglet quand une récompense attend.
@@ -622,10 +624,27 @@ function questActions(q, qd) {
     <div class="q-verify"><input class="field" id="q-url-${q.id}" placeholder="${tq.paste}" autocomplete="off" autocapitalize="off" spellcheck="false">
     <button class="btn primary" data-quest="verify" data-q="${q.id}">${tq.verify}</button></div>${msg}`;
   if (q.kind === 'x_claim') {
-    return `<div class="q-step"><span class="q-num">1</span><span>${tq.step1}</span></div>
+    // Avec le post d'annonce : on répond dessous. Sinon : un post libre avec son code.
+    const reply = statusId(q.url);
+    return `<div class="q-step"><span class="q-num">1</span><span>${reply ? tq.stepAnnounce : tq.step1}</span></div>
       <div class="q-code-row"><code class="q-code">${esc(qd.code)}</code>
-      <a class="btn" href="${xIntent(tq.claimTweet(qd.code, location.host))}" target="_blank" rel="noopener">${ICONS.x}${tq.postOnX}</a></div>
-      ${paste(tq.step2)}<p class="q-note">${tq.claimNote} ${tq.xNote}</p>`;
+      ${reply ? `<a class="btn" href="${esc(q.url)}" target="_blank" rel="noopener">${tq.openPost}${ICONS.arrow}</a>` : ''}
+      <a class="btn" href="${xIntent(reply ? t().rp.replyText(qd.code) : tq.claimTweet(qd.code, siteName()), reply)}" target="_blank" rel="noopener">${ICONS.x}${reply ? tq.replyOnX : tq.postOnX}</a></div>
+      ${paste(tq.step2)}<p class="q-note">${tq.claimNote}</p>`;
+  }
+  if (q.kind === 'x_photo') {
+    // La dernière du premier jour : la photo de sa bougie, avec le texte exact.
+    const text = tq.claimTweet(qd.code, siteName());
+    return `<div class="q-step"><span class="q-num">1</span><span>${tq.photo1}</span></div>
+      <div class="q-row"><button class="btn" data-action="photo">${ICONS.photo}${tq.takePhoto}</button></div>
+      <div class="q-step"><span class="q-num">2</span><span>${tq.photo2}</span></div>
+      <pre class="q-text">${esc(text)}</pre>
+      <div class="q-row"><button class="btn" data-copy="${esc(text)}">${ICONS.copy}${t().copy}</button>
+        <a class="btn" href="${xIntent(text)}" target="_blank" rel="noopener">${ICONS.x}${tq.postOnX}</a></div>
+      <div class="q-step"><span class="q-num">3</span><span>${tq.photo3}</span></div>
+      <div class="q-verify"><input class="field" id="q-url-${q.id}" placeholder="${tq.paste}" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button class="btn primary" data-quest="verify" data-q="${q.id}">${tq.verify}</button></div>${msg}
+      <p class="q-note">${tq.photoNote}</p>`;
   }
   if (q.kind === 'x_post') {
     const reply = statusId(q.url);
@@ -666,7 +685,7 @@ function drawQuests() {
     </div>`;
   const need = qd.needCandle ? `<div class="card q-need">${ICONS.flame}<span>${tq.needCandle}</span><a class="btn primary" href="#/">${tq.needCandleBtn}</a></div>` : '';
   const chapters = [...new Set(list.map((q) => q.chapter))];
-  const body = chapters.map((ch) => `<h2 class="section-title">${tq.chapter(ch)}</h2>
+  const body = chapters.map((ch) => `<h2 class="section-title">${tq.chapters[ch] || tq.chapter(ch)}</h2>
     <div class="q-list">${list.filter((q) => q.chapter === ch).map((q) => {
       const icon = q.status === 'done' ? ICONS.check : q.status === 'locked' ? ICONS.lock : q.kind.startsWith('x_') ? ICONS.x : q.kind === 'game' ? ICONS.flame : ICONS.quest;
       const open = q.status === 'current' && !qd.needCandle;
@@ -697,7 +716,11 @@ function tickQuests() {
 async function questAct(kind, id, el) {
   const tq = t().q;
   const msg = $(`q-msg-${id}`);
-  const say2 = (text, cls = 'bad') => { if (msg) { msg.className = `q-msg ${cls}`; msg.textContent = text; } };
+  const say2 = (text, cls = 'bad', why = '') => {
+    if (!msg) return;
+    msg.className = `q-msg ${cls}`;
+    msg.innerHTML = `${esc(text)}${why ? `<small class="why">${esc(why)}</small>` : ''}`;
+  };
   if (kind === 'start') {
     // Le lien s'ouvre dans un nouvel onglet ; on note l'heure côté serveur.
     const { ok, body } = await api('/api/quest', { method: 'POST', body: { id, step: 'start' } }).catch(() => ({ ok: false, body: {} }));
@@ -721,7 +744,7 @@ async function questAct(kind, id, el) {
   if (!ok) {
     el.disabled = false;
     if (kind === 'verify') el.textContent = tq.verify;
-    say2(tq.errors[body.error] || t().error);
+    say2(tq.errors[body.error] || t().error, 'bad', body.why);
     return;
   }
   accept(body);
@@ -925,17 +948,17 @@ async function loadThought() {
 // ------------------------------------------------------------ gestes
 // Allumer : la toute première fois, on choisit d'abord son pseudo (étape 1),
 // puis on garde sa phrase de flamme (étape 2). Ensuite, on ranime sa bougie directement.
-async function light(name = null) {
+// Renvoie null si la bougie est née, sinon { error, why } (affiché dans la fenêtre en cours).
+async function light(name = null, url = null) {
   if (viewingId) location.hash = '#/';
   document.querySelectorAll('[data-action]').forEach((b) => { b.disabled = true; });
   scene?.react('gratter');
-  const { ok, body } = await api('/api/light', { method: 'POST', body: { lang, ...(name ? { name } : {}) } }).catch(() => ({ ok: false, body: {} }));
+  const { ok, body } = await api('/api/light', { method: 'POST', body: { lang, ...(name ? { name } : {}), ...(url ? { url } : {}) } })
+    .catch(() => ({ ok: false, body: {} }));
   if (!ok) {
     drawActions();
-    if (body.error === 'name_taken' || body.error === 'bad_name') return body.error;
-    say(body.line || t().error);
-    reactionUntil = Date.now() + 6000;
-    return body.error || 'error';
+    if (!modal.open) { say(body.line || t().error); reactionUntil = Date.now() + 6000; }
+    return { error: body.error || 'error', why: body.why, line: body.line };
   }
   if (body.welcome) {
     if (demo) demoPhrase = body.welcome.phrase;
@@ -956,11 +979,14 @@ async function light(name = null) {
 }
 
 // Étape 1 : choisir son pseudo. Il est vérifié pendant la frappe (libre ? valide ?).
-function openNamePicker() {
+const gated = () => Boolean(data?.token?.announcement);
+const steps = () => (gated() ? 3 : 2);
+
+function openNamePicker(prefill = '') {
   const np = t().np;
   openModal(`
     <div class="np">
-      <p class="eyebrow step-tag">${np.step(1, 2)}</p>
+      <p class="eyebrow step-tag">${np.step(1, steps())}</p>
       <h2>${np.title}</h2>
       <p>${np.text}</p>
       <label class="np-field" for="np-input">
@@ -969,7 +995,7 @@ function openNamePicker() {
         <button type="button" class="np-dice" id="np-dice" title="${np.random}" aria-label="${np.random}">${ICONS.dice}</button>
       </label>
       <p class="np-status" id="np-status">${np.rules}</p>
-      <button class="btn primary np-go" id="np-go" disabled>${ICONS.gratter}${np.go}</button>
+      <button class="btn primary np-go" id="np-go" disabled>${gated() ? `${np.next}${ICONS.arrow}` : `${ICONS.gratter}${np.go}`}</button>
       <button class="link-btn np-skip" id="np-skip">${np.skip}</button>
     </div>`);
   const input = $('np-input');
@@ -977,6 +1003,7 @@ function openNamePicker() {
   const go = $('np-go');
   let seq = 0;
   let free = null;
+  let code = null;
   const show = (text, cls = '') => { status.className = `np-status ${cls}`; status.innerHTML = text; };
   async function check() {
     const v = input.value.trim().replace(/^@/, '');
@@ -991,7 +1018,7 @@ function openNamePicker() {
     if (mine !== seq) return;
     if (body.error) show(np.errors[body.error] || t().error, 'bad');
     else if (!body.available) show(`${ICONS.lock}${esc(np.taken(body.name))}`, 'bad');
-    else { free = body.name; go.disabled = false; show(`${ICONS.check}${esc(np.free(body.name))}`, 'ok'); }
+    else { free = body.name; code = body.code; go.disabled = false; show(`${ICONS.check}${esc(np.free(body.name))}`, 'ok'); }
   }
   input.addEventListener('input', check);
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !go.disabled) go.click(); });
@@ -999,18 +1026,71 @@ function openNamePicker() {
     const { body } = await api('/api/name?random=1').catch(() => ({ body: {} }));
     if (body.name) { input.value = body.name; check(); input.focus(); }
   });
-  const start = async (name) => {
+  const start = async (name, nameCode) => {
+    // Avec le post d'annonce : étape 2, répondre sous le post. Sinon, on allume tout de suite.
+    if (gated()) {
+      if (!name) {
+        const { body } = await api('/api/name?random=1').catch(() => ({ body: {} }));
+        if (!body.name) return;
+        name = body.name;
+        nameCode = body.code;
+      }
+      openReplyStep(name, nameCode);
+      return;
+    }
     go.disabled = true;
     $('np-skip').disabled = true;
-    const err = await light(name);
-    if (err === 'name_taken') { show(`${ICONS.lock}${esc(np.taken(name))}`, 'bad'); $('np-skip').disabled = false; return; }
-    if (err === 'bad_name') { show(np.errors.chars, 'bad'); $('np-skip').disabled = false; return; }
-    if (err) { modal.close(); return; }
+    const res = await light(name);
+    if (res?.error === 'name_taken') { show(`${ICONS.lock}${esc(np.taken(name))}`, 'bad'); $('np-skip').disabled = false; return; }
+    if (res?.error === 'bad_name') { show(np.errors.chars, 'bad'); $('np-skip').disabled = false; return; }
     modal.close();
   };
-  go.addEventListener('click', () => { if (free) start(free); });
+  go.addEventListener('click', () => { if (free) start(free, code); });
   $('np-skip').addEventListener('click', () => start(null));
+  if (prefill) { input.value = prefill; check(); }
   setTimeout(() => input.focus(), 60);
+}
+
+// Étape 2 (quand le post d'annonce existe) : répondre sous le post avec son code,
+// coller le lien de sa réponse, et la bougie naît. Le compte X est lié à la bougie.
+function openReplyStep(name, code) {
+  const rp = t().rp;
+  const ann = data.token.announcement;
+  const annId = statusId(ann);
+  openModal(`
+    <div class="np rp">
+      <p class="eyebrow step-tag">${t().np.step(2, 3)}</p>
+      <h2>${ICONS.x}${rp.title}</h2>
+      <p>${rp.text}</p>
+      <div class="rp-code"><span class="mono-label">${rp.code} · @${esc(name)}</span><code>${esc(code)}</code>
+        <button class="btn" data-copy="${esc(code)}">${ICONS.copy}${t().copy}</button></div>
+      <div class="row-btns rp-links">
+        <a class="btn" href="${esc(ann)}" target="_blank" rel="noopener">${rp.open}${ICONS.arrow}</a>
+        <a class="btn primary" href="${xIntent(rp.replyText(code), annId)}" target="_blank" rel="noopener">${ICONS.x}${rp.reply}</a>
+      </div>
+      <p class="q-step-label">${rp.paste}</p>
+      <input class="field" id="rp-url" placeholder="${t().q.paste}" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <p class="np-status" id="rp-status"></p>
+      <button class="btn primary np-go" id="rp-go">${ICONS.gratter}${rp.go}</button>
+      <p class="q-note rp-note">${rp.note}</p>
+      <button class="link-btn np-skip" id="rp-back">${rp.back}</button>
+    </div>`);
+  const status = $('rp-status');
+  const go = $('rp-go');
+  const show = (html, cls = '') => { status.className = `np-status ${cls}`; status.innerHTML = html; };
+  $('rp-back').addEventListener('click', () => openNamePicker(name));
+  go.addEventListener('click', async () => {
+    const url = $('rp-url').value.trim();
+    if (!statusId(url)) { show(t().q.errors.bad_url, 'bad'); return; }
+    go.disabled = true;
+    show(rp.checking, 'wait');
+    const res = await light(name, url);
+    if (!res) { modal.close(); return; }
+    go.disabled = false;
+    const msg = t().q.errors[res.error] || res.line || t().error;
+    show(`${esc(msg)}${res.why ? `<small class="why">${esc(res.why)}</small>` : ''}`, 'bad');
+  });
+  setTimeout(() => $('rp-url').focus(), 60);
 }
 
 async function act(action) {
@@ -1114,7 +1194,7 @@ function openWelcome(me, phrase) {
   openModal(`
     <div class="wp">
       <div class="wp-born" style="--me:${esc(me.color)}"><span class="me-dot"></span>${esc(wp.born(me.name))}</div>
-      <p class="eyebrow step-tag">${t().np.step(2, 2)}</p>
+      <p class="eyebrow step-tag">${t().np.step(steps(), steps())}</p>
       <h2>${ICONS.key}${wp.title}</h2>
       <p>${wp.text}</p>
       ${wordsHtml(phrase)}

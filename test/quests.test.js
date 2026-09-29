@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { dayOf, nextStreak } from '../lib/candles.js';
-import { BASE_QUESTS, allQuests, hasCode, parseStatusUrl, questCode, questStates, readOembed } from '../lib/quests.js';
+import { BASE_QUESTS, allQuests, birthCode, checkPost, codesFor, hasCode, parseStatusUrl, questCode, questStates, readOembed, readSyndication } from '../lib/quests.js';
 
 test('status links from x.com and twitter.com are understood', () => {
   assert.deepEqual(parseStatusUrl('https://x.com/Akimbo365/status/1839012345678901234?s=20'), { user: 'Akimbo365', id: '1839012345678901234' });
@@ -48,7 +48,13 @@ test('quests unlock one at a time, in order', () => {
 test('game quests are ready when the goal is reached', () => {
   const quests = allQuests();
   const rows = new Map([['claim', { done_at: 1 }], ['follow', { done_at: 2 }]]);
-  const feed3 = (streak) => questStates(quests, rows, { feedStreak: streak }).find((q) => q.id === 'feed3');
+  const meal = (feeds) => questStates(quests, rows, { feeds }).find((q) => q.id === 'meal1');
+  assert.equal(meal(0).status, 'current');
+  assert.equal(meal(0).ready, false);
+  assert.equal(meal(1).ready, true);
+  const done = new Map([...rows, ['meal1', { done_at: 3 }], ['photo', { done_at: 4 }]]);
+  const feed3 = (streak) => questStates(quests, done, { feedStreak: streak }).find((q) => q.id === 'feed3');
+  assert.equal(feed3(2).status, 'current');
   assert.deepEqual(feed3(2).progress, { have: 2, goal: 3 });
   assert.equal(feed3(2).ready, false);
   assert.equal(feed3(5).ready, true);
@@ -63,7 +69,8 @@ test('extra quests from the dev come after the base ones and are sanitized', () 
     { id: 'bad', kind: 'nope' },
     { id: 'big', kind: 'honor', title: 'Big', url: 'javascript:alert(1)', rewardHours: 999 },
   ]);
-  assert.equal(q.length, BASE_QUESTS.length + 2);
+  // Sans post d'annonce, la quête « like & repost » est retirée.
+  assert.equal(q.length, BASE_QUESTS.length - 1 + 2);
   assert.equal(q.at(-2).id, 'reply1');
   assert.equal(q.at(-1).rewardMs, 48 * 3600_000);
   assert.equal(q.at(-1).url, undefined);
@@ -75,4 +82,46 @@ test('day streaks: same day counts once, a missed day resets', () => {
   assert.equal(nextStreak(d - 1, 4, d), 5);
   assert.equal(nextStreak(d - 2, 4, d), 1);
   assert.equal(nextStreak(0, 0, d), 1);
+});
+
+test('with an announcement post, day one asks to reply under it and to boost it', () => {
+  const ann = 'https://x.com/trywickdotfun/status/1840000000000000000';
+  const q = allQuests([], ann);
+  assert.deepEqual(q.filter((x) => x.chapter === 1).map((x) => x.id), ['claim', 'follow', 'meal1', 'boost', 'photo']);
+  assert.equal(q.find((x) => x.id === 'claim').url, ann);
+  assert.equal(q.find((x) => x.id === 'boost').url, ann);
+  assert.equal(q.find((x) => x.id === 'photo').kind, 'x_photo');
+  assert.ok(q.find((x) => x.id === 'photo').rewardMs < q.find((x) => x.id === 'claim').rewardMs);
+});
+
+test('syndication answers give author, text, parent post and photos', () => {
+  const p = readSyndication({
+    __typename: 'Tweet', text: '@trywickdotfun lets go WICK-AB2CD', user: { screen_name: 'Akimbo365' },
+    in_reply_to_status_id_str: '1840000000000000000', photos: [{ url: 'x' }],
+  });
+  assert.deepEqual(p, { author: 'Akimbo365', text: '@trywickdotfun lets go WICK-AB2CD', replyTo: '1840000000000000000', photos: 1 });
+  assert.equal(readSyndication({ __typename: 'TweetTombstone' }), null);
+  assert.equal(readSyndication(null), null);
+});
+
+test('post checks: code, account, reply target and photo', () => {
+  const post = { author: 'Akimbo365', text: 'hello WICK‑AB2CD\u200b!', replyTo: '111', photos: 0 };
+  const codes = ['WICK-AB2CD'];
+  assert.equal(checkPost(post, { codes }), null);
+  assert.equal(checkPost(post, { codes: ['WICK-ZZZZZ'] }), 'code_missing');
+  assert.equal(checkPost(post, { codes, handle: 'akimbo365' }), null);
+  assert.equal(checkPost(post, { codes, handle: 'someone' }), 'wrong_account');
+  assert.equal(checkPost(post, { codes, replyTo: '111' }), null);
+  assert.equal(checkPost(post, { codes, replyTo: '222' }), 'not_a_reply');
+  assert.equal(checkPost(post, { codes, photo: true }), 'no_photo');
+  assert.equal(checkPost({ ...post, photos: 2 }, { codes, photo: true }), null);
+  // oEmbed ne dit ni le post parent ni les photos : on ne peut pas refuser pour ça.
+  assert.equal(checkPost({ ...post, replyTo: null, photos: null }, { codes, replyTo: '222', photo: true }), null);
+});
+
+test('a player keeps the code of their name, and old codes still work', async () => {
+  const player = { id: 'abc123', name: 'Akimbo365' };
+  const [first, legacy] = await codesFor(player, 's');
+  assert.equal(first, await birthCode('akimbo365', 's'));
+  assert.equal(legacy, await questCode('abc123', 's'));
 });

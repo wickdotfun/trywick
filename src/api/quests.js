@@ -1,14 +1,14 @@
 // GET /api/quests : mes quêtes (faites, en cours, à venir) et mon code.
 // POST /api/quest { id, step?, url? } : faire avancer la quête en cours.
 import { json } from '../../lib/http.js';
-import { HONOR_DELAY, OFFICIAL_X, fetchPost, hasCode, questCode } from '../../lib/quests.js';
+import { HONOR_DELAY, OFFICIAL_X, checkPost, codesFor, fetchPost, parseStatusUrl } from '../../lib/quests.js';
 import { addEvents } from '../../lib/store.js';
 import { forgetCommunityCache, saveCandle } from '../../lib/world.js';
 import { context, loadQuests as load, snapshot } from './common.js';
 
 async function payload(env, ctx, now, states) {
   return {
-    code: ctx.player ? await questCode(ctx.player.row.id, env.IP_SALT || '') : null,
+    code: ctx.player ? (await codesFor(ctx.player.row, env.IP_SALT || ''))[0] : null,
     x: ctx.player?.view.x ?? null,
     official: OFFICIAL_X,
     needCandle: !ctx.candle || Boolean(ctx.candle.diedAt),
@@ -24,7 +24,8 @@ export async function onRequestGet({ request, env }) {
   return json(await payload(env, ctx, now, states));
 }
 
-const fail = (error, status = 409) => json({ error }, status);
+// why : un petit détail technique (ce qu'X a répondu), affiché discrètement pour comprendre un échec.
+const fail = (error, status = 409, why = undefined) => json({ error, ...(why ? { why } : {}) }, status);
 
 export async function onRequestPost({ request, env }) {
   const now = Date.now();
@@ -58,12 +59,19 @@ export async function onRequestPost({ request, env }) {
 
   if (quest.kind === 'game' && !state.ready) return fail('not_yet');
 
-  if (quest.kind === 'x_claim' || quest.kind === 'x_post') {
+  if (quest.kind.startsWith('x_')) {
     const post = await fetchPost(body.url);
-    if (post.error) return fail(post.error, post.error === 'x_unreachable' ? 502 : 400);
-    const code = await questCode(pid, env.IP_SALT || '');
-    if (!hasCode(post.text, code)) return fail('code_missing', 400);
-    if (!post.author) return fail('post_not_found', 400);
+    if (post.error) return fail(post.error, post.error === 'x_unreachable' ? 502 : 400, post.why);
+    const x = ctx.player.view.x;
+    if (quest.kind !== 'x_claim' && !x) return fail('link_first');
+    const err = checkPost(post, {
+      codes: await codesFor(ctx.player.row, env.IP_SALT || ''),
+      handle: quest.kind === 'x_claim' ? null : x,
+      // Claim : une réponse au post d'annonce. Une quête x_post avec un lien : une réponse à ce post.
+      replyTo: parseStatusUrl(quest.kind === 'x_photo' ? null : quest.url)?.id ?? null,
+      photo: quest.kind === 'x_photo',
+    });
+    if (err) return fail(err, 400, `${post.source}: @${post.author} “${post.text.slice(0, 90)}”`);
     proof = `x:${post.id}`;
     const used = await db.prepare('SELECT player_id FROM quests WHERE proof = ?').bind(proof).first();
     if (used) return fail('proof_used');
@@ -73,8 +81,6 @@ export async function onRequestPost({ request, env }) {
       await db.prepare('UPDATE players SET x_handle = ? WHERE id = ?').bind(post.author, pid).run();
       ctx.player.view.x = post.author;
       ctx.player.row.x_handle = post.author;
-    } else if (!ctx.player.view.x || ctx.player.view.x.toLowerCase() !== post.author.toLowerCase()) {
-      return fail('wrong_account', 400);
     }
   }
 

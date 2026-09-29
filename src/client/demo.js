@@ -5,7 +5,7 @@ import { advance, applyAction, candleView, cooldownsFor, moodFor, newCandle, sta
 import { CONFIG, DAY, HOUR, MINUTE } from '../../lib/config.js';
 import { LINES, idleLine, langOf, pick } from '../../lib/lines.js';
 import { COLORS, checkName, newName, newPhrase } from '../../lib/players.js';
-import { HONOR_DELAY, OFFICIAL_X, allQuests, parseStatusUrl, questStates } from '../../lib/quests.js';
+import { HONOR_DELAY, OFFICIAL_X, allQuests, birthCode, parseStatusUrl, questStates } from '../../lib/quests.js';
 import { WEEK, lastDeadline, nextDeadline, shortAddress } from '../../lib/rewards.js';
 import { traitsFor } from '../../lib/traits.js';
 
@@ -169,16 +169,19 @@ export function createDemo() {
   // Les quêtes en démo : même liste et mêmes règles, mais les posts X ne sont pas
   // vraiment vérifiés (n'importe quel lien de post valide est accepté).
   const questRows = new Map();
+  // En démo, un faux post d'annonce : n'importe quelle réponse (lien de post valide) est acceptée.
+  const ANNOUNCEMENT = 'https://x.com/trywickdotfun/status/1840000000000000000';
+  let myCode = null;
   function questData(now, mood) {
     const view = mine ? candleView(mine, now, mood) : null;
     const stats = {
       feedStreak: view?.alive ? view.feedStreak : 0, stageIndex: view?.alive ? view.stageIndex : 0,
       feeds: view?.alive ? view.feeds : 0, visitStreak: me ? 1 : 0,
     };
-    return questStates(allQuests(), questRows, stats, Date.now());
+    return questStates(allQuests([], ANNOUNCEMENT), questRows, stats, Date.now());
   }
   function questPayload(now, mood) {
-    return { code: me ? 'WICK-DEMO7' : null, x: me?.x ?? null, official: OFFICIAL_X, needCandle: !mine || Boolean(mine.diedAt), quests: questData(now, mood) };
+    return { code: me ? myCode : null, x: me?.x ?? null, official: OFFICIAL_X, needCandle: !mine || Boolean(mine.diedAt), quests: questData(now, mood) };
   }
   function questSummary(now, mood) {
     if (!me) return null;
@@ -208,7 +211,7 @@ export function createDemo() {
         change24h: Math.round(market.change24h * 10) / 10,
         priceUsd: market.priceUsd, marketCap: market.priceUsd * 1e9, volume24h: 412_000, liquidity: 38_000, url: null,
       },
-      token: { mint: null, ticker: 'WICK', x: null, telegram: null },
+      token: { mint: null, ticker: 'WICK', x: null, telegram: null, announcement: ANNOUNCEMENT },
       feed: feed.slice(0, 20),
       stats: {
         alive: alive.length,
@@ -260,7 +263,12 @@ export function createDemo() {
         const picked = body.name ? checkName(body.name) : null;
         if (picked?.error) return fail(400, { error: 'bad_name', reason: picked.error });
         if (picked && candles.some((c) => c.name.toLowerCase() === picked.name.toLowerCase())) return fail(409, { error: 'name_taken' });
-        me = { id: 'me', name: picked?.name || newName(), color: COLORS[Math.floor(Math.random() * COLORS.length)], payout: null, torches: 0 };
+        const reply = parseStatusUrl(body.url);
+        if (!picked) return fail(400, { error: 'name_required' });
+        if (!reply) return fail(400, { error: 'bad_url' });
+        myCode = await birthCode(picked.name);
+        questRows.set('claim', { done_at: Date.now() });
+        me = { x: reply.user, id: 'me', name: picked?.name || newName(), color: COLORS[Math.floor(Math.random() * COLORS.length)], payout: null, torches: 0 };
         welcome = { token: 'demo', phrase: newPhrase() };
       }
       const mineAll = candles.filter((c) => c.playerId === 'me');
@@ -268,6 +276,8 @@ export function createDemo() {
       // Une seule bougie par joueur : ranimée avec le même look.
       const seed = mineAll[0]?.seed ?? Math.floor(Math.random() * 2 ** 32);
       mine = { ...newCandle({ id: nextId++, playerId: 'me', name: me.name, color: me.color, gen, seed, legacy: me.torches > 0 }, now) };
+      // La réponse au post d'annonce (quête « claim ») : la bougie naît avec sa croissance en cadeau.
+      if (welcome) mine = { ...mine, growth: allQuests()[0].rewardMs };
       candles.push(mine);
       log({ at: now, kind: 'born', who: mine.name, candle: mine.id, detail: gen });
       return ok({ ...snapshot(now, mood), line: pick(LINES[lang].event[gen > 1 ? 'reborn' : 'born']), ...(welcome ? { welcome } : {}) });
@@ -285,15 +295,15 @@ export function createDemo() {
     if (url.pathname === '/api/quests') return ok(questPayload(now, mood));
     if (url.pathname === '/api/name') {
       const taken = (n) => candles.some((c) => c.name.toLowerCase() === n.toLowerCase());
-      if (url.searchParams.has('random')) { let n = newName(); while (taken(n)) n = newName(); return ok({ name: n, available: true }); }
+      if (url.searchParams.has('random')) { let n = newName(); while (taken(n)) n = newName(); return ok({ name: n, available: true, code: await birthCode(n) }); }
       const r = checkName(url.searchParams.get('n'));
-      return ok(r.error ? { error: r.error } : { name: r.name, available: !taken(r.name) });
+      return ok(r.error ? { error: r.error } : { name: r.name, available: !taken(r.name), code: await birthCode(r.name) });
     }
     if (url.pathname === '/api/quest') {
       if (!me) return fail(401, { error: 'no_player' });
       if (!mine || mine.diedAt) return fail(409, { error: 'no_candle' });
       const states = questData(now, mood);
-      const q = allQuests().find((x) => x.id === body.id);
+      const q = allQuests([], ANNOUNCEMENT).find((x) => x.id === body.id);
       const st = states.find((x) => x.id === body.id);
       if (!q) return fail(404, { error: 'unknown_quest' });
       if (st.status !== 'current') return fail(409, { error: st.status === 'done' ? 'already_done' : 'locked' });

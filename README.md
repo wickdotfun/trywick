@@ -111,6 +111,7 @@ per-IP limit, `ANTHROPIC_API_KEY=...` turns on the AI-written thought of the mom
    | `TOKEN_MINT` | the coin's mint address (candles then follow its chart instead of SOL) |
    | `TOKEN_TICKER` | defaults to `WICK` |
    | `X_URL`, `TELEGRAM_URL` | social links |
+   | `ANNOUNCEMENT_URL` | link of the official announcement post. **When set, lighting a first candle requires replying under it with your code** (the X account is linked at birth: one X account, one candle), and day one gets a "like & repost" quest |
    | `REWARD_SHARE` | share of creator fees paid out weekly, e.g. `20%`. **Without it, the reward is hidden** |
    | `REWARD_POOL` (optional) | this week's pool shown on the site, e.g. `2.5 SOL` |
    | `ADMIN_KEY` (secret) | long random password used to record payment proofs |
@@ -119,14 +120,19 @@ per-IP limit, `ANTHROPIC_API_KEY=...` turns on the AI-written thought of the mom
 
 X's API is paid, so WICK never reads follows or likes. Instead:
 
-- **X quests** give each player a code (`WICK-7F3KQ`). They post it, paste the link of their post,
-  and the Worker checks it through X's public **oEmbed** endpoint (no key, no cost): the post must
-  exist, be public and contain the code. The first one, "Claim your candle", links the X account to
-  the candle: one X account can claim only one candle.
+- **X checks** use X's public embed services (no key, no cost): first *syndication* (author,
+  text, the post it replies to, photos), then *oEmbed* as a fallback (author and text only).
+  Each player has a code (`WICK-7F3KQ`, derived from their username) that must be in the post.
+- **Birth**: with `ANNOUNCEMENT_URL` set, a new player picks a name, replies under the
+  announcement with their code (any message), pastes the link, and the candle is born with the X
+  account linked: one X account, one candle.
+- **Day one** ends with "Show your candle": post the candle's photo with the exact text shown
+  (the post must contain an image). Then "Keep it burning": streaks, forms, meals.
 - **Honor quests** (follow, like) open the link and can be confirmed a few seconds later.
 - **Game quests** are checked in the game (feeding streak, form reached, visit streak, meals).
 
-**Adding a quest** (it goes after the others; `kind` is `x_post` or `honor`):
+**Adding a quest** (it goes after the others; `kind` is `x_post`, `x_photo` or `honor`;
+an `x_post` with a `url` must be a reply to that post):
 
 ```
 curl -X POST https://<your-site>/api/admin/quest \

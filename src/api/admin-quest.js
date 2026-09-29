@@ -20,7 +20,7 @@ export async function onRequestPost({ request, env }) {
   const extra = (await getKv(env.DB, 'quests.extra')) || [];
   const rest = extra.filter((q) => q.id !== body.id);
   if (!body.remove) {
-    if (!['x_post', 'honor'].includes(body.kind)) return json({ error: 'bad_kind' }, 400);
+    if (!['x_post', 'x_photo', 'honor'].includes(body.kind)) return json({ error: 'bad_kind' }, 400);
     const q = {
       id: body.id, kind: body.kind, chapter: body.chapter, title: body.title, text: body.text,
       url: body.url, rewardHours: body.rewardHours,

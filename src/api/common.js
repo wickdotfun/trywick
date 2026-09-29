@@ -29,7 +29,7 @@ export function forgetQuestCache() { extraCache = null; }
 
 // Les quêtes d'un joueur : la liste complète et l'état de chacune.
 export async function loadQuests(env, ctx, now) {
-  const quests = allQuests(await extraQuests(env.DB, now));
+  const quests = allQuests(await extraQuests(env.DB, now), env.ANNOUNCEMENT_URL);
   const { results } = ctx.player
     ? await env.DB.prepare('SELECT quest, started_at, done_at FROM quests WHERE player_id = ?').bind(ctx.player.row.id).all()
     : { results: [] };

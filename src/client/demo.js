@@ -4,7 +4,8 @@
 import { advance, applyAction, candleView, cooldownsFor, moodFor, newCandle, stageIndexFor } from '../../lib/candles.js';
 import { CONFIG, DAY, HOUR, MINUTE } from '../../lib/config.js';
 import { LINES, idleLine, langOf, pick } from '../../lib/lines.js';
-import { COLORS, newName, newPhrase } from '../../lib/players.js';
+import { COLORS, checkName, newName, newPhrase } from '../../lib/players.js';
+import { HONOR_DELAY, OFFICIAL_X, allQuests, parseStatusUrl, questStates } from '../../lib/quests.js';
 import { WEEK, lastDeadline, nextDeadline, shortAddress } from '../../lib/rewards.js';
 import { traitsFor } from '../../lib/traits.js';
 
@@ -161,7 +162,31 @@ export function createDemo() {
       id: c.id, name: c.name, color: l.flame.color, gen: c.gen, alive: !c.diedAt,
       legacy: l.legacy, torchAt: c.torchAt ?? null,
       stage: CONFIG.stages[c.stage].key,
-      ageMs: (c.diedAt || now) - c.bornAt, wax: Math.round(c.wax), diedAt: c.diedAt,
+      ageMs: (c.diedAt || now) - c.bornAt, growthMs: Math.round(c.growth), wax: Math.round(c.wax), diedAt: c.diedAt,
+    };
+  }
+
+  // Les quêtes en démo : même liste et mêmes règles, mais les posts X ne sont pas
+  // vraiment vérifiés (n'importe quel lien de post valide est accepté).
+  const questRows = new Map();
+  function questData(now, mood) {
+    const view = mine ? candleView(mine, now, mood) : null;
+    const stats = {
+      feedStreak: view?.alive ? view.feedStreak : 0, stageIndex: view?.alive ? view.stageIndex : 0,
+      feeds: view?.alive ? view.feeds : 0, visitStreak: me ? 1 : 0,
+    };
+    return questStates(allQuests(), questRows, stats, Date.now());
+  }
+  function questPayload(now, mood) {
+    return { code: me ? 'WICK-DEMO7' : null, x: me?.x ?? null, official: OFFICIAL_X, needCandle: !mine || Boolean(mine.diedAt), quests: questData(now, mood) };
+  }
+  function questSummary(now, mood) {
+    if (!me) return null;
+    const states = questData(now, mood);
+    const cur = states.find((q) => q.status === 'current');
+    return {
+      done: states.filter((q) => q.status === 'done').length, total: states.length,
+      current: cur ? { id: cur.id, title: cur.title, rewardMs: cur.rewardMs, ready: Boolean(cur.ready) } : null,
     };
   }
 
@@ -193,6 +218,8 @@ export function createDemo() {
         hungry: alive.filter((c) => c.wax < CONFIG.hungryBelow).length,
       },
       oldest: byAge.slice(0, 20).map((c) => listItem(c, now)),
+      tallest: [...alive].sort((a, b) => b.growth - a.growth).slice(0, 20).map((c) => listItem(c, now)),
+      quests: questSummary(now, mood),
       graveyard: dead.slice(0, 12).map((c) => listItem(c, now)),
       record: record ? listItem(record, now) : null,
       around: alive.slice(-60).map((c) => ({ id: String(c.id), color: look(c).flame.color, level: c.stage + 1 })),
@@ -223,18 +250,24 @@ export function createDemo() {
       if (!c) return fail(404, { error: 'not_found' });
       const rank = c.diedAt ? null : candles.filter((x) => !x.diedAt && x.bornAt < c.bornAt).length + 1;
       const story = feed.filter((e) => e.candle === c.id).slice(0, 12);
-      return ok({ candle: candleView(c, now, mood), profile: { rank, torches: c.torchAt ? 1 : 0, lit: c.gen, story } });
+      return ok({ candle: candleView(c, now, mood), profile: { rank, torches: c.torchAt ? 1 : 0, lit: c.gen, story, x: c.playerId === 'me' ? me?.x ?? null : null } });
     }
 
     if (url.pathname === '/api/light') {
       if (mine && !mine.diedAt) return fail(409, { error: 'already_lit' });
       let welcome = null;
       if (!me) {
-        me = { id: 'me', name: newName(), color: COLORS[Math.floor(Math.random() * COLORS.length)], payout: null, torches: 0 };
+        const picked = body.name ? checkName(body.name) : null;
+        if (picked?.error) return fail(400, { error: 'bad_name', reason: picked.error });
+        if (picked && candles.some((c) => c.name.toLowerCase() === picked.name.toLowerCase())) return fail(409, { error: 'name_taken' });
+        me = { id: 'me', name: picked?.name || newName(), color: COLORS[Math.floor(Math.random() * COLORS.length)], payout: null, torches: 0 };
         welcome = { token: 'demo', phrase: newPhrase() };
       }
-      const gen = candles.filter((c) => c.playerId === 'me').length + 1;
-      mine = { ...newCandle({ id: nextId++, playerId: 'me', name: me.name, color: me.color, gen, seed: Math.floor(Math.random() * 2 ** 32), legacy: me.torches > 0 }, now) };
+      const mineAll = candles.filter((c) => c.playerId === 'me');
+      const gen = mineAll.length + 1;
+      // Une seule bougie par joueur : ranimée avec le même look.
+      const seed = mineAll[0]?.seed ?? Math.floor(Math.random() * 2 ** 32);
+      mine = { ...newCandle({ id: nextId++, playerId: 'me', name: me.name, color: me.color, gen, seed, legacy: me.torches > 0 }, now) };
       candles.push(mine);
       log({ at: now, kind: 'born', who: mine.name, candle: mine.id, detail: gen });
       return ok({ ...snapshot(now, mood), line: pick(LINES[lang].event[gen > 1 ? 'reborn' : 'born']), ...(welcome ? { welcome } : {}) });
@@ -248,6 +281,39 @@ export function createDemo() {
       candles[i] = mine;
       log({ at: now, kind: body.action, who: mine.name, candle: mine.id });
       return ok({ ok: true, line: pick(LINES[lang].act[body.action]), ...snapshot(now, mood) });
+    }
+    if (url.pathname === '/api/quests') return ok(questPayload(now, mood));
+    if (url.pathname === '/api/name') {
+      const taken = (n) => candles.some((c) => c.name.toLowerCase() === n.toLowerCase());
+      if (url.searchParams.has('random')) { let n = newName(); while (taken(n)) n = newName(); return ok({ name: n, available: true }); }
+      const r = checkName(url.searchParams.get('n'));
+      return ok(r.error ? { error: r.error } : { name: r.name, available: !taken(r.name) });
+    }
+    if (url.pathname === '/api/quest') {
+      if (!me) return fail(401, { error: 'no_player' });
+      if (!mine || mine.diedAt) return fail(409, { error: 'no_candle' });
+      const states = questData(now, mood);
+      const q = allQuests().find((x) => x.id === body.id);
+      const st = states.find((x) => x.id === body.id);
+      if (!q) return fail(404, { error: 'unknown_quest' });
+      if (st.status !== 'current') return fail(409, { error: st.status === 'done' ? 'already_done' : 'locked' });
+      if (q.kind === 'honor') {
+        const row = questRows.get(q.id) || {};
+        if (body.step === 'start') { questRows.set(q.id, { ...row, started_at: row.started_at ?? Date.now() }); return ok(questPayload(now, mood)); }
+        if (!row.started_at || Date.now() - row.started_at < HONOR_DELAY) return fail(409, { error: 'too_soon' });
+      }
+      if (q.kind === 'game' && !st.ready) return fail(409, { error: 'not_yet' });
+      if (q.kind === 'x_claim' || q.kind === 'x_post') {
+        const p = parseStatusUrl(body.url);
+        if (!p) return fail(400, { error: 'bad_url' });
+        if (q.kind === 'x_claim') me.x = p.user;
+      }
+      questRows.set(q.id, { ...(questRows.get(q.id) || {}), done_at: Date.now() });
+      const i = candles.indexOf(mine);
+      mine = { ...mine, growth: mine.growth + q.rewardMs };
+      candles[i] = mine;
+      log({ at: now, kind: 'quest', who: mine.name, candle: mine.id, detail: q.title });
+      return ok({ ok: true, rewardMs: q.rewardMs, ...snapshot(now, mood), questsData: questPayload(now, mood) });
     }
     if (url.pathname === '/api/payout') {
       if (!me) return fail(401, { error: 'no_player' });

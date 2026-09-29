@@ -39,10 +39,11 @@
     <a class="brand" href="#/" aria-label="WICK">
       <img class="brand-logo" src="brand/icon-192.png" alt="">
       <img class="brand-word" src="brand/wordmark.png" alt="WICK">
-      <span class="brand-tag">v0.9</span>
+      <span class="brand-tag">v1.0</span>
     </a>
     <nav class="tabs" aria-label="Sections">
       <a href="#/" data-tab="home" data-i18n="tabHome">My candle</a>
+      <a href="#/quests" data-tab="quests"><span data-i18n="tabQuests">Quests</span><i class="tab-dot" hidden></i></a>
       <a href="#/leaderboard" data-tab="top" data-i18n="tabTop">Leaderboard</a>
       <a href="#/coin" data-tab="coin"><span data-i18n="tabCoin">The coin</span> <b class="tab-ticker">$WICK</b></a>
       <a href="#/how" data-tab="how" data-i18n="tabHow">How it works</a>
@@ -70,6 +71,7 @@
           <p class="eyebrow"><i class="pulse-dot"></i><span id="intro-eyebrow"></span></p>
           <h1 id="intro-title">Adopt your <span class="grad">candle.</span></h1>
           <p class="lead" id="intro-lead"></p>
+          <a class="quest-nudge" id="quest-nudge" href="#/quests" hidden></a>
         </div>
         <dl class="kpis" id="kpis"></dl>
       </div>
@@ -123,6 +125,11 @@
       </div>
     </section>
 
+    <!-- ================= Quêtes ================= -->
+    <section class="view" data-view="quests" hidden>
+      <div class="page" id="quests-page"></div>
+    </section>
+
     <!-- ================= Classement ================= -->
     <section class="view" data-view="top" hidden>
       <div class="page" id="top-page"></div>
@@ -147,6 +154,7 @@
       </div>
       <nav class="foot-links">
         <a href="#/" data-i18n="tabHome">My candle</a>
+        <a href="#/quests" data-i18n="tabQuests">Quests</a>
         <a href="#/leaderboard" data-i18n="tabTop">Leaderboard</a>
         <a href="#/coin">$WICK</a>
         <a href="#/how" data-i18n="tabHow">How it works</a>
@@ -158,7 +166,8 @@
   <!-- Barre d'onglets en bas, sur téléphone -->
   <nav class="tabbar" aria-label="Sections" id="tabbar">
     <a href="#/" data-tab="home" data-ico="flame"><span data-i18n="tabHome">My candle</span></a>
-    <a href="#/leaderboard" data-tab="top" data-ico="trophy"><span data-i18n="tabTop">Leaderboard</span></a>
+    <a href="#/quests" data-tab="quests" data-ico="quest"><span data-i18n="tabQuests">Quests</span><i class="tab-dot" hidden></i></a>
+    <a href="#/leaderboard" data-tab="top" data-ico="trophy"><span>Top</span></a>
     <a href="#/coin" data-tab="coin" data-ico="chart"><span>$WICK</span></a>
     <a href="#/how" data-tab="how" data-ico="info"><span data-i18n="tabHowShort">Info</span></a>
   </nav>

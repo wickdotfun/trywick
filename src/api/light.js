@@ -4,7 +4,7 @@
 import { ipHash, json } from '../../lib/http.js';
 import { LINES, langOf, pick } from '../../lib/lines.js';
 import { CONFIG } from '../../lib/config.js';
-import { createPlayer } from '../../lib/players.js';
+import { checkName, createPlayer, nameTaken } from '../../lib/players.js';
 import { addEvents } from '../../lib/store.js';
 import { birthsFromIp, forgetCommunityCache, insertCandle } from '../../lib/world.js';
 import { context, snapshot } from './common.js';
@@ -25,7 +25,22 @@ export async function onRequestPost({ request, env }) {
 
   let welcome = null;
   if (!ctx.player) {
-    const created = await createPlayer(env.DB, now);
+    // Le pseudo choisi (vérifié ici aussi), sinon un pseudo libre au hasard.
+    let name = null;
+    if (body?.name) {
+      const checked = checkName(body.name);
+      if (checked.error) return json({ error: 'bad_name', reason: checked.error }, 400);
+      if (await nameTaken(env.DB, checked.name)) return json({ error: 'name_taken' }, 409);
+      name = checked.name;
+    }
+    let created;
+    try {
+      created = await createPlayer(env.DB, now, name);
+    } catch (err) {
+      // Deux visiteurs ont pris le même pseudo à la même seconde.
+      if (/UNIQUE/i.test(String(err?.message))) return json({ error: 'name_taken' }, 409);
+      throw err;
+    }
     ctx.player = created;
     welcome = { token: created.token, phrase: created.phrase };
   }

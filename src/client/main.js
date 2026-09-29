@@ -38,6 +38,7 @@ let cooldownsAt = 0;
 let viewingId = null;     // #/b/12 : on regarde la bougie de quelqu'un d'autre
 let viewing = null;
 let viewingProfile = null; // rang, torches du joueur, histoire de la bougie regardée
+let questsData = null;     // GET /api/quests : mon code, mon compte X, mes quêtes
 let thought = null;
 let reactionUntil = 0;
 let bubbleKey = '';
@@ -236,6 +237,7 @@ function drawProfile() {
     p.rank ? `<span class="pf-badge gold">${ICONS.trophy}${t().pf.rank(p.rank)}</span>` : '',
     c.torchAt ? `<span class="pf-badge gold">${ICONS.trophy}${t().hallBadge}</span>` : '',
     c.look.legacy ? `<span class="pf-badge gold">${ICONS.flame}${t().eternalBadge}</span>` : '',
+    p.x ? `<a class="pf-badge x" href="https://x.com/${encodeURIComponent(p.x)}" target="_blank" rel="noopener">${ICONS.x}@${esc(p.x)}</a>` : '',
   ].join('');
   const born = new Date(c.bornAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const tiles = [
@@ -270,13 +272,14 @@ function storyText(e) {
   if (e.kind === 'evolved') return ev.evolved(stageName(e.detail));
   if (e.kind === 'died') return ev.died(dur(Number(e.detail)));
   if (e.kind === 'reward') return ev.reward(e.detail);
+  if (e.kind === 'quest') return ev.quest(e.detail);
   return ev[e.kind] || e.kind;
 }
 
 function drawStory(c, story) {
   const el = $('story');
   el.hidden = false;
-  const icon = { born: ICONS.gratter, nourrir: ICONS.nourrir, evolved: ICONS.pulse, died: ICONS.skull, reward: ICONS.trophy };
+  const icon = { born: ICONS.gratter, nourrir: ICONS.nourrir, evolved: ICONS.pulse, died: ICONS.skull, reward: ICONS.trophy, quest: ICONS.quest };
   const now = data.now + (Date.now() - cooldownsAt) * timeScale();
   const rows = story.length
     ? story.map((e) => `<li class="ev-${e.kind}"><span class="st-ico">${icon[e.kind] || ICONS.flame}</span>
@@ -443,13 +446,13 @@ function drawEvolution() {
     <div class="bar"><div class="bar-fill" style="width:${Math.max(2, Math.min(100, frac * 100))}%"></div></div>`);
 }
 
-function rankRow(c, i, mineId) {
+function rankRow(c, i, mineId, value = (x) => dur(x.ageMs)) {
   return `<a class="rank-row${c.id === mineId ? ' mine' : ''}${c.alive ? '' : ' dead'}" href="#/b/${c.id}">
     <span class="rank">${String(i + 1).padStart(2, '0')}</span>
     <span class="rank-dot" style="background:${esc(c.color)}"></span>
     <span class="rank-name"><span>${esc(fullName(c))}</span>${c.torchAt ? `<i class="rank-hof" title="${t().hallBadge}">${ICONS.trophy}</i>` : ''}${c.id === mineId ? `<em>${t().you}</em>` : ''}</span>
     <span class="rank-stage">${stageName(c.stage)}</span>
-    <span class="rank-age">${dur(c.ageMs)}</span></a>`;
+    <span class="rank-age">${value(c)}</span></a>`;
 }
 
 function drawPodium() {
@@ -491,6 +494,7 @@ function feedText(e) {
   if (e.kind === 'born') return `★ ${f.born(who, Number(e.detail) || 1)}`;
   if (e.kind === 'evolved') return `▲ ${f.evolved(who, stageName(e.detail))}`;
   if (e.kind === 'died') return `✕ ${f.died(who, dur(Number(e.detail)))}`;
+  if (e.kind === 'quest') return `✦ ${f.quest(who, esc(e.detail))}`;
   return `${who} <span class="op">→</span> ${f[e.kind] || e.kind}`;
 }
 
@@ -505,7 +509,7 @@ function drawFeed() {
   if (!feed.length) { setHtml(el, `<li><time>--:--</time><span class="txt">${t().empty}</span></li>`); return; }
   const mineId = data.candle?.id;
   const html = feed.map((e) => {
-    const cls = [e.kind === 'died' ? 'died' : '', e.kind === 'born' || e.kind === 'evolved' ? 'big' : '', e.candle && e.candle === mineId ? 'mine' : ''].filter(Boolean).join(' ');
+    const cls = [e.kind === 'died' ? 'died' : '', e.kind === 'born' || e.kind === 'evolved' || e.kind === 'quest' ? 'big' : '', e.candle && e.candle === mineId ? 'mine' : ''].filter(Boolean).join(' ');
     return `<li class="${cls}"${e.candle ? ` data-go="${e.candle}"` : ''}><time>${clock(e.at)}</time><span class="txt">${feedText(e)}</span></li>`;
   }).join('');
   setHtml(el, html);
@@ -543,9 +547,10 @@ function setOnline(on) {
 function drawTop() {
   const mineId = data.candle?.id;
   const r = data.record;
-  const table = (list, empty) => (list.length
-    ? `<div class="rank-list big">${list.map((c, i) => rankRow(c, i, mineId)).join('')}</div>`
+  const table = (list, empty, value) => (list.length
+    ? `<div class="rank-list big">${list.map((c, i) => rankRow(c, i, mineId, value)).join('')}</div>`
     : `<p class="muted" style="padding:8px 0">${empty}</p>`);
+  const tall = (x) => `<span class="grow-val">${ICONS.pulse}${dur(x.growthMs ?? 0)}</span>`;
   setHtml($('top-page'), `
     <header class="page-head"><p class="eyebrow">${t().topEyebrow}</p><h1>${t().topTitle}</h1><p class="lead">${t().topLead}</p></header>
     ${r ? `<a class="card record-card" href="#/b/${r.id}" style="--me:${esc(r.color)}">
@@ -554,11 +559,13 @@ function drawTop() {
         <p class="muted">${stageName(r.stage)} · ${r.alive ? t().recordAlive : t().recordDead}</p></div>
       <b class="record-age">${dur(r.ageMs)}</b></a>` : ''}
     <div class="top-grid">
-      <section class="card"><header class="panel-head"><span class="mono-label"><i class="dot-live"></i>${t().aliveTitle} · ${num(data.stats.alive)}</span></header>
+      <section class="card">${panelHead(ICONS.trophy, t().oldestTitle, `<i class="dot-live"></i> ${num(data.stats.alive)} lit`)}
         ${table(data.oldest || [], t().emptyTop)}</section>
-      <section class="card"><header class="panel-head"><span class="mono-label">${ICONS.skull}${t().graveTitle} · ${num(data.stats.died24h)} / 24h</span></header>
-        ${table(data.graveyard || [], t().graveEmpty)}</section>
+      <section class="card">${panelHead(ICONS.pulse, t().tallestTitle, 'growth')}
+        ${table(data.tallest || [], t().emptyTop, tall)}</section>
     </div>
+    <h2 class="section-title">${t().graveTitle} · ${num(data.stats.died24h)} / 24h</h2>
+    <section class="card">${table(data.graveyard || [], t().graveEmpty)}</section>
     ${rewardCard()}
     <h2 class="section-title">${t().hallTitle}</h2>
     <section class="card hall"><p class="muted" style="margin:0 0 10px">${t().hallLead}</p>
@@ -583,6 +590,145 @@ function rewardCard() {
         </div>`).join('')}</div>` : ''}
       <p class="photo-tip">${t().payoutTerms}</p>
     </section>`;
+}
+
+// ------------------------------------------------------------ rendu : quêtes
+const hours = (ms) => Math.round(ms / 3_600_000);
+const xIntent = (text, replyTo) => `https://x.com/intent/tweet?${replyTo ? `in_reply_to=${replyTo}&` : ''}text=${encodeURIComponent(text)}`;
+const statusId = (url) => String(url || '').match(/status(?:es)?\/(\d+)/)?.[1] || null;
+
+// Le rappel sous le titre de l'accueil, et le point sur l'onglet quand une récompense attend.
+function drawQuestHints() {
+  const q = data?.quests;
+  const cur = q?.current;
+  const ready = Boolean(cur?.ready);
+  document.querySelectorAll('.tab-dot').forEach((d) => { d.hidden = !ready; });
+  const el = $('quest-nudge');
+  el.hidden = !cur || !data.candle?.alive;
+  if (el.hidden) return;
+  el.classList.toggle('ready', ready);
+  setHtml(el, `${ICONS.quest}<span>${t().q.next} · <b>${esc(cur.title)}</b></span><em>${ready ? t().q.ready : t().q.reward(hours(cur.rewardMs))}</em>${ICONS.arrow}`);
+}
+
+async function loadQuests() {
+  const { ok, body } = await api('/api/quests').catch(() => ({ ok: false, body: {} }));
+  if (ok) { questsData = body; drawQuests(); }
+}
+
+function questActions(q, qd) {
+  const tq = t().q;
+  const msg = `<p class="q-msg" id="q-msg-${q.id}"></p>`;
+  const paste = (label) => `<div class="q-step"><span class="q-num">2</span><span>${label}</span></div>
+    <div class="q-verify"><input class="field" id="q-url-${q.id}" placeholder="${tq.paste}" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <button class="btn primary" data-quest="verify" data-q="${q.id}">${tq.verify}</button></div>${msg}`;
+  if (q.kind === 'x_claim') {
+    return `<div class="q-step"><span class="q-num">1</span><span>${tq.step1}</span></div>
+      <div class="q-code-row"><code class="q-code">${esc(qd.code)}</code>
+      <a class="btn" href="${xIntent(tq.claimTweet(qd.code, location.host))}" target="_blank" rel="noopener">${ICONS.x}${tq.postOnX}</a></div>
+      ${paste(tq.step2)}<p class="q-note">${tq.claimNote} ${tq.xNote}</p>`;
+  }
+  if (q.kind === 'x_post') {
+    const reply = statusId(q.url);
+    return `<div class="q-step"><span class="q-num">1</span><span>${tq.stepReply}</span></div>
+      <div class="q-code-row"><code class="q-code">${esc(qd.code)}</code>
+      ${q.url ? `<a class="btn" href="${esc(q.url)}" target="_blank" rel="noopener">${tq.openPost}${ICONS.arrow}</a>` : ''}
+      <a class="btn" href="${xIntent(tq.postTweet(qd.code), reply)}" target="_blank" rel="noopener">${ICONS.x}${reply ? tq.replyOnX : tq.postOnX}</a></div>
+      ${paste(tq.step2)}<p class="q-note">${tq.xNote}</p>`;
+  }
+  if (q.kind === 'honor') {
+    const started = Boolean(q.startedAt);
+    return `<div class="q-row">
+      <a class="btn" href="${esc(q.url || '#')}" target="_blank" rel="noopener" data-quest="start" data-q="${q.id}">${tq.open}${ICONS.arrow}</a>
+      <button class="btn primary" data-quest="done" data-q="${q.id}" data-started="${q.startedAt || ''}" ${started && q.ready ? '' : 'disabled'}>
+        <span data-countdown="${q.id}">${started && !q.ready ? tq.waitFor(8) : tq.confirm}</span></button></div>
+      <p class="q-note">${tq.honorNote}</p>${msg}`;
+  }
+  const { have, goal } = q.progress || { have: 0, goal: 1 };
+  return `<div class="q-progress"><div class="bar"><div class="bar-fill" style="width:${(have / goal) * 100}%"></div></div><span>${have} / ${goal}</span></div>
+    <div class="q-row"><button class="btn primary" data-quest="claim" data-q="${q.id}" ${q.ready ? '' : 'disabled'}>${q.ready ? tq.claim : tq.notYet}</button></div>${msg}`;
+}
+
+function drawQuests() {
+  const el = $('quests-page');
+  const tq = t().q;
+  const qd = questsData;
+  const head = `<header class="page-head"><p class="eyebrow">${tq.eyebrow}</p><h1>Make it <span class="grad">grow.</span></h1><p class="lead">${tq.lead}</p></header>`;
+  if (!qd) { setHtml(el, `${head}<div class="card"><p class="muted">…</p></div>`); return; }
+  const list = qd.quests || [];
+  const done = list.filter((q) => q.status === 'done');
+  const earned = done.reduce((n, q) => n + q.rewardMs, 0);
+  const summary = `<div class="q-summary card">
+      <div><span class="mono-label">${tq.eyebrow}</span><b>${tq.doneOf(done.length, list.length)}</b>
+        <div class="bar"><div class="bar-fill" style="width:${list.length ? (done.length / list.length) * 100 : 0}%"></div></div></div>
+      <div><span class="mono-label">${tq.earned}</span><b class="up">+${hours(earned)}h</b></div>
+      <div><span class="mono-label">${tq.code}</span><b class="mono">${qd.code ? esc(qd.code) : '—'}</b></div>
+      <div><span class="mono-label">${tq.linked}</span><b>${qd.x ? `<a href="https://x.com/${encodeURIComponent(qd.x)}" target="_blank" rel="noopener">@${esc(qd.x)}</a>` : `<span class="muted">${tq.notLinked}</span>`}</b></div>
+    </div>`;
+  const need = qd.needCandle ? `<div class="card q-need">${ICONS.flame}<span>${tq.needCandle}</span><a class="btn primary" href="#/">${tq.needCandleBtn}</a></div>` : '';
+  const chapters = [...new Set(list.map((q) => q.chapter))];
+  const body = chapters.map((ch) => `<h2 class="section-title">${tq.chapter(ch)}</h2>
+    <div class="q-list">${list.filter((q) => q.chapter === ch).map((q) => {
+      const icon = q.status === 'done' ? ICONS.check : q.status === 'locked' ? ICONS.lock : q.kind.startsWith('x_') ? ICONS.x : q.kind === 'game' ? ICONS.flame : ICONS.quest;
+      const open = q.status === 'current' && !qd.needCandle;
+      return `<article class="q-card ${q.status}${open ? ' open' : ''}">
+        <div class="q-head"><span class="q-ico">${icon}</span>
+          <div class="q-title"><h3>${esc(q.title)}</h3><p>${esc(q.text)}</p></div>
+          <span class="q-reward">${q.status === 'done' ? tq.done : tq.reward(hours(q.rewardMs))}</span></div>
+        ${open ? `<div class="q-body">${questActions(q, qd)}</div>` : ''}
+      </article>`;
+    }).join('')}</div>`).join('');
+  const all = list.length && done.length === list.length ? `<p class="q-note" style="text-align:center;margin-top:18px">${tq.allDone}</p>` : '';
+  setHtml(el, head + summary + need + body + all);
+  tickQuests();
+}
+
+// Le compte à rebours des quêtes sur l'honneur, sans redessiner la page (le champ garde sa saisie).
+function tickQuests() {
+  document.querySelectorAll('[data-countdown]').forEach((span) => {
+    const btn = span.closest('button');
+    const started = Number(btn.dataset.started);
+    if (!started) return;
+    const left = Math.ceil((started + 8000 - Date.now()) / 1000);
+    btn.disabled = left > 0;
+    span.textContent = left > 0 ? t().q.waitFor(left) : t().q.confirm;
+  });
+}
+
+async function questAct(kind, id, el) {
+  const tq = t().q;
+  const msg = $(`q-msg-${id}`);
+  const say2 = (text, cls = 'bad') => { if (msg) { msg.className = `q-msg ${cls}`; msg.textContent = text; } };
+  if (kind === 'start') {
+    // Le lien s'ouvre dans un nouvel onglet ; on note l'heure côté serveur.
+    const { ok, body } = await api('/api/quest', { method: 'POST', body: { id, step: 'start' } }).catch(() => ({ ok: false, body: {} }));
+    if (ok) {
+      questsData = body;
+      const q = body.quests.find((x) => x.id === id);
+      const btn = document.querySelector(`[data-quest="done"][data-q="${id}"]`);
+      if (btn && q?.startedAt) btn.dataset.started = q.startedAt;
+      tickQuests();
+    }
+    return;
+  }
+  const payload = { id };
+  if (kind === 'verify') {
+    payload.url = $(`q-url-${id}`)?.value.trim();
+    if (!payload.url) { say2(tq.errors.bad_url); return; }
+    el.disabled = true;
+    el.textContent = tq.verifying;
+  } else el.disabled = true;
+  const { ok, body } = await api('/api/quest', { method: 'POST', body: payload }).catch(() => ({ ok: false, body: {} }));
+  if (!ok) {
+    el.disabled = false;
+    if (kind === 'verify') el.textContent = tq.verify;
+    say2(tq.errors[body.error] || t().error);
+    return;
+  }
+  accept(body);
+  questsData = body.questsData;
+  drawQuests();
+  drawAll();
+  toast(tq.gained(hours(body.rewardMs)));
 }
 
 // ------------------------------------------------------------ rendu : pages
@@ -682,6 +828,7 @@ function drawAll() {
   if (!data) return;
   drawNav();
   drawIntro();
+  drawQuestHints();
   drawProfile();
   drawScene();
   drawHud();
@@ -776,16 +923,19 @@ async function loadThought() {
 }
 
 // ------------------------------------------------------------ gestes
-async function light() {
+// Allumer : la toute première fois, on choisit d'abord son pseudo (étape 1),
+// puis on garde sa phrase de flamme (étape 2). Ensuite, on ranime sa bougie directement.
+async function light(name = null) {
   if (viewingId) location.hash = '#/';
   document.querySelectorAll('[data-action]').forEach((b) => { b.disabled = true; });
   scene?.react('gratter');
-  const { ok, body } = await api('/api/light', { method: 'POST', body: { lang } }).catch(() => ({ ok: false, body: {} }));
+  const { ok, body } = await api('/api/light', { method: 'POST', body: { lang, ...(name ? { name } : {}) } }).catch(() => ({ ok: false, body: {} }));
   if (!ok) {
+    drawActions();
+    if (body.error === 'name_taken' || body.error === 'bad_name') return body.error;
     say(body.line || t().error);
     reactionUntil = Date.now() + 6000;
-    drawActions();
-    return;
+    return body.error || 'error';
   }
   if (body.welcome) {
     if (demo) demoPhrase = body.welcome.phrase;
@@ -802,6 +952,65 @@ async function light() {
   say(body.line);
   reactionUntil = Date.now() + 8000;
   if (body.welcome) setTimeout(() => openWelcome(body.me, body.welcome.phrase), 1400);
+  return null;
+}
+
+// Étape 1 : choisir son pseudo. Il est vérifié pendant la frappe (libre ? valide ?).
+function openNamePicker() {
+  const np = t().np;
+  openModal(`
+    <div class="np">
+      <p class="eyebrow step-tag">${np.step(1, 2)}</p>
+      <h2>${np.title}</h2>
+      <p>${np.text}</p>
+      <label class="np-field" for="np-input">
+        <span class="np-at">@</span>
+        <input id="np-input" maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="yourname">
+        <button type="button" class="np-dice" id="np-dice" title="${np.random}" aria-label="${np.random}">${ICONS.dice}</button>
+      </label>
+      <p class="np-status" id="np-status">${np.rules}</p>
+      <button class="btn primary np-go" id="np-go" disabled>${ICONS.gratter}${np.go}</button>
+      <button class="link-btn np-skip" id="np-skip">${np.skip}</button>
+    </div>`);
+  const input = $('np-input');
+  const status = $('np-status');
+  const go = $('np-go');
+  let seq = 0;
+  let free = null;
+  const show = (text, cls = '') => { status.className = `np-status ${cls}`; status.innerHTML = text; };
+  async function check() {
+    const v = input.value.trim().replace(/^@/, '');
+    free = null;
+    go.disabled = true;
+    if (!v) { show(np.rules); return; }
+    const mine = ++seq;
+    show(np.checking, 'wait');
+    await new Promise((r) => setTimeout(r, 280));
+    if (mine !== seq) return;
+    const { body } = await api(`/api/name?n=${encodeURIComponent(v)}`).catch(() => ({ body: {} }));
+    if (mine !== seq) return;
+    if (body.error) show(np.errors[body.error] || t().error, 'bad');
+    else if (!body.available) show(`${ICONS.lock}${esc(np.taken(body.name))}`, 'bad');
+    else { free = body.name; go.disabled = false; show(`${ICONS.check}${esc(np.free(body.name))}`, 'ok'); }
+  }
+  input.addEventListener('input', check);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !go.disabled) go.click(); });
+  $('np-dice').addEventListener('click', async () => {
+    const { body } = await api('/api/name?random=1').catch(() => ({ body: {} }));
+    if (body.name) { input.value = body.name; check(); input.focus(); }
+  });
+  const start = async (name) => {
+    go.disabled = true;
+    $('np-skip').disabled = true;
+    const err = await light(name);
+    if (err === 'name_taken') { show(`${ICONS.lock}${esc(np.taken(name))}`, 'bad'); $('np-skip').disabled = false; return; }
+    if (err === 'bad_name') { show(np.errors.chars, 'bad'); $('np-skip').disabled = false; return; }
+    if (err) { modal.close(); return; }
+    modal.close();
+  };
+  go.addEventListener('click', () => { if (free) start(free); });
+  $('np-skip').addEventListener('click', () => start(null));
+  setTimeout(() => input.focus(), 60);
 }
 
 async function act(action) {
@@ -826,7 +1035,9 @@ function postOnX() {
 }
 
 function run(action) {
-  if (action === 'light' || action === 'relight' || action === 'adopt') return light();
+  // Pas encore de joueur : on choisit d'abord son pseudo. Sinon, on (r)allume directement.
+  if (action === 'light' || action === 'adopt') return data?.me ? light() : openNamePicker();
+  if (action === 'relight') return light();
   if (action === 'photo') return openPhoto();
   if (action === 'back') { location.hash = '#/'; return undefined; }
   return act(action);
@@ -896,19 +1107,34 @@ function openModal(html) {
 const wordsHtml = (phrase, blur = false) => `<div class="words${blur ? ' blur' : ''}" id="words">${phrase.split(' ').map((w) => `<span>${esc(w)}</span>`).join('')}</div>`;
 const myPhrase = () => (demo ? demoPhrase : store.get('wick.phrase'));
 
+// Étape 2 : la phrase de flamme. Simple : les 12 mots, copier ou télécharger,
+// et on coche « je l'ai gardée » avant de continuer.
 function openWelcome(me, phrase) {
+  const wp = t().wp;
   openModal(`
-    <div class="hello"><div class="me-flame" style="--me:${esc(me.color)}">${ICONS.flame}</div>
-      <div><p class="eyebrow">${t().welcomeEyebrow}</p><h2>${esc(me.name)}</h2></div></div>
-    <p>${t().welcomeText}</p>
-    <h3 style="margin:18px 0 4px">${ICONS.key}${t().phraseTitle}</h3>
-    <p>${t().phraseText}</p>
-    ${wordsHtml(phrase)}
-    ${WARN(t().notSeed)}
-    <div class="row-btns" style="margin-top:16px">
-      <button class="btn" data-copy-phrase>${t().copy}</button>
-      <button class="btn primary" data-close>${t().noted}</button>
+    <div class="wp">
+      <div class="wp-born" style="--me:${esc(me.color)}"><span class="me-dot"></span>${esc(wp.born(me.name))}</div>
+      <p class="eyebrow step-tag">${t().np.step(2, 2)}</p>
+      <h2>${ICONS.key}${wp.title}</h2>
+      <p>${wp.text}</p>
+      ${wordsHtml(phrase)}
+      <div class="row-btns wp-tools">
+        <button class="btn" data-copy-phrase>${ICONS.copy}${t().copy}</button>
+        <button class="btn" id="wp-dl">${ICONS.share}${wp.download}</button>
+      </div>
+      ${WARN(t().notSeed)}
+      <label class="wp-check"><input type="checkbox" id="wp-ok"><span>${wp.saved}</span></label>
+      <button class="btn primary wp-done" id="wp-done" data-close disabled>${ICONS.flame}${wp.done}</button>
     </div>`);
+  $('wp-ok').addEventListener('change', (e) => { $('wp-done').disabled = !e.target.checked; });
+  $('wp-dl').addEventListener('click', () => {
+    const url = URL.createObjectURL(new Blob([wp.file(me.name, phrase)], { type: 'text/plain' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: `wick-${me.name}-flame-phrase.txt` });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  });
 }
 
 function openMe() {
@@ -1020,7 +1246,7 @@ function openRecover() {
 }
 
 // ------------------------------------------------------------ navigation
-const ROUTES = { '': 'home', '#/': 'home', '#/leaderboard': 'top', '#/coin': 'coin', '#/how': 'how' };
+const ROUTES = { '': 'home', '#/': 'home', '#/quests': 'quests', '#/leaderboard': 'top', '#/coin': 'coin', '#/how': 'how' };
 function route() {
   const m = location.hash.match(/^#\/b\/(\d+)$/);
   const nextViewing = m ? Number(m[1]) : null;
@@ -1046,18 +1272,28 @@ function route() {
     if (view === 'coin') drawCoin();
   }
   if (view === 'how') drawHow();
+  if (view === 'quests') { drawQuests(); loadQuests(); }
   window.scrollTo({ top: 0 });
 }
 window.addEventListener('hashchange', route);
-document.addEventListener('visibilitychange', () => {
+function onShow() {
   scene?.setActive(view === 'home' && !document.hidden);
   if (!document.hidden) requestAnimationFrame(wakeScene);
-});
+}
+document.addEventListener('visibilitychange', onShow);
+window.addEventListener('focus', onShow);
+window.addEventListener('pageshow', onShow);
 
 // ------------------------------------------------------------ clics
 document.addEventListener('click', async (e) => {
-  const el = e.target.closest('[data-action],[data-open],[data-close],[data-copy],[data-copy-phrase],[data-reveal],[data-forget],[data-go],[data-speed],[data-photo],#me-btn');
+  const el = e.target.closest('[data-action],[data-open],[data-close],[data-copy],[data-copy-phrase],[data-reveal],[data-forget],[data-go],[data-speed],[data-photo],[data-quest],#me-btn');
   if (!el) return;
+  if (el.dataset.quest) {
+    // « Open » garde son lien normal (nouvel onglet) ; le reste est géré ici.
+    if (el.dataset.quest !== 'start') e.preventDefault();
+    if (!el.disabled) questAct(el.dataset.quest, el.dataset.q, el);
+    return undefined;
+  }
   if (el.dataset.photo) return photoAction(el.dataset.photo, el);
   if (el.dataset.action && !el.disabled) return run(el.dataset.action);
   if (el.dataset.go) { location.hash = `#/b/${el.dataset.go}`; return undefined; }
@@ -1110,7 +1346,10 @@ loadState().then(loadThought);
 // En démo, tout va plus vite : on rafraîchit chaque seconde.
 setInterval(() => { if (!document.hidden) loadState(); }, demo ? 1000 : 15_000);
 setInterval(() => { if (!document.hidden) loadThought(); }, demo ? 20_000 : 90_000);
-setInterval(() => { if (data && view === 'home') { drawActions(); drawReward(); drawIntro(); showLine(); } }, 1000);
+setInterval(() => {
+  if (data && view === 'home') { drawActions(); drawReward(); drawIntro(); showLine(); }
+  if (view === 'quests') tickQuests();
+}, 1000);
 
 // Pour le développement local : accès à la scène depuis la console.
 window.WICK = { get scene() { return scene; }, get data() { return data; } };

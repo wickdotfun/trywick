@@ -17,7 +17,7 @@ export async function onRequestGet({ request, env }) {
   const [rank, owner, story] = await Promise.all([
     // Sa place parmi les plus vieilles flammes encore allumées.
     candle.diedAt ? null : db.prepare('SELECT COUNT(*) AS n FROM candles WHERE died_at IS NULL AND born_at < ?').bind(candle.bornAt).first(),
-    db.prepare('SELECT p.torches AS torches, (SELECT COUNT(*) FROM candles WHERE player_id = p.id) AS lit FROM players p WHERE p.id = ?').bind(candle.playerId).first(),
+    db.prepare('SELECT p.torches AS torches, p.x_handle AS x, (SELECT COUNT(*) FROM candles WHERE player_id = p.id) AS lit FROM players p WHERE p.id = ?').bind(candle.playerId).first(),
     candleEvents(db, id),
   ]);
   return json({
@@ -26,6 +26,8 @@ export async function onRequestGet({ request, env }) {
       rank: rank ? rank.n + 1 : null,
       torches: owner?.torches ?? 0,
       lit: owner?.lit ?? 1,
+      // Le compte X lié par la quête « Claim your candle » (public, choisi par le joueur).
+      x: owner?.x ?? null,
       story,
     },
   });

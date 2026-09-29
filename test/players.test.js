@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { PHRASE_WORDS, WORDS, newName, newPhrase, normalizePhrase } from '../lib/players.js';
+import { PHRASE_WORDS, WORDS, checkName, newName, newPhrase, normalizePhrase } from '../lib/players.js';
 
 test('a new phrase has 12 words from our own list', () => {
   const words = newPhrase().split(' ');
@@ -30,6 +30,21 @@ test('wrong phrases are rejected before any lookup', () => {
   assert.equal(normalizePhrase(null), null);
 });
 
-test('flame names look right', () => {
-  assert.match(newName(), /^\S+ \S+ #\d{4}$/);
+test('random names are valid usernames', () => {
+  for (let i = 0; i < 200; i++) {
+    const n = newName();
+    assert.match(n, /^[A-Za-z]+\d{2}$/);
+    assert.deepEqual(checkName(n), { name: n });
+  }
+});
+
+test('usernames: 3-20 letters, numbers or _, no impersonation', () => {
+  assert.deepEqual(checkName('@Akimbo365'), { name: 'Akimbo365' });
+  assert.deepEqual(checkName('  cool_name  '), { name: 'cool_name' });
+  assert.equal(checkName('ab').error, 'short');
+  assert.equal(checkName('a'.repeat(21)).error, 'long');
+  assert.equal(checkName('hello world').error, 'chars');
+  assert.equal(checkName('émile').error, 'chars');
+  for (const n of ['wick', 'WICK_team', 'trywickdotfun', 'wickdotfun', 'WickOfficial', 'admin', 'Support']) assert.equal(checkName(n).error, 'reserved', n);
+  assert.deepEqual(checkName('Wicked'), { name: 'Wicked' });
 });

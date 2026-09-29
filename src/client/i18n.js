@@ -1,7 +1,7 @@
 // Tous les textes du site. Le site est uniquement en anglais.
 export const T = {
   // Navigation
-  tabHome: 'My candle', tabTop: 'Leaderboard', tabCoin: 'The coin', tabHow: 'How it works', tabHowShort: 'Info',
+  tabHome: 'My candle', tabQuests: 'Quests', tabTop: 'Leaderboard', tabCoin: 'The coin', tabHow: 'How it works', tabHowShort: 'Info',
   soon: 'Soon on pump.fun', buy: 'Buy $WICK',
   live: 'live', offline: 'offline',
   disclaimer: 'WICK is a meme and a game. Not financial advice. No promises, just a flame.',
@@ -17,7 +17,7 @@ export const T = {
     ready: 'It can eat again. Feed it to keep it bright.',
     wait: (t) => `All good. Next meal in ${t}.`,
     boost: (b, t) => `$WICK is pumping: it grows ×${b} faster right now.${t ? ` Next meal in ${t}.` : ' Feed it!'}`,
-    dead: (t) => `It burned for ${t}. Light a new one: new look, fresh start.`,
+    dead: (t) => `It burned for ${t}. Rekindle it: same candle, but its age starts from zero.`,
   },
   worldTitle: 'The world right now',
   kpiAlive: 'Candles lit', kpiDied: 'Went out · 24h', kpiBorn: 'Born · 24h', kpiRecord: 'Longest life',
@@ -30,7 +30,7 @@ export const T = {
   growthChip: (b) => `growth ×${b}`,
   actions: {
     light: ['Strike the match', 'your candle is born right away'],
-    relight: ['Light a new candle', 'new look, starts from zero'],
+    relight: ['Rekindle it', 'same candle, age back to zero'],
     nourrir: ['Feed', '+30 wax'],
     photo: ['Photo', 'to share'],
     back: ['My candle', 'back to mine'],
@@ -55,7 +55,7 @@ export const T = {
   hintHungry: 'It\'s hungry! Feed it fast or it will go out.',
   hintBoost: (b) => `$WICK is going up: it grows ×${b} faster right now!`,
   hintScared: 'The chart is going down and it\'s a little scared… but that never makes it melt. Come say hi.',
-  hintDead: 'It rests in the graveyard. You can light a new one: new look, starting from zero.',
+  hintDead: 'It went out. Rekindle it: same candle, same look, but its age starts from zero.',
   deadAfter: (t) => `Went out after ${t}`,
 
   // Look
@@ -77,6 +77,7 @@ export const T = {
     ev: {
       born: 'Was lit', nourrir: 'Got fed', evolved: (s) => `Became a ${s}`,
       died: (t) => `Went out after ${t}`, reward: (r) => `Won the weekly reward (#${r})`,
+      quest: (q) => `Completed “${q}”`,
     },
     ago: (t) => `${t} ago`,
   },
@@ -101,6 +102,7 @@ export const T = {
     evolved: (w, s) => (s === 'Torch' ? `${w} became a Torch and entered the Hall of Fame` : `${w} became a ${s}`),
     reward: (w, r) => `${w} won this week's reward (#${r})`,
     died: (w, t) => `${w} went out after ${t}`,
+    quest: (w, q) => `${w} completed “${q}”`,
   },
   empty: 'Nothing yet. Light the first candle.',
 
@@ -126,7 +128,35 @@ export const T = {
   // Hall of Fame
   hallTitle: 'Hall of Fame', hallLead: 'Every candle that ever became a torch. Forever.', hallEmpty: 'No torch yet. Be the first legend.',
 
+  // Quests
+  q: {
+    eyebrow: 'Quests', lead: 'Quests give your candle growth, so it evolves faster toward the torch. They never change its age: the race for the oldest flame stays fair.',
+    doneOf: (d, n) => `${d} / ${n} done`, earned: 'Growth earned', code: 'Your candle code', linked: 'X account', notLinked: 'not linked yet',
+    chapter: (n) => `Chapter ${n}`, reward: (h) => `+${h}h growth`,
+    locked: 'Finish the quest before to unlock this one.', done: 'Done',
+    needCandle: 'Light your candle to start the quests.', needCandleBtn: 'Go to my candle',
+    step1: 'Post your code on X', step2: 'Paste the link of your post', stepReply: 'Reply to the post with your code',
+    claimTweet: (code, site) => `Claiming my candle on WICK 🕯️\n\n${code}\n\n@trywickdotfun ${site}`,
+    postTweet: (code) => `${code} 🕯️`,
+    postOnX: 'Post on X', openPost: 'Open the post', replyOnX: 'Reply on X',
+    paste: 'https://x.com/you/status/…', verify: 'Verify', verifying: 'Checking on X…',
+    open: 'Open', waitFor: (s) => `Come back in ${s}s`, confirm: 'I did it', claim: 'Claim reward', notYet: 'Not yet',
+    gained: (h) => `+${h}h growth for your candle!`,
+    honorNote: 'We can\'t check this one for free: honor system.',
+    xNote: 'Checked for free with X\'s public embed. Your post must stay public.',
+    claimNote: 'One X account can only claim one candle.',
+    next: 'Next quest', ready: 'ready', allDone: 'All quests done. New ones are coming, follow the X account.',
+    errors: {
+      bad_url: 'That is not a link to a post on X.', post_not_found: 'Post not found. Is it public?',
+      code_missing: 'Your code is not in this post.', handle_taken: 'This X account already claimed another candle.',
+      wrong_account: 'Post it from the X account linked to your candle.', proof_used: 'This post was already used.',
+      x_unreachable: 'X is not answering. Try again in a minute.', too_soon: 'Open the link first, then come back.',
+      not_yet: 'Not there yet.', no_candle: 'Light your candle first.', locked: 'Finish the previous quest first.',
+    },
+  },
+
   // Leaderboard
+  tallestTitle: 'Tallest flames', oldestTitle: 'Oldest flames',
   topEyebrow: 'Leaderboard', topTitle: 'The oldest flames',
   topLead: 'The candles that last the longest. A forgotten candle goes out and joins the graveyard.',
   recordTitle: 'Longest life', recordAlive: 'still burning', recordDead: 'went out',
@@ -143,6 +173,24 @@ export const T = {
   photoTipMobile: 'Tip: "Share" sends the image straight to X, Telegram or Instagram.',
   photoTipDesktop: 'Tip: copy the image, click "Post on X", then paste it into your post (Ctrl+V).',
   cardTagline: 'adopt your candle · $WICK',
+
+  // Choosing a name (step 1) and saving the flame phrase (step 2)
+  np: {
+    step: (a, b) => `Step ${a} of ${b}`,
+    title: 'Name your candle',
+    text: 'Your public name on WICK, and your candle\'s name. Nobody else can take it, and it can\'t be changed later.',
+    rules: '3 to 20 letters, numbers or _',
+    checking: 'Checking…', free: (n) => `@${n} is available`, taken: (n) => `@${n} is already taken`,
+    errors: { short: 'At least 3 characters', long: '20 characters max', chars: 'Only letters, numbers and _', reserved: 'This name is reserved' },
+    random: 'Random name', go: 'Strike the match', skip: 'Skip: give me a random name',
+  },
+  wp: {
+    born: (n) => `@${n} is born`,
+    title: 'Save your flame phrase',
+    text: 'These 12 words are the only way to get your candle back on another phone or computer. Write them down, or keep them somewhere safe.',
+    download: 'Download', saved: 'I saved my 12 words', done: 'Meet my candle',
+    file: (n, p) => `WICK — flame phrase of @${n}\n\n${p}\n\nKeep it safe. It is NOT a wallet seed: it only gives access to your candle on WICK.\n`,
+  },
 
   // Flame phrase
   meTitle: 'Your candle', myPhrase: 'My flame phrase', otherDevice: 'Recover my candle',
@@ -189,7 +237,8 @@ export const T = {
   faq: [
     ['Do I need to connect a wallet?', 'No, never. Everything is free and walletless. Your candle is tied to your browser, plus a 12-word phrase to get it back elsewhere.'],
     ['What is the flame phrase?', '12 words generated for you, to recover your candle on another device. None of them can appear in a wallet seed: it gives access to no money.'],
-    ['What happens if it goes out?', 'It joins the graveyard with its lifetime. You can light a new one whenever you want, with a new look, but it starts from zero.'],
+    ['What happens if it goes out?', 'It joins the graveyard with its lifetime. You can rekindle it whenever you want: it is still YOUR candle, same name and same look, but its age starts from zero. One person, one candle.'],
+    ['What are quests?', 'Small missions, in order: claim your candle on X, feed it 3 days in a row, reach the Taper form… Each one gives your candle growth, so it evolves faster. Quests never change its age, so the oldest-flame race and the weekly reward stay fair.'],
     ['What\'s the link with $WICK?', 'The site is the coin\'s showcase: when $WICK goes up, every candle grows faster. You can play without buying. It is not an investment and there are no promises.'],
     ['How does the weekly reward work?', 'Every Sunday at 20:00 UTC, the 3 oldest living candles whose owner added a Solana payout address win a share of $WICK creator fees, sent manually by the dev. The payment proof is shown on the leaderboard. No purchase needed; amounts vary and the program may change or stop.'],
     ['What do I get for a torch?', 'Your candle enters the Hall of Fame forever, even after it goes out, and all your next candles are born with the eternal flame (gold).'],

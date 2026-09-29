@@ -5,8 +5,12 @@
 Every visitor adopts their own little 3D candle. Keep it alive, watch it grow, and try to
 turn it into a torch. No wallet, no signup, no transaction: just a candle.
 
-- **Strike the match**: your candle is born with a name and a random look (wax color, flame
-  color, sometimes an accessory). No rarity, just different candles: 240 possible looks.
+- **Pick your name**: a unique username, like on X (case-insensitive, 3 to 20 letters, numbers or
+  `_`). It becomes your candle's name. No idea? Get a random one.
+- **Strike the match**: your candle is born with a random look (wax color, flame color, sometimes
+  an accessory). No rarity, just different candles: 240 possible looks.
+- **One person, one candle**: if it goes out, you rekindle the *same* candle (same name, same
+  look), but its age starts from zero.
 - **Keep it alive**: it melts a little every hour. Feed it (at most every 4 hours). Forget it
   for too long and it goes out for good, straight to the graveyard.
 - **The chart makes it grow**: when $WICK pumps, every candle grows faster (×1.5, then ×2).
@@ -18,6 +22,9 @@ turn it into a torch. No wallet, no signup, no transaction: just a candle.
   - **the weekly reward** (only shown when enabled): every Sunday at 20:00 UTC, the 3 oldest
     living candles whose owner left a public Solana address share a part of the creator fees,
     paid manually, with the payment proof shown on the site.
+- **Quests**: small missions, in order (claim your candle on X, feed it 3 days in a row, reach the
+  Taper…). Each one gives your candle **growth**, never age, so the oldest-flame race stays fair.
+- **Two leaderboards**: the oldest flames (age) and the tallest flames (growth).
 - **Show it off**: the Photo button renders a 1080 × 1350 card of *your* candle, as it is right now.
 
 The site sells nothing, asks for no transaction and never connects to a wallet.
@@ -47,7 +54,8 @@ The 3D is [Three.js](https://threejs.org/), with all geometry generated in code.
 | Life of a candle (pure functions, shared by the server and the demo) | `lib/candles.js` |
 | Looks (wax, flame, accessory) | `lib/traits.js` |
 | World tick, leaderboard, Hall of Fame, weekly draw | `lib/world.js`, `lib/rewards.js` |
-| Players (name, 12-word flame phrase) | `lib/players.js` |
+| Players (unique username, 12-word flame phrase) | `lib/players.js` |
+| Quests, player codes, X post checks | `lib/quests.js`, `src/api/quests.js` |
 | Price feed (DexScreener, no key) | `lib/market.js` |
 | Handwritten lines, optional AI "thought of the moment" | `lib/lines.js`, `lib/thought.js` |
 | Database schema (created automatically) | `lib/schema.js` |
@@ -106,6 +114,27 @@ per-IP limit, `ANTHROPIC_API_KEY=...` turns on the AI-written thought of the mom
    | `REWARD_SHARE` | share of creator fees paid out weekly, e.g. `20%`. **Without it, the reward is hidden** |
    | `REWARD_POOL` (optional) | this week's pool shown on the site, e.g. `2.5 SOL` |
    | `ADMIN_KEY` (secret) | long random password used to record payment proofs |
+
+### Quests and X, for free
+
+X's API is paid, so WICK never reads follows or likes. Instead:
+
+- **X quests** give each player a code (`WICK-7F3KQ`). They post it, paste the link of their post,
+  and the Worker checks it through X's public **oEmbed** endpoint (no key, no cost): the post must
+  exist, be public and contain the code. The first one, "Claim your candle", links the X account to
+  the candle: one X account can claim only one candle.
+- **Honor quests** (follow, like) open the link and can be confirmed a few seconds later.
+- **Game quests** are checked in the game (feeding streak, form reached, visit streak, meals).
+
+**Adding a quest** (it goes after the others; `kind` is `x_post` or `honor`):
+
+```
+curl -X POST https://<your-site>/api/admin/quest \
+  -H "authorization: Bearer <ADMIN_KEY>" -H "content-type: application/json" \
+  -d '{"id": "reply1", "kind": "x_post", "title": "Reply to our launch post", "text": "Reply with your code.", "url": "https://x.com/trywickdotfun/status/…", "rewardHours": 6}'
+```
+
+Remove one with `{"id": "reply1", "remove": true}`.
 
 **Recording a payout**: after sending a winner their share, post the transaction signature:
 

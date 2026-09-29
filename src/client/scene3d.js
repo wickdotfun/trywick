@@ -868,11 +868,14 @@ export function createScene(container, { onPoke } = {}) {
   // cachée (autre onglet du site), la scène mesurait 0 et restait sinon toute petite.
   let sizeW = 0;
   let sizeH = 0;
+  let needsDraw = true;
   function resize() {
     const w = container.clientWidth || 1;
     const h = container.clientHeight || 1;
     sizeW = container.clientWidth;
     sizeH = container.clientHeight;
+    // Changer la taille efface le dessin : on redessine au moins une image, même en pause.
+    needsDraw = true;
     renderer.setSize(w, h, false);
     composer.setSize(w, h);
     bloom.resolution.set(w / 2, h / 2);
@@ -896,7 +899,11 @@ export function createScene(container, { onPoke } = {}) {
 
   function onMove(e) {
     const r = container.getBoundingClientRect();
-    pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, -(((e.clientY - r.top) / r.height) * 2 - 1));
+    // Sur un autre onglet du site, la scène est cachée et mesure 0 : sans ce garde-fou,
+    // la division donnait NaN, la caméra partait à l'infini et la bougie disparaissait.
+    if (!r.width || !r.height) return;
+    const clamp = (v) => Math.max(-1.5, Math.min(1.5, v));
+    pointer.set(clamp(((e.clientX - r.left) / r.width) * 2 - 1), clamp(-(((e.clientY - r.top) / r.height) * 2 - 1)));
   }
   window.addEventListener('pointermove', onMove, { passive: true });
 
@@ -917,8 +924,9 @@ export function createScene(container, { onPoke } = {}) {
 
   function frame() {
     raf = requestAnimationFrame(frame);
-    if (!running) return;
     if (container.clientWidth && (container.clientWidth !== sizeW || container.clientHeight !== sizeH)) resize();
+    if (!running && !(needsDraw && container.clientWidth)) return;
+    needsDraw = false;
     const dt = Math.min(clock.getDelta(), 0.05);
     const t = clock.elapsedTime;
 
@@ -937,6 +945,9 @@ export function createScene(container, { onPoke } = {}) {
     const mood = props.mood;
     pointerSmooth.x = damp(pointerSmooth.x, pointer.x, 4, dt);
     pointerSmooth.y = damp(pointerSmooth.y, pointer.y, 4, dt);
+    // Filet de sécurité : une valeur invalide ne doit jamais bloquer la caméra.
+    if (!Number.isFinite(pointerSmooth.x + pointerSmooth.y)) { pointer.set(0, 0); pointerSmooth.set(0, 0); }
+    if (!Number.isFinite(root.rotation.y)) root.rotation.y = 0;
 
     // Corps : respiration, humeur, réactions.
     appear = Math.min(1, appear + dt * 1.6);

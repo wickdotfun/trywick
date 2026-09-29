@@ -2,9 +2,12 @@
 // servis directement ; tout le reste arrive ici, et seules les routes /api existent.
 import { onRequestPost as act } from './api/act.js';
 import { onRequestPost as adminPaid } from './api/admin.js';
+import { onRequestPost as adminQuest } from './api/admin-quest.js';
 import { onRequestGet as candle } from './api/candle.js';
 import { onRequestPost as light } from './api/light.js';
+import { onRequestGet as name } from './api/name.js';
 import { onRequestPost as payout } from './api/payout.js';
+import { onRequestGet as quests, onRequestPost as quest } from './api/quests.js';
 import { onRequestPost as recover } from './api/recover.js';
 import { onRequestGet as state } from './api/state.js';
 import { onRequestGet as thought } from './api/thought.js';
@@ -16,12 +19,16 @@ import { tickWorld } from '../lib/world.js';
 const ROUTES = {
   'GET /api/state': state,
   'POST /api/light': light,
+  'GET /api/name': name,
   'POST /api/act': act,
   'GET /api/candle': candle,
   'GET /api/thought': thought,
   'POST /api/recover': recover,
   'POST /api/payout': payout,
   'POST /api/admin/paid': adminPaid,
+  'POST /api/admin/quest': adminQuest,
+  'GET /api/quests': quests,
+  'POST /api/quest': quest,
 };
 
 export default {

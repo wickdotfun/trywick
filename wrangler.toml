@@ -31,3 +31,9 @@ enabled = true
 # Every 2 minutes, matches whose launch was sent but not confirmed yet get checked on-chain.
 [triggers]
 crons = ["*/2 * * * *"]
+
+# Worker Previews (each branch / pull request): their own database, never the production one.
+[[previews.d1_databases]]
+binding = "DB"
+database_name = "wick-preview"
+database_id = "735273ac-921c-4dd8-a649-9d9bdf3a97f5"

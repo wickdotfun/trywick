@@ -105,7 +105,7 @@ function renderMeter() {
   const c = world.candle;
   if (!c) return;
   const p = candleNow();
-  const live = world.buyback.live;
+  const live = world.buyback.live && !world.buyback.paused;
   const off = span(c.matchMs);
   $('candle-no').textContent = `#${c.number}`;
   $('meter-matches').textContent = `${fmt(c.matches)} ${c.matches === 1 ? 'match' : 'matches'}`;
@@ -117,7 +117,9 @@ function renderMeter() {
   $('bar').style.width = `${(p.melted * 100).toFixed(2)}%`;
   $('meter-sub').innerHTML = live
     ? `Every coin launched here burns <b>${off}</b> off.`
-    : `Every coin launched here burns <b>${off}</b> off. Buybacks start with $WICK.`;
+    : world.buyback.paused
+      ? `Every coin launched here burns <b>${off}</b> off. Buybacks are paused for now.`
+      : `Every coin launched here burns <b>${off}</b> off. Buybacks start with $WICK.`;
   document.querySelectorAll('[data-t="match"]').forEach((el) => { el.textContent = off; });
   document.querySelectorAll('[data-t="total"]').forEach((el) => { el.textContent = span(c.durationMs); });
   if (!scene?.burning) scene?.setCandle({ melted: p.melted, heat: world.heat / HEAT_FULL });
@@ -143,10 +145,10 @@ function historyLine(h) {
     what = `${sol(h.buySol)} → ${link(h.burnSig, `<b>${compact(h.burned)} $${esc(ticker)}</b> burned 🔥`)}`;
   } else if (h.note === 'not_live' || (h.status === 'ended' && !world.buyback.live)) {
     what = 'no buyback yet';
+  } else if (h.note === 'paused' || (h.status === 'ended' && world.buyback.paused)) {
+    what = 'buyback paused, pot carried over';
   } else if (['ended', 'buying', 'bought', 'burning_tx'].includes(h.status)) {
     what = '<span class="pulse-text">buyback in progress…</span>';
-  } else if (h.note === 'not_live') {
-    what = 'no buyback yet';
   } else if (h.note === 'empty_pot') {
     what = 'pot too small, carried over';
   } else {
@@ -205,7 +207,7 @@ function applyState(data, first) {
     // La bougie a fondu : les allumettes plongent dans la flamme, puis une nouvelle sort de la flaque.
     const nextCandle = data.candle;
     toast(`<span>🕯️ <b>Candle #${world.candle.number} burned out.</b> ${
-      world.buyback.live ? `Buying back $${esc(world.token?.ticker || 'WICK')}…` : 'A new one is lit.'}</span>`, 6500);
+      world.buyback.live && !world.buyback.paused ? `Buying back $${esc(world.token?.ticker || 'WICK')}…` : 'A new one is lit.'}</span>`, 6500);
     world.candle = { ...world.candle, startedAt: -Infinity };
     scene?.setCandle({ melted: 1, heat: data.heat / HEAT_FULL });
     const after = () => {

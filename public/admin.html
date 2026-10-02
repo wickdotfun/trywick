@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>WICK — admin</title>
+  <link rel="icon" href="brand/icon-64.png" type="image/png">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body { overflow: auto; }
+    .adm { max-width: 980px; margin: 0 auto; padding: 24px 16px 60px; }
+    .adm-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
+    .adm-top h1 { display: flex; align-items: center; gap: 10px; font-size: 18px; margin: 0; }
+    .adm-top h1 img { width: 30px; height: 30px; border-radius: 8px; }
+    .adm-top .row { display: flex; gap: 8px; }
+    .card { border: 1px solid var(--line); border-radius: 16px; background: #100b08; padding: 18px; margin-bottom: 14px; }
+    .card h2 { font: 500 11px/1 var(--mono); text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 0 0 14px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+    .grid .card { margin: 0; }
+    .hero { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+    .state { display: flex; align-items: center; gap: 12px; font-size: 22px; font-weight: 650; letter-spacing: -.02em; }
+    .state i { width: 12px; height: 12px; border-radius: 50%; background: var(--dim); }
+    .state.live i { background: #3ddc84; box-shadow: 0 0 12px #3ddc84; }
+    .state.paused i { background: #ffb347; box-shadow: 0 0 12px #ffb347; }
+    .state.off i { background: var(--danger); }
+    .state small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); letter-spacing: 0; margin-top: 2px; }
+    .btn { height: 40px; padding: 0 16px; border-radius: 11px; font-weight: 600; border: 1px solid var(--line-2); background: rgba(255,220,180,.04); }
+    .btn:hover { border-color: var(--accent); }
+    .btn:disabled { opacity: .5; cursor: wait; }
+    .btn.danger { color: #ffd9d4; background: rgba(255, 90, 70, .14); border-color: rgba(255, 90, 70, .45); }
+    .btn.go { color: #c9ffe0; background: rgba(61, 220, 132, .12); border-color: rgba(61, 220, 132, .45); }
+    .btn.primary { color: #1a0d03; background: var(--amber); border-color: transparent; }
+    dl.kv { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 0; font-size: 13.5px; }
+    dl.kv dt { color: var(--muted); }
+    dl.kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    .ok { color: #3ddc84; } .bad { color: var(--danger); } .warn { color: #ffb347; }
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font: 500 10.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--dim); }
+    td a { color: var(--gold); }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 99px; font: 500 11px/1.4 var(--mono); background: rgba(255,255,255,.06); }
+    .tag.burned { background: rgba(61,220,132,.14); color: #9ff0c2; }
+    .tag.failed { background: rgba(255,90,70,.16); color: #ffb3a8; }
+    .tag.skipped { color: var(--muted); }
+    .tag.work { background: rgba(255,154,46,.16); color: var(--gold); }
+    .login { max-width: 380px; margin: 14vh auto 0; }
+    .login input { width: 100%; height: 44px; padding: 0 12px; margin: 10px 0 12px; border-radius: 11px; color: var(--text);
+      border: 1px solid var(--line-2); background: rgba(255,220,180,.04); font: 14px var(--mono); }
+    .msg { margin-top: 10px; font-size: 13px; }
+    .scroll { overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <main class="adm">
+    <section class="login card" id="login" hidden>
+      <h2>WICK admin</h2>
+      <p class="muted small">Enter the <b>ADMIN_KEY</b> set in Cloudflare (Settings → Variables and Secrets).</p>
+      <form id="login-form">
+        <input id="key" type="password" autocomplete="current-password" placeholder="Admin key">
+        <button class="btn primary" type="submit">Open</button>
+      </form>
+      <p class="msg bad" id="login-msg" hidden></p>
+    </section>
+
+    <section id="dash" hidden>
+      <header class="adm-top">
+        <h1><img src="brand/icon-192.png" alt="">WICK admin</h1>
+        <div class="row">
+          <button class="btn" id="refresh">Refresh</button>
+          <button class="btn" id="logout">Log out</button>
+        </div>
+      </header>
+
+      <div class="card hero">
+        <div class="state" id="state"><i></i><div><span id="state-text">…</span><small id="state-sub"></small></div></div>
+        <div class="row" style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" id="run">Run buyback now</button>
+          <button class="btn" id="pause">…</button>
+        </div>
+      </div>
+      <p class="msg" id="action-msg" hidden></p>
+
+      <div class="grid">
+        <div class="card"><h2>Configuration</h2><dl class="kv" id="checks"></dl></div>
+        <div class="card"><h2>Buyback wallet</h2><dl class="kv" id="wallet"></dl></div>
+        <div class="card"><h2>Candle &amp; cron</h2><dl class="kv" id="candle"></dl></div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h2>Last 20 candles</h2>
+        <div class="scroll"><table>
+          <thead><tr><th>#</th><th>Ended</th><th>Matches</th><th>Status</th><th>Bought</th><th>Burned</th><th>Note</th></tr></thead>
+          <tbody id="cycles"></tbody>
+        </table></div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module">
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const when = (t) => (t ? new Date(t).toLocaleString() : '—');
+    const tx = (sig, label) => (sig ? `<a href="https://solscan.io/tx/${esc(sig)}" target="_blank" rel="noopener">${label}</a>` : '');
+    const num = (n, d = 4) => (n == null ? '—' : Number(n).toLocaleString('en-US', { maximumFractionDigits: d }));
+    let key = '';
+    try { key = sessionStorage.getItem('wick.admin') || ''; } catch {}
+    let data = null;
+
+    async function call(path, body) {
+      const res = await fetch(path, {
+        method: body ? 'POST' : 'GET',
+        headers: { authorization: `Bearer ${key}`, ...(body ? { 'content-type': 'application/json' } : {}) },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const out = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      if (!res.ok) throw Object.assign(new Error(out.error || `HTTP ${res.status}`), { status: res.status });
+      return out;
+    }
+
+    function showLogin(msg) {
+      $('dash').hidden = true;
+      $('login').hidden = false;
+      $('login-msg').hidden = !msg;
+      $('login-msg').textContent = msg || '';
+    }
+
+    function flash(text, cls = '') {
+      const el = $('action-msg');
+      el.className = `msg ${cls}`;
+      el.textContent = text;
+      el.hidden = false;
+    }
+
+    const yes = (ok, good, bad, cls = 'bad') => `<span class="${ok ? 'ok' : cls}">${ok ? good : bad}</span>`;
+
+    function render() {
+      const d = data, w = d.wallet, c = d.checks;
+      const configured = c.tokenMint && w.key === 'ok';
+      const st = $('state');
+      st.className = `state ${!configured ? 'off' : d.paused ? 'paused' : 'live'}`;
+      $('state-text').textContent = !configured ? 'Buyback not configured' : d.paused ? 'Buyback PAUSED' : 'Buyback LIVE';
+      $('state-sub').textContent = !configured
+        ? 'Set TOKEN_MINT and BUYBACK_SECRET_KEY to turn it on.'
+        : d.paused ? 'No new buy will start. Candles keep burning, the pot waits.' : 'Every burned-out candle triggers a buy and a burn.';
+      const p = $('pause');
+      p.textContent = d.paused ? '▶ Resume buyback' : '⏸ Pause buyback';
+      p.className = `btn ${d.paused ? 'go' : 'danger'}`;
+      $('run').disabled = !configured;
+
+      $('checks').innerHTML = `
+        <dt>TOKEN_MINT</dt><dd>${c.tokenMint ? `<span class="ok">${esc(c.tokenMint)}</span>` : '<span class="bad">missing</span>'}</dd>
+        <dt>BUYBACK_SECRET_KEY</dt><dd>${yes(w.key === 'ok', 'valid', w.key === 'invalid' ? 'invalid key' : 'missing')}</dd>
+        <dt>SOLANA_RPC</dt><dd>${yes(c.customRpc, 'set', 'public RPC (rate-limited)', 'warn')}</dd>
+        <dt>IP_SALT</dt><dd>${yes(c.ipSalt, 'set', 'missing', 'warn')}</dd>
+        <dt>Collect creator fees</dt><dd>${c.collectFees ? 'on' : 'off'}</dd>
+        <dt>Candle</dt><dd>${num(c.cycleMinutes)} min · −${num(c.matchMinutes)} min per match</dd>`;
+
+      $('wallet').innerHTML = w.address ? `
+        <dt>Address</dt><dd><a href="https://solscan.io/account/${esc(w.address)}" target="_blank" rel="noopener">${esc(w.address)}</a></dd>
+        <dt>SOL</dt><dd>${num(w.sol)}</dd>
+        <dt>Pot (above 0.02 reserve)</dt><dd><b>${num(w.pot)} SOL</b></dd>
+        <dt>$WICK held</dt><dd>${num(w.token, 2)}</dd>
+        ${w.rpcError ? `<dt>RPC</dt><dd class="bad">${esc(w.rpcError)}</dd>` : ''}`
+        : `<dt>Wallet</dt><dd class="${w.key === 'invalid' ? 'bad' : 'muted'}">${w.key === 'invalid' ? esc(w.error) : 'not set'}</dd>`;
+
+      const left = Math.max(0, d.candle.endsAt - d.now);
+      $('candle').innerHTML = `
+        <dt>Candle</dt><dd>#${d.candle.number} · ${d.candle.matches} matches</dd>
+        <dt>Burns out in</dt><dd>${Math.floor(left / 60000)}m ${Math.round((left % 60000) / 1000)}s</dd>
+        <dt>Launches awaiting confirmation</dt><dd>${d.pendingLaunches}</dd>
+        <dt>Last buyback step</dt><dd>${d.lastRun ? `${esc(d.lastRun.step)} · ${when(d.lastRun.at)}` : '—'}</dd>
+        <dt>Last error</dt><dd class="${d.lastError ? 'bad' : ''}">${d.lastError ? `${esc(d.lastError.message)} · ${when(d.lastError.at)}` : 'none'}</dd>`;
+
+      const tag = (s) => {
+        const cls = s === 'burned' ? 'burned' : s === 'failed' ? 'failed' : s === 'skipped' ? 'skipped' : s === 'burning' ? '' : 'work';
+        return `<span class="tag ${cls}">${esc(s)}</span>`;
+      };
+      $('cycles').innerHTML = d.cycles.map((r) => `<tr>
+        <td>${r.id}</td><td>${r.ended_at ? when(r.ended_at) : '<span class="ok">burning</span>'}</td><td>${r.matches}</td>
+        <td>${tag(r.status)}</td>
+        <td>${r.buy_sol != null ? `${num(r.buy_sol)} SOL ${tx(r.buy_sig, '↗')}` : ''}</td>
+        <td>${r.burned_ui != null ? `${num(r.burned_ui, 0)} ${tx(r.burn_sig, '↗')}` : tx(r.burn_sig, 'pending ↗')}</td>
+        <td class="muted">${esc(r.note || '')}</td></tr>`).join('');
+    }
+
+    async function load() {
+      try {
+        data = await call('/api/admin/status');
+        $('login').hidden = true;
+        $('dash').hidden = false;
+        render();
+      } catch (err) {
+        if (err.status === 401) { try { sessionStorage.removeItem('wick.admin'); } catch {} key = ''; showLogin('Wrong key.'); }
+        else if (err.status === 404) showLogin('Admin is off: set an ADMIN_KEY (16+ characters) in Cloudflare.');
+        else flash(`Could not load: ${err.message}`, 'bad');
+      }
+    }
+
+    $('login-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      key = $('key').value.trim();
+      try { sessionStorage.setItem('wick.admin', key); } catch {}
+      load();
+    });
+    $('logout').addEventListener('click', () => { try { sessionStorage.removeItem('wick.admin'); } catch {} key = ''; showLogin(); });
+    $('refresh').addEventListener('click', load);
+
+    $('pause').addEventListener('click', async () => {
+      const next = !data.paused;
+      if (!confirm(next ? 'Pause the buyback? No new buy will start until you resume.' : 'Resume the buyback?')) return;
+      $('pause').disabled = true;
+      try {
+        await call('/api/admin/pause', { paused: next });
+        flash(next ? 'Buyback paused.' : 'Buyback resumed.', next ? 'warn' : 'ok');
+      } catch (err) { flash(err.message, 'bad'); }
+      $('pause').disabled = false;
+      load();
+    });
+
+    $('run').addEventListener('click', async () => {
+      if (!confirm('Run the next buyback step now? If a burned-out candle is waiting, this spends the pot on $WICK.')) return;
+      $('run').disabled = true;
+      flash('Running… (up to a minute)', 'warn');
+      try {
+        const { step } = await call('/api/admin/run', {});
+        flash(step ? `Done: ${step}` : 'Nothing to do: no burned-out candle is waiting.', step?.startsWith('error') ? 'bad' : 'ok');
+      } catch (err) { flash(err.message, 'bad'); }
+      load();
+    });
+
+    if (key) load(); else showLogin();
+    setInterval(() => { if (key && !document.hidden) load(); }, 10_000);
+  </script>
+</body>
+</html>

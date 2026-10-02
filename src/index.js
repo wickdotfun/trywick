@@ -1,5 +1,6 @@
 // Point d'entrée du Worker Cloudflare. Les fichiers de public/ (le site) sont
 // servis directement ; tout le reste arrive ici, et seules les routes /api existent.
+import { adminPause, adminRun, adminStatus, recordRun } from './api/admin.js';
 import { prepare, status, submit } from './api/launch.js';
 import { state } from './api/state.js';
 import { json } from '../lib/http.js';
@@ -13,6 +14,9 @@ const ROUTES = {
   'POST /api/launch/prepare': prepare,
   'POST /api/launch/submit': submit,
   'GET /api/launch/status': status,
+  'GET /api/admin/status': adminStatus,
+  'POST /api/admin/pause': adminPause,
+  'POST /api/admin/run': adminRun,
 };
 
 export default {
@@ -49,7 +53,7 @@ export default {
     const now = Date.now();
     await sweep(env, now);
     await tickCycle(env, now);
-    const step = await runBuyback(env, Date.now()).catch((err) => `error: ${err.message}`);
+    const step = await recordRun(env, () => runBuyback(env, Date.now()));
     if (step) console.log('buyback', step);
   },
 };

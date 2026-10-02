@@ -28,9 +28,10 @@ database_id = "b18af738-eaa4-45f6-811c-55a3ce7a2557"
 [observability]
 enabled = true
 
-# Every 2 minutes, matches whose launch was sent but not confirmed yet get checked on-chain.
+# Every minute: the candle burns out on time even with no visitors, the buyback of a
+# burned-out candle moves forward, and launches sent but not confirmed yet get checked.
 [triggers]
-crons = ["*/2 * * * *"]
+crons = ["* * * * *"]
 
 # Worker Previews (each branch / pull request): their own database, never the production one.
 [[previews.d1_databases]]

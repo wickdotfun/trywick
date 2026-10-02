@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>WICK — strike a match</title>
-  <meta name="description" content="One giant candle. Every coin launched here is a match that orbits it and makes it melt. Strike yours.">
+  <meta name="description" content="One giant candle, 30 minutes of wax. Every coin launched here is a match that melts it faster. When the flame dies, $WICK is bought back and burned.">
   <meta property="og:title" content="WICK — strike a match">
-  <meta property="og:description" content="One giant candle. Every coin launched is a match that makes it melt.">
+  <meta property="og:description" content="Every coin launched melts the candle. When it dies, $WICK is bought back and burned.">
   <meta property="og:image" content="/brand/og.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="/brand/og.png">
@@ -45,12 +45,33 @@
     </nav>
   </header>
 
-  <!-- Où en est la bougie -->
-  <section class="meter" aria-live="polite">
-    <p class="eyebrow">Candle <b id="candle-no">#1</b></p>
-    <p class="count"><strong id="count">0</strong><span>/ <span id="per">1,000</span> matches</span></p>
+  <!-- Où en est la bougie : le compte à rebours du buyback -->
+  <section class="meter">
+    <p class="eyebrow">Candle <b id="candle-no">#1</b> · <span id="meter-matches">0 matches</span></p>
+    <p class="count-label" id="count-label">Next buyback in</p>
+    <p class="count"><strong id="countdown">30:00</strong></p>
     <div class="bar"><i id="bar"></i></div>
-    <p class="meter-sub" id="meter-sub">&nbsp;</p>
+    <p class="meter-sub" id="meter-sub">Every coin launched here burns <b>1 minute</b> off.</p>
+    <dl class="stats" id="stats">
+      <div><dt>$WICK burned</dt><dd id="st-burned">0</dd></div>
+      <div><dt>In the wax</dt><dd id="st-pot">—</dd></div>
+      <div><dt>Buybacks</dt><dd id="st-buybacks">0</dd></div>
+    </dl>
+  </section>
+
+  <!-- À la première visite : ce qu'est le site, en trois lignes -->
+  <section class="intro" id="intro" hidden>
+    <p class="eyebrow">What is WICK?</p>
+    <h1>One candle.<br><span class="grad">Every coin melts it.</span></h1>
+    <ol class="intro-steps">
+      <li><i>1</i><span><b>Launch a coin from here.</b> It's a real pump.fun coin, yours, and it becomes a match orbiting the candle.</span></li>
+      <li><i>2</i><span><b>Every match burns <span data-t="match">1 minute</span></b> off the candle. Left alone, it lasts <span data-t="total">30 minutes</span>.</span></li>
+      <li><i>3</i><span><b>When the flame dies, $WICK is bought back and burned</b> with the creator fees. Then a new candle is lit.</span></li>
+    </ol>
+    <div class="intro-actions">
+      <button class="cta" id="intro-strike">Strike a match</button>
+      <button class="ghost" id="intro-close">Watch the candle</button>
+    </div>
   </section>
 
   <!-- Le fil des allumettes -->
@@ -61,7 +82,7 @@
     </header>
     <ol class="feed-list" id="feed"></ol>
     <section class="finals" id="finals" hidden>
-      <h3>Final matches</h3>
+      <h3>Buybacks</h3>
       <ol id="finals-list"></ol>
     </section>
   </aside>
@@ -75,7 +96,7 @@
       <svg class="match-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19 15.5 8.5"/><circle cx="17" cy="7" r="2.6"/></svg>
       Strike a match
     </button>
-    <p class="cta-sub">Launch your coin on pump.fun · it joins the orbit</p>
+    <p class="cta-sub">Launch your coin on pump.fun · it melts the candle <span data-t="match">1 minute</span> faster</p>
   </div>
 
   <div class="tip" id="tip" hidden></div>

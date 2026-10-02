@@ -3,5 +3,9 @@
 DEV_NO_IP_LIMIT=
 # A faster Solana RPC than the public one (Helius, Triton, QuickNode…)
 # SOLANA_RPC=https://mainnet.helius-rpc.com/?api-key=...
-# Smaller candles to try the end of a candle quickly
-# MATCHES_PER_CANDLE=5
+# Short candles to see them burn out quickly (here: 1 minute, 15 s per match)
+# CYCLE_MINUTES=1
+# MATCH_MINUTES=0.25
+# Buyback (never with a real wallet locally)
+# TOKEN_MINT=
+# BUYBACK_SECRET_KEY=

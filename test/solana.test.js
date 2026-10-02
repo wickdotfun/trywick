@@ -86,3 +86,13 @@ test('judges a confirmed transaction', () => {
   noPump.transaction.message.instructions = [{ programIdIndex: 2 }];
   assert.equal(judgeConfirmed(noPump, { creator, mint }), 'mismatch');
 });
+
+test('base58 decoding matches web3.js', async () => {
+  const { fromBase58 } = await import('../lib/solana.js');
+  for (let i = 0; i < 20; i++) {
+    const k = Keypair.generate().publicKey;
+    assert.deepEqual([...fromBase58(k.toBase58())], [...k.toBytes()]);
+  }
+  assert.deepEqual([...fromBase58('11111111111111111111111111111111')], new Array(32).fill(0));
+  assert.throws(() => fromBase58('0OIl'));
+});

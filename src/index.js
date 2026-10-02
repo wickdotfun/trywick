@@ -3,6 +3,8 @@
 import { prepare, status, submit } from './api/launch.js';
 import { state } from './api/state.js';
 import { json } from '../lib/http.js';
+import { runBuyback } from '../lib/buyback.js';
+import { tickCycle } from '../lib/cycles.js';
 import { sweep } from '../lib/matches.js';
 import { ensureSchema } from '../lib/schema.js';
 
@@ -39,10 +41,15 @@ export default {
     return res;
   },
 
-  // Toutes les 2 minutes (voir wrangler.toml) : les allumettes envoyées dont le navigateur
-  // a été fermé avant la confirmation s'allument quand même.
+  // Chaque minute (voir wrangler.toml) : les allumettes envoyées dont le navigateur a été
+  // fermé avant la confirmation s'allument quand même, la bougie s'éteint à l'heure même
+  // sans visiteurs, et le buyback de la bougie éteinte avance.
   async scheduled(event, env) {
     await ensureSchema(env.DB);
-    await sweep(env, Date.now());
+    const now = Date.now();
+    await sweep(env, now);
+    await tickCycle(env, now);
+    const step = await runBuyback(env, Date.now()).catch((err) => `error: ${err.message}`);
+    if (step) console.log('buyback', step);
   },
 };

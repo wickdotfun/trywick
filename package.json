@@ -7,7 +7,7 @@
     "build": "esbuild src/client/app.js --bundle --splitting --minify --format=esm --target=es2022 --outdir=public/build --entry-names=[name] --chunk-names=chunks/[name]-[hash]",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "test": "node --test test/*.test.js"
+    "test": "node --no-warnings --test test/*.test.js"
   },
   "devDependencies": {
     "@solana/web3.js": "^1.99.0",

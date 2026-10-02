@@ -19,6 +19,15 @@ const api = DEMO ? createDemo() : {
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const short = (k) => (k ? `${k.slice(0, 4)}…${k.slice(-4)}` : '');
 const fmt = (n) => n.toLocaleString('en-US');
+const compact = (n) => new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n);
+const sol = (n) => `${(n ?? 0).toLocaleString('en-US', { maximumFractionDigits: n >= 10 ? 1 : 2 })} SOL`;
+// Une durée lisible : « 1 minute », « 30 minutes », « 6 seconds ».
+function span(ms) {
+  if (ms >= 60_000) { const m = Math.round(ms / 6_000) / 10; return `${m} ${m === 1 ? 'minute' : 'minutes'}`; }
+  const s = Math.round(ms / 1000);
+  return `${s} ${s === 1 ? 'second' : 'seconds'}`;
+}
+const solscan = (sig) => `https://solscan.io/tx/${sig}`;
 const pumpUrl = (mint) => `https://pump.fun/coin/${mint}`;
 
 function ago(at, now = Date.now()) {
@@ -65,7 +74,11 @@ function startScene() {
 const world = {
   candle: null,
   matches: [],               // les allumettes de la bougie en cours, de la plus ancienne à la plus récente
-  finals: [],
+  history: [],               // les bougies fondues et leur buyback
+  totals: { burned: 0, sol: 0, buybacks: 0 },
+  buyback: { live: false, potSol: null },
+  clock: 0,                  // l'écart entre l'horloge du serveur et la nôtre
+  seenBurns: null,           // les buybacks déjà annoncés
   heat: 0,
   token: null,
   lastSeq: 0,
@@ -74,21 +87,72 @@ const world = {
   mine: new Set(),           // les allumettes frappées depuis ce navigateur
 };
 
+// Où en est la bougie, recalculé chaque seconde avec l'horloge du serveur.
+function candleNow() {
+  const c = world.candle;
+  const now = Date.now() + world.clock;
+  const burned = Math.max(0, now - c.startedAt) + c.matches * c.matchMs;
+  const remaining = Math.max(0, c.durationMs - burned);
+  return { remaining, melted: Math.min(1, burned / c.durationMs) };
+}
+
+function clockText(ms) {
+  const s = Math.ceil(ms / 1000);
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+}
+
 function renderMeter() {
   const c = world.candle;
   if (!c) return;
+  const p = candleNow();
+  const live = world.buyback.live;
+  const off = span(c.matchMs);
   $('candle-no').textContent = `#${c.number}`;
-  $('count').textContent = fmt(c.matches);
-  $('per').textContent = fmt(c.perCandle);
-  $('bar').style.width = `${(c.melted * 100).toFixed(2)}%`;
-  const left = c.perCandle - c.matches;
-  $('meter-sub').innerHTML = c.matches === 0
-    ? 'A fresh candle. <b>Be the first match.</b>'
-    : `<b>${fmt(left)}</b> more ${left === 1 ? 'match' : 'matches'} and it's gone.`;
-  document.documentElement.style.setProperty('--melt', c.melted.toFixed(3));
+  $('meter-matches').textContent = `${fmt(c.matches)} ${c.matches === 1 ? 'match' : 'matches'}`;
+  $('count-label').textContent = p.remaining > 0
+    ? (live ? 'Next buyback in' : 'Burns out in')
+    : (live ? 'Buying back $WICK…' : 'Burning out…');
+  $('countdown').textContent = clockText(p.remaining);
+  $('countdown').classList.toggle('hot', p.remaining < 60_000);
+  $('bar').style.width = `${(p.melted * 100).toFixed(2)}%`;
+  $('meter-sub').innerHTML = live
+    ? `Every coin launched here burns <b>${off}</b> off.`
+    : `Every coin launched here burns <b>${off}</b> off. Buybacks start with $WICK.`;
+  document.querySelectorAll('[data-t="match"]').forEach((el) => { el.textContent = off; });
+  document.querySelectorAll('[data-t="total"]').forEach((el) => { el.textContent = span(c.durationMs); });
+  if (!scene?.burning) scene?.setCandle({ melted: p.melted, heat: world.heat / HEAT_FULL });
   if (document.body.classList.contains('no-webgl')) {
-    $('css-candle').style.setProperty('--h', `${Math.max(4, (1 - c.melted) * 100)}%`);
+    $('css-candle').style.setProperty('--h', `${Math.max(4, (1 - p.melted) * 100)}%`);
   }
+}
+
+function renderStats() {
+  const t = world.totals, b = world.buyback;
+  const ticker = world.token?.ticker || 'WICK';
+  $('stats').querySelector('dt').textContent = `$${ticker} burned`;
+  $('st-burned').textContent = t.burned ? compact(t.burned) : '0';
+  $('st-pot').textContent = b.live && b.potSol != null ? sol(b.potSol) : 'soon';
+  $('st-buybacks').textContent = fmt(t.buybacks);
+}
+
+function historyLine(h) {
+  const ticker = world.token?.ticker || 'WICK';
+  const link = (sig, text) => (sig ? `<a href="${solscan(esc(sig))}" target="_blank" rel="noopener">${text}</a>` : text);
+  let what;
+  if (h.status === 'burned' && h.burned > 0) {
+    what = `${sol(h.buySol)} → ${link(h.burnSig, `<b>${compact(h.burned)} $${esc(ticker)}</b> burned 🔥`)}`;
+  } else if (h.note === 'not_live' || (h.status === 'ended' && !world.buyback.live)) {
+    what = 'no buyback yet';
+  } else if (['ended', 'buying', 'bought', 'burning_tx'].includes(h.status)) {
+    what = '<span class="pulse-text">buyback in progress…</span>';
+  } else if (h.note === 'not_live') {
+    what = 'no buyback yet';
+  } else if (h.note === 'empty_pot') {
+    what = 'pot too small, carried over';
+  } else {
+    what = 'buyback missed, pot carried over';
+  }
+  return `<li><span class="mono">#${h.number}</span><span>${what}</span></li>`;
 }
 
 function feedItem(m) {
@@ -105,13 +169,8 @@ function renderFeed() {
   $('feed').innerHTML = items.length
     ? items.map(feedItem).join('')
     : '<li class="fi-empty">No match yet on this candle.<br>Strike the first one.</li>';
-  const finals = world.finals;
-  $('finals').hidden = !finals.length;
-  $('finals-list').innerHTML = finals.map((f) => `<li>
-    <a href="${pumpUrl(f.match.mint)}" target="_blank" rel="noopener">
-      <span class="mono">Candle #${f.candle}</span>
-      <span>burned out by <b>$${esc(f.match.symbol)}</b></span>
-    </a></li>`).join('');
+  $('finals').hidden = !world.history.length;
+  $('finals-list').innerHTML = world.history.map(historyLine).join('');
 }
 
 function renderToken() {
@@ -132,27 +191,27 @@ function applyState(data, first) {
   const known = new Set(world.matches.map((m) => m.mint));
   const incoming = data.matches.filter((m) => m.seq > world.lastSeq && !known.has(m.mint));
   world.lastSeq = Math.max(world.lastSeq, data.total);
-  world.finals = data.finals;
+  world.clock = data.now - Date.now();
+  world.history = data.history || [];
+  world.totals = data.totals || world.totals;
+  world.buyback = data.buyback || world.buyback;
+  announceBurns(first);
 
   if (first || !world.candle) {
     world.candle = data.candle;
     world.matches = data.matches;
     scene?.setMatches(world.matches);
-    scene?.setCandle({ melted: data.candle.melted, heat: data.heat / HEAT_FULL });
   } else if (rolled) {
-    // La bougie a fondu : la dernière allumette la finit, puis une nouvelle sort de la flaque.
-    const last = data.finals[0];
+    // La bougie a fondu : les allumettes plongent dans la flamme, puis une nouvelle sort de la flaque.
     const nextCandle = data.candle;
-    if (last) {
-      toast(`${avatar(last.match, 22)}<span><b>Candle #${last.candle} burned out.</b> Final match: <b>$${esc(last.match.symbol)}</b></span>`, 6500);
-    }
-    world.candle = { ...world.candle, matches: world.candle.perCandle, melted: 1 };
+    toast(`<span>🕯️ <b>Candle #${world.candle.number} burned out.</b> ${
+      world.buyback.live ? `Buying back $${esc(world.token?.ticker || 'WICK')}…` : 'A new one is lit.'}</span>`, 6500);
+    world.candle = { ...world.candle, startedAt: -Infinity };
     scene?.setCandle({ melted: 1, heat: data.heat / HEAT_FULL });
     const after = () => {
       world.candle = nextCandle;
       world.matches = data.matches;
       for (const m of data.matches) { scene?.addMatch(m); world.fresh.set(m.mint, performance.now()); }
-      scene?.setCandle({ melted: nextCandle.melted, heat: data.heat / HEAT_FULL });
       renderMeter();
       renderFeed();
     };
@@ -172,11 +231,22 @@ function applyState(data, first) {
       world.fresh.set(m.mint, performance.now());
       if (!world.mine.has(m.mint)) toast(`${avatar(m, 22)}<span><b>$${esc(m.symbol)}</b> struck a match</span>`);
     }
-    scene?.setCandle({ melted: data.candle.melted, heat: data.heat / HEAT_FULL });
   }
   renderMeter();
+  renderStats();
   renderFeed();
   renderToken();
+}
+
+// Un buyback vient d'être brûlé : on l'annonce (pas au premier chargement).
+function announceBurns(first) {
+  const burned = world.history.filter((h) => h.status === 'burned' && h.burned > 0);
+  if (!world.seenBurns) { world.seenBurns = new Set(burned.map((h) => h.number)); return; }
+  for (const h of burned) {
+    if (world.seenBurns.has(h.number)) continue;
+    world.seenBurns.add(h.number);
+    if (!first) toast(`<span>🔥 <b>${compact(h.burned)} $${esc(world.token?.ticker || 'WICK')} burned</b> · ${sol(h.buySol)} bought back with candle #${h.number}</span>`, 7000);
+  }
 }
 
 let polling = false;
@@ -273,17 +343,20 @@ modal.addEventListener('click', (e) => { if (e.target === modal && !busy) modal.
 modal.addEventListener('cancel', (e) => { if (busy) e.preventDefault(); });
 
 function howItWorks() {
-  const per = fmt(world.candle?.perCandle ?? 1000);
+  const c = world.candle;
+  const total = span(c?.durationMs ?? 1_800_000);
+  const off = span(c?.matchMs ?? 60_000);
+  const ticker = esc(world.token?.ticker || 'WICK');
   openModal(`
     <h2>How it works</h2>
     <ol class="how">
-      <li><b>One giant candle.</b> Everyone sees the same one, burning live.</li>
+      <li><b>One giant candle.</b> Everyone sees the same one, burning live. Left alone, it lasts ${total}.</li>
       <li><b>Strike a match = launch a coin.</b> Pick a name, a ticker and an image: your coin is created on
         pump.fun, signed by your own wallet. You are its creator.</li>
-      <li><b>Every coin is a match.</b> It joins the orbit around the candle, and the candle melts a little.
-        ${per} matches and it's gone.</li>
-      <li><b>The last match is remembered.</b> The coin that finishes a candle is engraved as its final match.
-        Then a new candle is lit.</li>
+      <li><b>Every coin is a match that melts the candle faster</b>: ${off} off per
+        launch. The more launches, the more often it burns out.</li>
+      <li><b>When the flame dies, $${ticker} is bought back and burned.</b> The pot is the $${ticker} creator fees.
+        Every buyback and every burn is on-chain, with its Solscan link. Then a new candle is lit.</li>
       <li><b>The more coins, the bigger the flame.</b> Launches from the last 10 minutes make it burn harder.</li>
     </ol>
     <div class="note">
@@ -512,11 +585,12 @@ async function submitLaunch(form) {
 }
 
 function success(m, signature) {
-  const share = `I just struck a match: $${m.symbol} is orbiting the candle 🕯️🔥\n${location.origin}`;
+  const share = `I just struck a match: $${m.symbol} is melting the WICK candle 🕯️🔥\n${location.origin}`;
   openModal(`
     <div class="lit">${avatar(m, 72)}</div>
     <h2><span class="grad">$${esc(m.symbol)}</span> is lit</h2>
-    <p class="muted">Match #${fmt(m.seq)} is orbiting candle #${world.candle?.number ?? 1}. Look for the label.</p>
+    <p class="muted">Match #${fmt(m.seq)} is orbiting candle #${world.candle?.number ?? 1} and just burned
+    ${span(world.candle?.matchMs ?? 60_000)} off it. Look for the label.</p>
     <div class="wallets">
       <a class="wbtn primary" href="${pumpUrl(m.mint)}" target="_blank" rel="noopener">See it on pump.fun</a>
       <a class="wbtn" href="https://x.com/intent/post?text=${encodeURIComponent(share)}" target="_blank" rel="noopener">Share on X</a>
@@ -524,13 +598,29 @@ function success(m, signature) {
     </div>`, 'm-done');
 }
 
+// ------------------------------------------------------------ première visite
+function wireIntro() {
+  const intro = $('intro');
+  let seen = false;
+  try { seen = localStorage.getItem('wick.intro') === '1'; } catch { /* pas de stockage : on l'affiche */ }
+  const close = () => {
+    intro.hidden = true;
+    document.body.classList.remove('intro-open');
+    try { localStorage.setItem('wick.intro', '1'); } catch { /* tant pis */ }
+  };
+  if (!seen) { intro.hidden = false; document.body.classList.add('intro-open'); }
+  $('intro-close').addEventListener('click', close);
+  $('intro-strike').addEventListener('click', () => { close(); launchForm(); });
+}
+
 // ------------------------------------------------------------ démarrage
 function start() {
   if (DEMO) {
     $('demo-bar').hidden = false;
-    $('demo-bar').innerHTML = 'Demo · a simulated, sped-up world (150 matches per candle) · <a href="/">see the real candle</a>';
+    $('demo-bar').innerHTML = 'Demo · a simulated, sped-up world (2-minute candles) · <a href="/">see the real candle</a>';
   }
   $('strike-btn').addEventListener('click', () => launchForm());
+  wireIntro();
   $('how-btn').addEventListener('click', howItWorks);
   $('feed-toggle').addEventListener('click', () => document.body.classList.toggle('feed-open'));
   wirePointer();
@@ -538,6 +628,12 @@ function start() {
     if (!document.hidden) poll();
     document.querySelectorAll('time[data-at]').forEach((t) => { t.textContent = ago(Number(t.dataset.at)); });
   }, POLL_MS);
+  // Le compte à rebours, chaque seconde. À zéro, on demande plus souvent la nouvelle bougie.
+  setInterval(() => {
+    if (!world.candle || document.hidden) return;
+    renderMeter();
+    if (candleNow().remaining === 0 && !scene?.burning) poll();
+  }, 1000);
   startScene();
   poll(true);
 }

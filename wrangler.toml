@@ -28,6 +28,12 @@ database_id = "b18af738-eaa4-45f6-811c-55a3ce7a2557"
 [observability]
 enabled = true
 
-# Every 10 minutes, candles age, go out or evolve, even when nobody visits the site.
+# Every 2 minutes, matches whose launch was sent but not confirmed yet get checked on-chain.
 [triggers]
-crons = ["*/10 * * * *"]
+crons = ["*/2 * * * *"]
+
+# Worker Previews (each branch / pull request): their own database, never the production one.
+[[previews.d1_databases]]
+binding = "DB"
+database_name = "wick-preview"
+database_id = "735273ac-921c-4dd8-a649-9d9bdf3a97f5"

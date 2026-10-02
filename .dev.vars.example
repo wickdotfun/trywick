@@ -1,11 +1,7 @@
 # Copy to .dev.vars for local development (never committed).
-# ANTHROPIC_API_KEY=sk-ant-...
-# Force a mood: 10 = euphoria, 4 = happy, 0 = calm, -5 = stress, -12 = panic
-DEV_CHANGE=
-# Lift the per-IP limit (every local visitor shares the same IP)
+# Lift the per-IP launch limit (every local visitor shares the same IP)
 DEV_NO_IP_LIMIT=
-
-# Weekly reward (optional locally)
-# REWARD_SHARE=20%
-# REWARD_POOL=2.5 SOL
-# ADMIN_KEY=a-long-random-password
+# A faster Solana RPC than the public one (Helius, Triton, QuickNode…)
+# SOLANA_RPC=https://mainnet.helius-rpc.com/?api-key=...
+# Smaller candles to try the end of a candle quickly
+# MATCHES_PER_CANDLE=5

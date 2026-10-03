@@ -65,10 +65,17 @@ export async function strike({ wallet, creator, fields, image, onStep }) {
 
   onStep('sign');
   const tx = VersionedTransaction.deserialize(b64.from(prepared.tx));
-  // Le wallet signe d'abord (c'est ce que demande Phantom), puis la clé du mint.
-  let signed;
+  const feeTx = prepared.feeTx ? VersionedTransaction.deserialize(b64.from(prepared.feeTx)) : null;
+  // Le wallet signe d'abord (c'est ce que demande Phantom), puis la clé du mint. Avec un frais de
+  // lancement, les deux transactions sont signées d'un coup (une seule validation).
+  let signed, signedFee = null;
   try {
-    signed = (await wallet.provider.signTransaction(tx)) || tx;
+    if (feeTx && wallet.provider.signAllTransactions) {
+      [signed, signedFee] = await wallet.provider.signAllTransactions([tx, feeTx]);
+    } else {
+      signed = (await wallet.provider.signTransaction(tx)) || tx;
+      if (feeTx) signedFee = (await wallet.provider.signTransaction(feeTx)) || feeTx;
+    }
   } catch (err) {
     throw Object.assign(new Error('rejected'), { code: 'rejected', cause: err });
   }
@@ -78,7 +85,7 @@ export async function strike({ wallet, creator, fields, image, onStep }) {
   const sent = await call('/api/launch/submit', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ mint, tx: b64.to(signed.serialize()) }),
+    body: JSON.stringify({ mint, tx: b64.to(signed.serialize()), feeTx: signedFee ? b64.to(signedFee.serialize()) : null }),
   });
 
   onStep('confirm');

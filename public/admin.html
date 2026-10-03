@@ -88,6 +88,14 @@
       </div>
 
       <div class="card" style="margin-top:14px">
+        <h2>Burn queue (last 20)</h2>
+        <div class="scroll"><table>
+          <thead><tr><th>#</th><th>Kind</th><th>Status</th><th>SOL</th><th>Burned</th><th>Note</th></tr></thead>
+          <tbody id="burns"></tbody>
+        </table></div>
+      </div>
+
+      <div class="card">
         <h2>Last 20 candles</h2>
         <div class="scroll"><table>
           <thead><tr><th>#</th><th>Ended</th><th>Matches</th><th>Status</th><th>Bought</th><th>Burned</th><th>Note</th></tr></thead>
@@ -154,6 +162,8 @@
         <dt>SOLANA_RPC</dt><dd>${yes(c.customRpc, 'set', 'public RPC (rate-limited)', 'warn')}</dd>
         <dt>IP_SALT</dt><dd>${yes(c.ipSalt, 'set', 'missing', 'warn')}</dd>
         <dt>Collect creator fees</dt><dd>${c.collectFees ? 'on' : 'off'}</dd>
+        <dt>Launch fee (burned)</dt><dd>${c.launchFeeSol ? `${num(c.launchFeeSol)} SOL` : '<span class="muted">off (buyback not live)</span>'}</dd>
+        <dt>Telegram bot</dt><dd>${yes(c.telegram, 'on', 'off (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID)', 'warn')}</dd>
         <dt>Candle</dt><dd>${num(c.cycleMinutes)} min · −${num(c.matchMinutes)} min per match</dd>`;
 
       $('wallet').innerHTML = w.address ? `
@@ -176,6 +186,12 @@
         const cls = s === 'burned' ? 'burned' : s === 'failed' ? 'failed' : s === 'skipped' ? 'skipped' : s === 'burning' ? '' : 'work';
         return `<span class="tag ${cls}">${esc(s)}</span>`;
       };
+      $('burns').innerHTML = d.burns.length ? d.burns.map((b) => `<tr>
+        <td>${b.id}</td><td>${b.kind === 'candle' ? `candle #${esc(b.ref)}` : `launch $${esc(b.symbol || '?')}`}</td>
+        <td>${tag(b.status)}</td>
+        <td>${b.sol != null ? `${num(b.sol)} ${tx(b.buy_sig, '↗')}` : ''}</td>
+        <td>${b.burned_ui != null ? `${num(b.burned_ui, 0)} ${tx(b.burn_sig, '↗')}` : tx(b.burn_sig, 'pending ↗')}</td>
+        <td class="muted">${esc(b.note || '')}</td></tr>`).join('') : '<tr><td colspan="6" class="muted">No burn yet.</td></tr>';
       $('cycles').innerHTML = d.cycles.map((r) => `<tr>
         <td>${r.id}</td><td>${r.ended_at ? when(r.ended_at) : '<span class="ok">burning</span>'}</td><td>${r.matches}</td>
         <td>${tag(r.status)}</td>

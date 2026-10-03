@@ -70,19 +70,22 @@ test('the burn transaction is a valid SPL Burn, signed by the owner', async () =
   assert.equal(ix.data.readBigUInt64LE(1), 123456789012345n);
 });
 
-// Un faux Solana + PumpPortal : un wallet qui achète 1 000 000 de jetons à chaque achat.
-function fakeChain(wallet, { lamports, held = 5_000_000n, failBuy = false }) {
+// Un faux Solana + PumpPortal : chaque achat rapporte 1 000 000 de jetons au wallet.
+export function fakeChain(wallet, { lamports, held = 5_000_000n, failBuy = false }) {
   const calls = [];
-  let tokens = held;
+  const portal = [];          // les actions PumpPortal, dans l'ordre où leurs transactions partent
   const sent = [];
+  const buys = [];
+  let tokens = held;
   globalThis.fetch = async (url, init) => {
     const body = init?.body;
     if (String(url).includes('pumpportal')) {
       const req = JSON.parse(body);
       calls.push(`portal:${req.action}`);
+      portal.push(req);
       const msg = new TransactionMessage({
         payerKey: new PublicKey(wallet.publicKey), recentBlockhash: BLOCKHASH,
-        instructions: [SystemProgram.transfer({ fromPubkey: new PublicKey(wallet.publicKey), toPubkey: new PublicKey(wallet.publicKey), lamports: sent.length + 1 })],
+        instructions: [SystemProgram.transfer({ fromPubkey: new PublicKey(wallet.publicKey), toPubkey: new PublicKey(wallet.publicKey), lamports: portal.length })],
       }).compileToV0Message();
       return new Response(new VersionedTransaction(msg).serialize());
     }
@@ -99,18 +102,25 @@ function fakeChain(wallet, { lamports, held = 5_000_000n, failBuy = false }) {
         const key = await crypto.subtle.importKey('raw', new PublicKey(wallet.publicKey).toBytes(), { name: 'Ed25519' }, false, ['verify']);
         assert.ok(await crypto.subtle.verify('Ed25519', key, tx.signatures[0], tx.message.serialize()));
         sent.push(sig);
-        if (sent.length === 2 && !failBuy) tokens += 1_000_000n; // 1er envoi = collecte, 2e = achat
+        const isBurn = tx.message.staticAccountKeys.some((k) => k.toBase58() === TOKEN_PROGRAM);
+        if (!isBurn) {
+          const req = portal.shift();
+          if (req?.action === 'buy') {
+            buys.push({ sig, ...req });
+            if (!failBuy) tokens += 1_000_000n;
+          }
+        }
         return ok(sig);
       }
       case 'getSignatureStatuses': {
-        const fail = failBuy && params[0][0] === sent[1];
+        const fail = failBuy && buys.some((b) => b.sig === params[0][0]);
         return ok({ value: [{ confirmationStatus: 'confirmed', err: fail ? { InstructionError: [0, 'x'] } : null }] });
       }
       case 'getLatestBlockhash': return ok({ value: { blockhash: BLOCKHASH } });
       default: throw new Error(`unexpected rpc ${method}`);
     }
   };
-  return { calls, sent, tokens: () => tokens };
+  return { calls, sent, buys, tokens: () => tokens };
 }
 
 async function world(lamports, opts = {}) {
@@ -130,9 +140,9 @@ test('a burned-out candle: fees collected, $WICK bought, only the bought tokens 
   const { env, chain } = await world(1.5e9);
   const step = await runBuyback(env, 30 * MIN);
   assert.equal(step, 'burned');
-  const row = await env.DB.prepare('SELECT * FROM cycles WHERE id = 1').first();
+  const row = await env.DB.prepare('SELECT * FROM burns WHERE id = 1').first();
   assert.equal(row.status, 'burned');
-  assert.equal(row.buy_sol, 1.48);                // 1,5 SOL moins la réserve de 0,02
+  assert.equal(row.sol, 1.48);                    // 1,5 SOL moins la réserve de 0,02
   assert.equal(row.pre_raw, '5000000');
   assert.equal(row.bought_raw, '1000000');        // le dev bag (5 M) n'est pas touché
   assert.equal(row.burned_ui, 1);
@@ -149,10 +159,10 @@ test('an empty pot skips the buyback', async () => {
 test('a failed buy is recorded and nothing is burned', async () => {
   const { env, chain } = await world(1e9, { failBuy: true });
   assert.equal(await runBuyback(env, 30 * MIN), 'failed:buy');
-  const row = await env.DB.prepare('SELECT * FROM cycles WHERE id = 1').first();
+  const row = await env.DB.prepare('SELECT * FROM burns WHERE id = 1').first();
   assert.equal(row.status, 'failed');
   assert.equal(row.burn_sig, null);
-  assert.equal(chain.sent.length, 2);
+  assert.equal(chain.buys.length, 1);
 });
 
 test('without a token or a key, candles still burn but no buyback runs', async () => {
@@ -161,11 +171,30 @@ test('without a token or a key, candles still burn but no buyback runs', async (
   await tickCycle(env, 0);
   await tickCycle(env, 30 * MIN);
   assert.equal(await runBuyback(env, 30 * MIN), 'skipped:not_live');
-  assert.equal((await env.DB.prepare('SELECT note FROM cycles WHERE id = 1').first()).note, 'not_live');
+  assert.equal((await env.DB.prepare('SELECT note FROM burns WHERE id = 1').first()).note, 'not_live');
 });
 
 test('two overlapping crons never buy twice', async () => {
   const { env, chain } = await world(1e9);
   await Promise.all([runBuyback(env, 30 * MIN), runBuyback(env, 30 * MIN)]);
   assert.equal(chain.calls.filter((c) => c === 'portal:buy').length, 1);
+});
+
+test('a launch fee is bought back and burned on its own, outside the candle pot', async () => {
+  const { env, chain } = await world(1.5e9);
+  // Un frais de lancement de 0,0195 SOL attend, avant le buyback de la bougie n° 1.
+  await env.DB.prepare("INSERT INTO burns (kind, ref, created_at, sol) VALUES ('match', 'MintX', 0, 0.0195)").run();
+  // La bougie passe d'abord (elle est plus ancienne) : sa cagnotte ne prend pas le frais en attente.
+  assert.equal(await runBuyback(env, 30 * MIN), 'burned');
+  const candle = await env.DB.prepare("SELECT * FROM burns WHERE kind = 'candle'").first();
+  assert.equal(candle.sol, 1.4605);                // 1,5 − 0,02 de réserve − 0,0195 en attente
+  // Puis le frais de lancement : racheté en entier, avec des frais réseau plus petits, et brûlé.
+  assert.equal(await runBuyback(env, 31 * MIN), 'burned');
+  const match = await env.DB.prepare("SELECT * FROM burns WHERE kind = 'match'").first();
+  assert.equal(match.status, 'burned');
+  assert.equal(match.burned_ui, 1);
+  const buy = chain.buys.at(-1);
+  assert.equal(buy.amount, 0.0195);
+  assert.equal(buy.priorityFee, 0.0001);
+  assert.equal(chain.calls.filter((c) => c === 'portal:collectCreatorFee').length, 1);  // pas de collecte pour un lancement
 });

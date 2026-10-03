@@ -3,11 +3,17 @@
 DEV_NO_IP_LIMIT=
 # A faster Solana RPC than the public one (Helius, Triton, QuickNode…)
 # SOLANA_RPC=https://mainnet.helius-rpc.com/?api-key=...
-# Short candles to see them burn out quickly (here: 1 minute, 15 s per match)
+# A short breath to see buybacks come quickly (here: 1 minute, 15 s per match)
 # CYCLE_MINUTES=1
 # MATCH_MINUTES=0.25
+# Share of the $WICK supply per candle (default 0.5)
+# CANDLE_PCT=0.5
 # Buyback (never with a real wallet locally)
 # TOKEN_MINT=
 # BUYBACK_SECRET_KEY=
+# LAUNCH_FEE_SOL=0.02
 # Admin page (/admin)
 # ADMIN_KEY=a-long-random-password
+# Telegram bot
+# TELEGRAM_BOT_TOKEN=
+# TELEGRAM_CHAT_ID=@yourchannel

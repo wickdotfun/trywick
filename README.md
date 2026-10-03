@@ -36,6 +36,9 @@ feeds the flame. Every flame burns $WICK: launch a coin → Ignition Fee → buy
   Ignition Fee and socials, updated with the burn transaction once its fee is burned; every buyback & burn (SOL
   spent with its dollar value, $WICK burned, supply left, Buy/Burn TX); every fully melted candle with its season
   stats; and a daily report (launches, burns, hottest coins, pyromaniac of the day).
+- **The $WICK launch announcement**: the cron watches the dev wallet; within a minute of it creating the coin with the
+  $WICK ticker on pump.fun, the official message ("$WICK is live. the only CA: …") is posted in the channel and pinned,
+  once (`lib/announce.js`).
 
 **Demo mode**: add `?demo` to the address for a simulated, sped-up world (90-second breaths, tiny candles, fake
 burns, a fake launch with no wallet), running entirely in your browser, with a permanent "Demo" banner.
@@ -193,6 +196,7 @@ Locally, `CYCLE_MINUTES=1` in `.dev.vars` makes the breath (buyback countdown) 1
    | `HOLDER_MIN` | minimum $WICK held for a golden flame (default: any amount) |
    | `TELEGRAM_BOT_TOKEN` (secret), `TELEGRAM_CHAT_ID` | the bot (from @BotFather) and the channel (`@yourchannel` or its numeric id); the bot must be an admin of the channel |
    | `SITE_URL` | the link in Telegram posts (default `https://trywick.fun`) |
+   | `DEPLOYER_WALLET` | the dev wallet that launches $WICK (default: the one in `lib/config.js`). The bot announces the launch in the channel within a minute and pins it |
    | `TELEGRAM_DAILY_HOUR` | hour (UTC) of the daily report in the channel (default `18`, `off` to turn it off) |
    | `TOKEN_TICKER` | defaults to `WICK` |
    | `X_URL` | the X link in the header |

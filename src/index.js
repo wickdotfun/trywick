@@ -11,6 +11,7 @@ import { runBuyback } from '../lib/buyback.js';
 import { tickCycle } from '../lib/cycles.js';
 import { checkMilestones } from '../lib/hall.js';
 import { refreshMarkets } from '../lib/markets.js';
+import { runAnnounce } from '../lib/announce.js';
 import { runShares } from '../lib/sharing.js';
 import { runTelegram } from '../lib/telegram.js';
 import { sweep } from '../lib/matches.js';
@@ -66,6 +67,13 @@ export default {
   async scheduled(event, env) {
     await ensureSchema(env.DB);
     const now = Date.now();
+    // En premier : l'annonce du lancement officiel de $WICK (une seule fois), le plus vite possible.
+    try {
+      const mint = await runAnnounce(env, now);
+      if (mint) console.log('launch announced', mint);
+    } catch (err) {
+      console.error('announce', err?.message ?? err);
+    }
     await sweep(env, now);
     const open = await tickCycle(env, now);
     const step = await recordRun(env, () => runBuyback(env, Date.now()));

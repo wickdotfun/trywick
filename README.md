@@ -52,6 +52,15 @@ Each step is claimed by an atomic database write, so two overlapping crons never
 buy leaves the SOL in the wallet for the next candle. Without `TOKEN_MINT` and `BUYBACK_SECRET_KEY`,
 candles still burn out on time, but no buyback runs ("no buyback yet").
 
+**The admin page** (`/admin`, needs `ADMIN_KEY`) shows the configuration checklist, the buyback wallet
+(SOL, pot, $WICK held), the current candle, the last 20 candles with their buy and burn transactions, and
+the last cron step and error. It has two buttons:
+
+- **Pause buyback**: the emergency switch. No new buy starts (burned-out candles are marked "paused", the pot
+  waits); candles keep burning, and a buy already sent still goes on to its burn. The site shows "Buybacks are
+  paused".
+- **Run buyback now**: moves the buyback forward right away instead of waiting for the next cron.
+
 **The buyback wallet** is a dedicated Solana wallet whose secret key is stored as the
 `BUYBACK_SECRET_KEY` secret. To receive the creator fees, it should be the wallet that launched $WICK on
 pump.fun (or the fee recipient set on pump.fun). Everything it holds above the reserve is spent on
@@ -79,6 +88,7 @@ small JSON API, backed by a [D1](https://developers.cloudflare.com/d1/) database
 | Matches in the database, cron sweep | `lib/matches.js`, `lib/schema.js` |
 | Candles (30-minute cycles) | `lib/candle.js`, `lib/cycles.js` |
 | Buyback and burn | `lib/buyback.js` |
+| Admin page (status, pause, run) | `public/admin.html`, `src/api/admin.js`, `lib/settings.js` |
 
 The database tables (`matches`, `cycles`) are created on the first request. Tables from the previous version of
 the site are left untouched (they can be dropped by hand).
@@ -112,6 +122,7 @@ Locally, `CYCLE_MINUTES=1` in `.dev.vars` lets you see a candle burn out quickly
    | `SOLANA_RPC` (secret, recommended) | a Solana RPC URL (Helius, Triton…). Defaults to the public one, which is rate-limited |
    | `TOKEN_MINT` | the $WICK mint address: turns the buyback on, and shows a `$WICK` link in the header |
    | `BUYBACK_SECRET_KEY` (secret) | the buyback wallet's secret key (Phantom export, base58, or a Solana CLI `[…]` array) |
+   | `ADMIN_KEY` (secret) | long random password (16+ characters) for `/admin`. Without it, the admin page is off |
    | `BUYBACK_COLLECT_FEES` | set to `off` to skip collecting creator fees before each buyback |
    | `CYCLE_MINUTES`, `MATCH_MINUTES` | candle length (default `30`) and time burned per match (default `1`) |
    | `TOKEN_TICKER` | defaults to `WICK` |

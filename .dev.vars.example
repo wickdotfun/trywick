@@ -9,3 +9,5 @@ DEV_NO_IP_LIMIT=
 # Buyback (never with a real wallet locally)
 # TOKEN_MINT=
 # BUYBACK_SECRET_KEY=
+# Admin page (/admin)
+# ADMIN_KEY=a-long-random-password

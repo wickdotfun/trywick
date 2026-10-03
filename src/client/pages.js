@@ -302,33 +302,52 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
     const l = world.launch || {};
     const fee = l.feeSol || 0.02;
     const s = l.split || { creatorBps: 9000, burnBps: 500, teamBps: 500 };
+    const live = Boolean(l.feeSol);
+    const burnPct = s.burnBps / 100, teamPct = s.teamBps / 100, creatorPct = s.creatorBps / 100;
+    const sharedPct = (10_000 - s.creatorBps) / 100;
     openModal(`
       <h2>How WICK works</h2>
-      <p class="muted"><b class="gold">WICK is the launchpad that burns itself.</b> Every coin launched here is a match.
-        Every match feeds the flame. The flame burns ${tk()}.</p>
+      <p class="muted"><b class="gold">WICK is the launchpad that burns itself.</b> Launch a pump.fun coin from WICK and it pays
+        a small Ignition Fee. Half of it buys ${tk()} and burns it. The more WICK is used, the more of its own supply disappears.</p>
       <ol class="loop big">
         <li>${icon('rocket')}<b>Launch a coin</b><small>on pump.fun, from your wallet</small></li>
         <li>${icon('flame')}<b>Generate fees</b><small>Ignition Fee + shared creator fees</small></li>
-        <li>${icon('swap')}<b>Buy ${tk()}</b><small>within a minute</small></li>
+        <li>${icon('swap')}<b>Buy ${tk()}</b><small>with the burn share</small></li>
         <li>${icon('candle')}<b>Burn ${tk()}</b><small>gone from circulation</small></li>
       </ol>
+      ${live ? '' : `<p class="note"><b>Before ${tk()} is live,</b> launching on WICK has no Ignition Fee and no fee sharing:
+        you only pay pump.fun's own costs. Everything below switches on at the ${tk()} launch.</p>`}
       <ol class="how">
-        <li><b>Launch a coin.</b> Name, ticker, image, socials: your coin is created on pump.fun, signed
-          by your own wallet. You are its creator and you get its pump.fun creator fees.</li>
-        <li><b>The Ignition Fee.</b> A ${fee} SOL fee that belongs to WICK (it is not a pump.fun fee), signed together with
-          your launch. <b>50% burns ${tk()}, 50% funds the team</b>: the burn half buys ${tk()} and burns it within a minute,
-          the other half goes to the WICK team wallet, in the same transaction.</li>
-        <li><b>Share the fire (optional).</b> When you launch, you can share ${(10_000 - s.creatorBps) / 100}% of
-          your coin's pump.fun creator fees with WICK, forever. Your Ignition Fee drops to ${l.sharedFeeSol ?? 0.01} SOL.
-          The split is <b>${s.creatorBps / 100}% creator · ${s.burnBps / 100}% burn · ${s.teamBps / 100}% team</b>, locked on
-          pump.fun itself: nobody can change it, not even WICK.</li>
-        <li><b>The breath.</b> Every ${span(b?.durationMs ?? 1_800_000)} at most, everything waiting in the WICK burn wallet
-          (the burn share of the fees) buys ${tk()} back and burns it. Every launch brings the next one ${span(b?.matchMs ?? 60_000)} closer.</li>
+        <li><b>Launch a coin.</b> Name, ticker, image, links and an optional dev buy: your coin is created on pump.fun,
+          signed by your own wallet (two approvals: the launch, then the Ignition Fee). You are its creator: its pump.fun
+          page and its creator fees are yours. On WICK it becomes a match orbiting the candle.</li>
+        <li><b>The Ignition Fee: ${fee} SOL.</b> WICK's own fee, not a pump.fun fee. <b>50% burns ${tk()}, 50% funds the
+          team</b>: both transfers sit in one transaction you see in your wallet before you sign. The burn half buys ${tk()}
+          and burns it within a minute of your launch.</li>
+        <li><b>Share your creator fees (optional).</b> Share ${sharedPct}% of your coin's pump.fun creator fees with WICK,
+          forever, and your Ignition Fee drops to ${l.sharedFeeSol ?? 0.01} SOL. The split is <b>${creatorPct}% you ·
+          ${burnPct}% burn · ${teamPct}% team</b>, set with pump.fun's own fee sharing and locked on-chain: nobody can
+          change it, not even WICK. pump.fun pays each part directly.</li>
+        <li><b>The breath.</b> On top of the burn of each launch, a buyback every ${span(b?.durationMs ?? 1_800_000)} at most:
+          everything waiting in the WICK burn wallet (the burn share of shared creator fees, and any leftovers) buys
+          ${tk()} back and burns it. Every launch brings the next one ${span(b?.matchMs ?? 60_000)} closer: the countdown is
+          on the home page.</li>
         <li><b>The candle is the supply.</b> One candle = ${c?.stepPct ?? 0.5}% of the ${tk()} supply. It melts with every
-          burn and never comes back. Fully melted, it enters the Hall of Flames, and the next season starts.</li>
-        <li><b>Your flames.</b> Coins launched by a ${tk()} holder burn in gold. Creators climb the Pyromaniacs
-          leaderboard and unlock achievements.</li>
+          burn and never comes back. Fully melted, it enters the Hall of Flames, and the next one is lit.</li>
+        <li><b>Living matches.</b> Every coin launched on WICK orbits the candle. Coins that pump grow and move closer to
+          the flame, dead ones fade. Coins launched by a ${tk()} holder burn in gold.</li>
+        <li><b>Your flames.</b> Track your coins and unlock achievements in Your flames, climb the Pyromaniacs leaderboard,
+          browse every coin in Explore, and follow every number on the Dashboard and in the Telegram channel.</li>
       </ol>
+      <div class="money">
+        <h3>Where the money goes</h3>
+        <dl>
+          <dt>Ignition Fee</dt><dd>50% burns ${tk()} · 50% team</dd>
+          <dt>Shared creator fees</dt><dd>${creatorPct}% creator · ${burnPct}% burn · ${teamPct}% team</dd>
+          <dt>Your coin's creator fees</dt><dd>yours (${creatorPct}% if you share)</dd>
+          <dt>${tk()}'s own creator fees</dt><dd>the team, like any pump.fun coin's creator</dd>
+        </dl>
+      </div>
       <div class="note"><b>Everything is on-chain.</b> Every burn has its Solscan link, and the supply is read from
         Solana. Your keys stay yours: the site never sees them, and every transaction shows up in your wallet before you sign.</div>
       <p class="muted small">Burning removes ${tk()} from circulation. It is a mechanism of the protocol, not a promise about

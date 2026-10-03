@@ -3,7 +3,7 @@ export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&a
 export const short = (k) => (k ? `${k.slice(0, 4)}…${k.slice(-4)}` : '');
 export const fmt = (n) => n.toLocaleString('en-US');
 export const compact = (n) => new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n);
-export const sol = (n) => `${(n ?? 0).toLocaleString('en-US', { maximumFractionDigits: n >= 10 ? 1 : 2 })} SOL`;
+export const sol = (n) => `${(n ?? 0).toLocaleString('en-US', { maximumFractionDigits: n >= 10 ? 1 : n >= 1 ? 2 : 4 })} SOL`;
 // Une durée lisible : « 1 minute », « 30 minutes », « 6 seconds ».
 export function span(ms) {
   if (ms >= 60_000) { const m = Math.round(ms / 6_000) / 10; return `${m} ${m === 1 ? 'minute' : 'minutes'}`; }

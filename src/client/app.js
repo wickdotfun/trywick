@@ -1,47 +1,27 @@
 // Le site : la bougie géante, ses allumettes, le fil, et le bouton pour en frapper une.
 import { createDemo } from './demo.js';
+import { createPages } from './pages.js';
 import { createScene, headColor } from './scene.js';
+import { createTokenPage, remember } from './token.js';
+import { ago, compact, esc, fmt, pumpUrl, short, sol, solscan, span } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 const DEMO = new URLSearchParams(location.search).has('demo');
 const POLL_MS = DEMO ? 1500 : 4000;
 const HEAT_FULL = 25;          // 25 coins en 10 minutes : la flamme est à fond
 
+async function get(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
 const api = DEMO ? createDemo() : {
-  async state(since = 0, markets = false) {
-    const res = await fetch(`/api/state?since=${since}${markets ? '&markets=1' : ''}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  },
-  async leaderboard() {
-    const res = await fetch('/api/leaderboard');
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  },
+  state: (since = 0, markets = false) => get(`/api/state?since=${since}${markets ? '&markets=1' : ''}`),
+  leaderboard: () => get('/api/leaderboard'),
+  launches: (sort, offset = 0) => get(`/api/launches?sort=${encodeURIComponent(sort)}&offset=${offset}`),
+  profile: (wallet) => get(`/api/profile?wallet=${encodeURIComponent(wallet)}`),
+  token: () => get('/api/token'),
 };
-
-// ------------------------------------------------------------ petits outils
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const short = (k) => (k ? `${k.slice(0, 4)}…${k.slice(-4)}` : '');
-const fmt = (n) => n.toLocaleString('en-US');
-const compact = (n) => new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n);
-const sol = (n) => `${(n ?? 0).toLocaleString('en-US', { maximumFractionDigits: n >= 10 ? 1 : 2 })} SOL`;
-// Une durée lisible : « 1 minute », « 30 minutes », « 6 seconds ».
-function span(ms) {
-  if (ms >= 60_000) { const m = Math.round(ms / 6_000) / 10; return `${m} ${m === 1 ? 'minute' : 'minutes'}`; }
-  const s = Math.round(ms / 1000);
-  return `${s} ${s === 1 ? 'second' : 'seconds'}`;
-}
-const solscan = (sig) => `https://solscan.io/tx/${sig}`;
-const pumpUrl = (mint) => `https://pump.fun/coin/${mint}`;
-
-function ago(at, now = Date.now()) {
-  const s = Math.max(0, Math.round((now - at) / 1000));
-  if (s < 45) return 'just now';
-  if (s < 3600) return `${Math.round(s / 60)}m ago`;
-  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
-  return `${Math.round(s / 86400)}d ago`;
-}
 
 function avatar(m, size = 34) {
   const color = headColor(m.mint, m.holder);
@@ -80,11 +60,13 @@ const world = {
   candle: null,              // la bougie de $WICK : { number, melted, burnedPct, stepPct, startedAt }
   breath: null,              // le souffle : le compte à rebours du prochain buyback
   matches: [],               // les allumettes en orbite, de la plus ancienne à la plus récente
+  recent: [],                // les derniers lancements, toutes bougies confondues (le fil)
   history: [],               // les buybacks (un par souffle)
   burns: [],                 // le journal des burns, du plus récent au plus ancien
   hall: [],                  // la salle des bougies consumées
   hot: [],                   // les coins WICK les plus chauds
   totals: { burned: 0, supplyPct: null },
+  total: 0,                  // le nombre de coins lancés
   buyback: { live: false, potSol: null },
   clock: 0,                  // l'écart entre l'horloge du serveur et la nôtre
   heat: 0,
@@ -97,6 +79,7 @@ const world = {
 };
 const ticker = () => esc(world.token?.ticker || 'WICK');
 const pct = (n) => `${n < 1 ? n.toFixed(2) : n.toFixed(n < 10 ? 2 : 1)}%`;
+const pad = (n) => String(n).padStart(3, '0');
 const burnKey = (b) => `${b.kind}:${b.ref}`;
 
 // Le souffle, recalculé chaque seconde avec l'horloge du serveur.
@@ -119,93 +102,113 @@ function renderMeter() {
   const live = world.buyback.live && !world.buyback.paused;
   const off = span(b.matchMs);
   const fee = world.launch?.feeSol || 0;
-  $('candle-no').textContent = `#${c.number}`;
+  const tk = `$${world.token?.ticker || 'WICK'}`;
+  $('candle-no').textContent = `#${pad(c.number)}`;
   $('candle-melt').textContent = `${Math.floor(c.melted * 100)}% melted`;
   $('bar').style.width = `${(c.melted * 100).toFixed(2)}%`;
   $('supply-pct').textContent = pct(c.burnedPct);
-  $('supply-label').textContent = `of $${world.token?.ticker || 'WICK'} burned forever`;
+  $('supply-label').textContent = `of the ${tk} supply burned forever`;
   $('count-label').textContent = p.remaining > 0
     ? (live ? 'Next buyback in' : world.buyback.paused ? 'Buybacks paused · next breath in' : 'Next breath in')
-    : (live ? `Buying back $${world.token?.ticker || 'WICK'}…` : 'Breathing…');
+    : (live ? `Buying back ${tk}…` : 'Breathing…');
   $('countdown').textContent = clockText(p.remaining);
   $('countdown').classList.toggle('hot', p.remaining < 60_000);
   $('meter-sub').innerHTML = live
-    ? `Every coin launched here burns <b>${fee ? `${fee} SOL of $${ticker()}` : `$${ticker()}`}</b> right away and brings the buyback <b>${off}</b> closer.`
+    ? `Every launch removes ${fee ? `<b>${fee} SOL of ${esc(tk)}</b>` : esc(tk)} from circulation and brings the buyback <b>${off}</b> closer.`
     : world.buyback.paused
       ? 'Buybacks are paused for now. The candle waits.'
-      : `The candle melts once $${ticker()} is live: every buyback and every launch will burn it.`;
+      : `The candle starts melting once ${esc(tk)} is live.`;
   $('cta-sub').innerHTML = fee
-    ? `Launch your coin on pump.fun · <b>${fee} SOL of $${ticker()} burned</b> with it`
-    : 'Launch your coin on pump.fun · it joins the orbit';
-  document.querySelectorAll('[data-t="match"]').forEach((el) => { el.textContent = off; });
-  document.querySelectorAll('[data-t="step"]').forEach((el) => { el.textContent = `${c.stepPct}%`; });
-  document.querySelectorAll('[data-t="fee-line"]').forEach((el) => {
-    el.textContent = fee ? `Its ${fee} SOL launch fee buys back $${world.token?.ticker || 'WICK'} and burns it within a minute`
-      : 'Once $WICK is live, its launch fee buys back $WICK and burns it within a minute';
-  });
+    ? `Launch your coin on pump.fun · <b>${fee} SOL Ignition Fee</b> burns ${esc(tk)}`
+    : 'Launch your coin on pump.fun · it feeds the flame';
+  document.querySelectorAll('[data-t="ticker"]').forEach((el) => { el.textContent = tk; });
   if (!scene?.burning) scene?.setCandle({ melted: c.melted, heat: world.heat / HEAT_FULL });
   if (document.body.classList.contains('no-webgl')) {
     $('css-candle').style.setProperty('--h', `${Math.max(4, (1 - c.melted) * 100)}%`);
   }
+  tokenPage.tick();
 }
 
 function renderStats() {
-  const t = world.totals, b = world.buyback;
+  const t = world.totals;
   $('st-burned-label').textContent = `$${world.token?.ticker || 'WICK'} burned`;
   $('st-burned').textContent = t.burned ? compact(t.burned) : '0';
-  $('st-pot').textContent = b.live && b.potSol != null ? sol(b.potSol) : 'soon';
-  $('st-candles').textContent = fmt((world.candle?.number ?? 1) - 1);
+  $('st-sol').textContent = (t.sol || 0).toLocaleString('en-US', { maximumFractionDigits: t.sol >= 10 ? 1 : 3 });
+  $('st-launches').textContent = fmt(t.launches ?? world.total ?? 0);
 }
 
-function historyLine(h) {
-  const link = (sig, text) => (sig ? `<a href="${solscan(esc(sig))}" target="_blank" rel="noopener">${text}</a>` : text);
-  let what;
-  if (h.status === 'burned' && h.burned > 0) {
-    what = `${sol(h.buySol)} → ${link(h.burnSig, `<b>${compact(h.burned)} $${ticker()}</b> burned 🔥`)}`;
-  } else if (h.note === 'not_live' || (h.status === 'ended' && !world.buyback.live)) {
-    what = 'no buyback yet';
-  } else if (h.note === 'paused' || (h.status === 'ended' && world.buyback.paused)) {
-    what = 'buyback paused, pot carried over';
-  } else if (['ended', 'buying', 'bought', 'burning_tx'].includes(h.status)) {
-    what = '<span class="pulse-text">buyback in progress…</span>';
-  } else if (h.note === 'empty_pot') {
-    what = 'pot too small, carried over';
-  } else {
-    what = 'buyback missed, pot carried over';
-  }
-  return `<li><span class="mono">#${h.number}</span><span>${what}</span></li>`;
-}
-
-function feedItem(m) {
-  const tags = [
-    m.holder ? '<i class="tag gold" title="Launched by a $WICK holder">👑</i>' : '',
-    m.burned > 0 ? `<i class="tag fire" title="$WICK burned by this launch">🔥 ${compact(m.burned)}</i>` : '',
-  ].join('');
-  return `<li class="fi${world.mine.has(m.mint) ? ' mine' : ''}${m.holder ? ' holder' : ''}">
+// Le fil : chaque lancement (et son Ignition Fee ajoutée au feu), chaque burn, le buyback en cours.
+function launchCard(m) {
+  const fee = m.fee ?? null;
+  return `<li class="ev launch${world.mine.has(m.mint) ? ' mine' : ''}${m.holder ? ' holder' : ''}">
     <a href="${pumpUrl(m.mint)}" target="_blank" rel="noopener">
       ${avatar(m)}
-      <span class="fi-main"><b>$${esc(m.symbol)} ${tags}</b><span>${esc(m.name)}</span></span>
-      <span class="fi-meta"><span class="mono">${m.mcap ? `$${compact(m.mcap)}` : `#${fmt(m.seq)}`}</span><time data-at="${m.at}">${ago(m.at)}</time></span>
+      <span class="ev-main"><b>$${esc(m.symbol)} launched${m.holder ? ' <i class="tag gold" title="Launched by a $WICK holder">👑</i>' : ''}</b>
+        <span>${fee ? `<em class="fire">+${fee} SOL</em> added to the fire` : esc(m.name)}</span></span>
+      <span class="ev-meta"><span class="mono">${m.mcap ? `$${compact(m.mcap)}` : `#${fmt(m.seq)}`}</span><time data-at="${m.at}">${ago(m.at)}</time></span>
     </a></li>`;
 }
 
+function burnCard(b) {
+  const what = b.kind === 'match' ? `$${esc(b.symbol || '?')}'s Ignition Fee` : `buyback #${esc(b.ref)}`;
+  const inner = `<span class="ev-ico">🔥</span>
+      <span class="ev-main"><b>${compact(b.burned)} $${ticker()} burned</b><span>${sol(b.sol)} used · ${what}</span></span>
+      <span class="ev-meta">${b.sig ? '<span class="mono">TX ↗</span>' : ''}<time data-at="${b.at}">${ago(b.at)}</time></span>`;
+  return `<li class="ev burn">${b.sig ? `<a href="${solscan(esc(b.sig))}" target="_blank" rel="noopener">${inner}</a>` : `<div>${inner}</div>`}</li>`;
+}
+
+function pendingCard() {
+  const h = world.history[0];
+  if (!h || !['ended', 'buying', 'bought', 'burning_tx'].includes(h.status) || !world.buyback.live || world.buyback.paused) return '';
+  return `<li class="ev pending"><div><span class="ev-ico">💨</span>
+    <span class="ev-main"><b>Buyback #${h.number}</b><span class="pulse-text">buying $${ticker()}…</span></span></div></li>`;
+}
+
 function renderFeed() {
-  const items = world.matches.slice(-40).reverse();
-  $('feed').innerHTML = items.length
-    ? items.map(feedItem).join('')
-    : '<li class="fi-empty">No match on this candle yet.<br>Strike the first one.</li>';
-  $('finals').hidden = !world.history.length;
-  $('finals-list').innerHTML = world.history.slice(0, 8).map(historyLine).join('');
+  const events = [
+    ...world.recent.map((m) => ({ at: m.at, html: () => launchCard(m) })),
+    ...world.burns.slice(0, 40).map((b) => ({ at: b.at, html: () => burnCard(b) })),
+  ].sort((a, b) => b.at - a.at).slice(0, 50);
+  $('feed').innerHTML = pendingCard() + (events.length
+    ? events.map((e) => e.html()).join('')
+    : `<li class="fi-empty">The fire is quiet.<br>Strike the first match.</li>`);
 }
 
 function renderToken() {
   const t = world.token;
   if (!t) return;
-  const btn = $('wick-btn');
-  btn.textContent = `$${t.ticker}`;
-  btn.hidden = !t.mint;
-  if (t.mint) btn.href = pumpUrl(t.mint);
+  $('wick-btn').textContent = `$${t.ticker}`;
   if (t.x) $('x-link').href = t.x;
+  if (t.telegram) $('tg-link').href = t.telegram;
+}
+
+// Le reçu d'un burn, au-dessus de la bougie : la flamme se ravive, la bougie fond.
+const pops = [];
+let popping = false;
+function burnPop(b) {
+  pops.push(b);
+  if (!popping) nextPop();
+}
+function nextPop() {
+  const b = pops.shift();
+  const el = $('burn-pop');
+  if (!b) { popping = false; return; }
+  popping = true;
+  el.innerHTML = `<strong>🔥 ${fmt(Math.round(b.burned))} $${ticker()} burned</strong>
+    <span>${sol(b.sol)} used · ${b.kind === 'match' ? `$${esc(b.symbol || '?')}'s Ignition Fee` : `buyback #${esc(b.ref)}`}</span>
+    ${b.sig ? `<a href="${solscan(esc(b.sig))}" target="_blank" rel="noopener">View TX ↗</a>` : ''}`;
+  el.hidden = false;
+  el.classList.remove('out');
+  void el.offsetWidth;
+  el.classList.add('in');
+  scene?.flare();
+  $('candle-card').classList.remove('melt');
+  void $('candle-card').offsetWidth;
+  $('candle-card').classList.add('melt');
+  setTimeout(() => {
+    el.classList.add('out');
+    setTimeout(() => { el.hidden = true; el.classList.remove('in', 'out'); nextPop(); }, 500);
+  }, pops.length ? 3200 : 6000);
 }
 
 // Les nouveaux burns : une notification pour chacun (pas au premier chargement).
@@ -221,13 +224,12 @@ function mergeBurns(data, first) {
     world.burns.unshift(b);
     if (first) continue;
     if (b.kind === 'match') {
-      toast(`<span>🔥 <b>$${esc(b.symbol || '?')}</b>'s launch burned <b>${compact(b.burned)} $${ticker()}</b></span>`, 6000);
-      const m = world.matches.find((x) => x.mint === b.ref);
-      if (m) m.burned = b.burned;
-    } else {
-      toast(`<span>🔥 <b>Buyback #${esc(b.ref)}</b> burned <b>${compact(b.burned)} $${ticker()}</b> · ${sol(b.sol)}</span>`, 7000);
+      for (const list of [world.matches, world.recent]) {
+        const m = list.find((x) => x.mint === b.ref);
+        if (m) m.burned = b.burned;
+      }
     }
-    scene?.flare();
+    burnPop(b);
   }
 }
 
@@ -235,6 +237,7 @@ function applyState(data, first) {
   world.token = data.token;
   world.launch = data.launch;
   world.heat = data.heat;
+  world.total = data.total;
   world.clock = data.now - Date.now();
   world.history = data.history || [];
   world.totals = data.totals || world.totals;
@@ -242,6 +245,15 @@ function applyState(data, first) {
   world.hot = data.hot || world.hot;
   if (data.hall) world.hall = data.hall;
   mergeBurns(data, first);
+  // Le fil garde les lancements d'une bougie à l'autre.
+  const seen = new Set(world.recent.map((m) => m.mint));
+  if (data.recent) world.recent = data.recent.slice().reverse();
+  for (const m of data.matches) if (!seen.has(m.mint) && !world.recent.some((x) => x.mint === m.mint)) world.recent.push(m);
+  world.recent = world.recent.slice(-40);
+  if (data.markets) {
+    const byMint = new Map(data.markets.map((k) => [k.mint, k]));
+    for (const m of world.recent) { const k = byMint.get(m.mint); if (k) { m.mcap = k.mcap; m.change = k.change; } }
+  }
 
   const consumed = world.candle && data.candle.number > world.candle.number;
   const breathed = world.breath && data.breath.number !== world.breath.number;
@@ -255,7 +267,9 @@ function applyState(data, first) {
     toast(`<span>💨 <b>Buyback #${world.history[0]?.number ?? ''}</b> is buying back $${ticker()}…</span>`, 5000);
   }
 
-  if (first || !world.candle) {
+  if (world.burningOut) {
+    // La bougie fond encore à l'écran : la suivante attend la fin de l'animation.
+  } else if (first || !world.candle) {
     world.candle = data.candle;
     world.matches = data.matches;
     scene?.setMatches(world.matches);
@@ -263,10 +277,12 @@ function applyState(data, first) {
     // Une bougie entière a fondu : ce palier de $WICK est brûlé pour de bon. Les allumettes
     // plongent dans la flamme, la bougie rejoint la salle, la suivante sort de la cire.
     const done = world.candle.number;
-    toast(`<span>🕯️ <b>Candle #${done} consumed.</b> ${pct(data.candle.burnedPct)} of $${ticker()} burned forever.</span>`, 8000);
+    toast(`<span>🕯️ <b>Candle #${pad(done)} fully melted 🔥</b> ${pct(data.candle.burnedPct)} of $${ticker()} burned forever. It joins the Hall of Flames.</span>`, 8000);
+    world.burningOut = true;
     world.candle = { ...world.candle, melted: 1 };
     scene?.setCandle({ melted: 1, heat: data.heat / HEAT_FULL });
     const after = () => {
+      world.burningOut = false;
       world.candle = data.candle;
       world.matches = data.matches;
       for (const m of data.matches) { scene?.addMatch(m); world.fresh.set(m.mint, performance.now()); }
@@ -405,153 +421,40 @@ function openModal(html, cls = '') {
 modal.addEventListener('click', (e) => { if (e.target === modal && !busy) modal.close(); });
 modal.addEventListener('cancel', (e) => { if (busy) e.preventDefault(); });
 
-function howItWorks() {
-  const b = world.breath, c = world.candle;
-  const fee = world.launch?.feeSol || 0.02;
-  openModal(`
-    <h2>How it works</h2>
-    <ol class="how">
-      <li><b>The candle is $${ticker()}.</b> It melts as $${ticker()} is burned, and it never comes back.
-        One candle = ${c?.stepPct ?? 0.5}% of the supply. When it's fully consumed, that slice of $${ticker()} is gone
-        forever: the candle joins the hall and the next one is lit.</li>
-      <li><b>Strike a match = launch a coin.</b> Pick a name, a ticker and an image: your coin is created on
-        pump.fun, signed by your own wallet. You are its creator.</li>
-      <li><b>Every launch burns $${ticker()}.</b> A ${fee} SOL launch fee, signed with your launch, buys back
-        $${ticker()} and burns it within a minute.</li>
-      <li><b>The breath: a buyback every ${span(b?.durationMs ?? 1_800_000)} at most.</b> The $${ticker()} creator fees buy back
-        and burn $${ticker()}. Every launch brings the next one ${span(b?.matchMs ?? 60_000)} closer.</li>
-      <li><b>Living matches.</b> Coins that pump grow and move closer to the flame. Coins launched by a $${ticker()}
-        holder burn in gold. The best creators climb the Pyromaniacs leaderboard.</li>
-    </ol>
-    <div class="note">
-      <b>Everything is on-chain.</b> Every buyback and every burn has its Solscan link. Your keys stay yours: the
-      site never sees them, and every transaction shows up in your wallet before you sign.
-    </div>
-    <p class="muted small">WICK is a meme. Coins launched here are made by their creators, not by WICK.
-    Nothing here is financial advice.</p>`, 'm-how');
-}
+const isOpen = (cls) => modal.open && modal.classList.contains(cls);
+// Fermer une page enlève son adresse (#explore, #wick…) de la barre d'adresse.
+modal.addEventListener('close', () => {
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+});
 
-// ------------------------------------------------------------ le suivi des burns
-// La courbe du $WICK brûlé, cumulé dans le temps : une seule série (une aire, une ligne de 2 px),
-// un réticule qui suit la souris, et la liste des burns en dessous comme tableau.
-function burnChart(list) {
-  const pts = [...list].filter((b) => b.at && b.burned > 0).sort((a, b) => a.at - b.at);
-  if (pts.length < 2) return '<p class="muted chart-empty">The chart starts with the first burns.</p>';
-  let total = 0;
-  const series = pts.map((b) => ({ at: b.at, total: (total += b.burned), b }));
-  const W = 560, H = 190, L = 8, R = 52, T = 14, B = 22;
-  const x0 = series[0].at, x1 = series.at(-1).at, ymax = total;
-  const x = (t) => L + ((t - x0) / Math.max(1, x1 - x0)) * (W - L - R);
-  const y = (v) => T + (1 - v / ymax) * (H - T - B);
-  let d = `M${x(series[0].at)},${y(0)}`;
-  for (const p of series) d += ` L${x(p.at).toFixed(1)},${y(p.total).toFixed(1)}`;
-  const area = `${d} L${x(x1)},${y(0)} Z`;
-  const line = d.replace(/^M[^L]+L/, `M${x(series[0].at)},${y(series[0].total)} L`);
-  const ticks = [0, 0.5, 1].map((k) => `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(ymax * k)}" y2="${y(ymax * k)}"/>
-    <text class="axis" x="${W - R + 6}" y="${y(ymax * k) + 4}">${compact(ymax * k)}</text>`).join('');
-  const day = (t) => new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  return `<div class="chart" id="burn-chart" data-points='${JSON.stringify(series.map((p) => [x(p.at), y(p.total), p.at, p.total]))}'>
-    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="$WICK burned over time, ${compact(total)} in total">
-      ${ticks}
-      <path class="area" d="${area}"/>
-      <path class="line" d="${line}"/>
-      <circle class="end" cx="${x(x1)}" cy="${y(total)}" r="4"/>
-      <text class="axis" x="${L}" y="${H - 6}">${day(x0)}</text>
-      <text class="axis" x="${W - R}" y="${H - 6}" text-anchor="end">${day(x1)}</text>
-      <line class="cross" id="cross" x1="0" x2="0" y1="${T}" y2="${H - B}" visibility="hidden"/>
-      <circle class="dot" id="cross-dot" r="4" cx="-10" cy="-10"/>
-    </svg>
-    <div class="chart-tip" id="chart-tip" hidden></div>
-  </div>`;
-}
+// ------------------------------------------------------------ les pages
+const tokenPage = createTokenPage({
+  api, openModal, isOpen, world, ticker, demo: DEMO,
+  breathText: () => (world.breath ? clockText(breathNow().remaining) : '—'),
+  onBurns: () => go('dashboard'),
+});
+const pages = createPages({
+  api, openModal, isOpen, world, ticker, avatar, pct, demo: DEMO,
+  onStrike: () => launchForm(),
+  onToken: () => go('wick'),
+});
 
-function wireChart() {
-  const box = $('burn-chart');
-  if (!box) return;
-  const pts = JSON.parse(box.dataset.points);
-  const svg = box.querySelector('svg');
-  const tip = $('chart-tip');
-  const move = (e) => {
-    const r = svg.getBoundingClientRect();
-    const vx = ((e.clientX - r.left) / r.width) * svg.viewBox.baseVal.width;
-    let best = pts[0];
-    for (const p of pts) if (Math.abs(p[0] - vx) < Math.abs(best[0] - vx)) best = p;
-    $('cross').setAttribute('x1', best[0]); $('cross').setAttribute('x2', best[0]);
-    $('cross').setAttribute("visibility", "visible");
-    $('cross-dot').setAttribute('cx', best[0]); $('cross-dot').setAttribute('cy', best[1]);
-    tip.hidden = false;
-    tip.innerHTML = `<b>${compact(best[3])} $${ticker()}</b><span>${new Date(best[2]).toLocaleString()}</span>`;
-    const left = (best[0] / svg.viewBox.baseVal.width) * r.width;
-    tip.style.left = `${Math.min(r.width - 150, Math.max(0, left - 70))}px`;
-  };
-  svg.addEventListener('pointermove', move);
-  svg.addEventListener('pointerleave', () => { tip.hidden = true; $('cross').setAttribute("visibility", "hidden"); $('cross-dot').setAttribute('cx', -10); });
-}
-
-function burnTracker() {
-  const t = world.totals, c = world.candle;
-  const rows = world.burns.slice(0, 60).map((b) => `<tr>
-    <td>${b.kind === 'match' ? `🔥 Launch <b>$${esc(b.symbol || '?')}</b>` : `💨 Buyback #${esc(b.ref)}`}</td>
-    <td class="num">${sol(b.sol)}</td>
-    <td class="num"><b>${compact(b.burned)}</b></td>
-    <td class="num">${b.sig ? `<a href="${solscan(esc(b.sig))}" target="_blank" rel="noopener">${ago(b.at)} ↗</a>` : ago(b.at)}</td></tr>`).join('');
-  openModal(`
-    <h2>🔥 Burn tracker</h2>
-    <div class="bt-hero">
-      <div><strong>${compact(t.burned || 0)}</strong><span>$${ticker()} burned</span></div>
-      <div><strong>${t.supplyPct != null ? pct(t.supplyPct) : '—'}</strong><span>of the supply, forever</span></div>
-      <div><strong>${fmt((c?.number ?? 1) - 1)}</strong><span>candles consumed</span></div>
-    </div>
-    <p class="muted small">Candle #${c?.number ?? 1} is ${Math.floor((c?.melted ?? 0) * 100)}% melted. One candle = ${c?.stepPct ?? 0.5}% of the $${ticker()} supply.</p>
-    <h3 class="m-sub">$${ticker()} burned over time</h3>
-    ${burnChart(world.burns)}
-    <h3 class="m-sub">Every burn</h3>
-    ${rows ? `<div class="scroll"><table class="bt-table"><thead><tr><th>What</th><th class="num">SOL</th><th class="num">$${ticker()} burned</th><th class="num">When</th></tr></thead><tbody>${rows}</tbody></table></div>`
-      : `<p class="muted">No burn yet. ${world.buyback.live ? 'The first one is coming.' : `Burns start once $${ticker()} is live.`}</p>`}`, 'm-wide');
-  wireChart();
-}
-
-// ------------------------------------------------------------ classements
-async function leaderboardModal(tab = 'pyro') {
-  const tabs = [['pyro', 'Pyromaniacs'], ['hot', 'Hottest coins'], ['hall', 'Candle hall']];
-  const head = `<h2>Leaderboard</h2><div class="tabs">${tabs.map(([k, label]) => `<button class="tab${k === tab ? ' on' : ''}" data-tab="${k}">${label}</button>`).join('')}</div>`;
-  let body = '<p class="muted">Loading…</p>';
-  openModal(head + `<div id="board-body">${body}</div>`, 'm-wide');
-  document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => leaderboardModal(b.dataset.tab)));
-  if (tab === 'pyro') {
-    try {
-      const { pyromaniacs } = await api.leaderboard();
-      body = pyromaniacs.length ? `<p class="muted small">Creators ranked by the $${ticker()} their launches burned. Titles: Spark (1 launch), Firestarter (3), Arsonist (10), Pyromaniac (25).</p>
-        <ol class="board">${pyromaniacs.map((r) => `<li${r.holder ? ' class="holder"' : ''}>
-          <span class="rank">${r.rank}</span>
-          <span class="who"><b>${esc(short(r.creator))}${r.holder ? ' 👑' : ''}</b><em>${esc(r.title)}</em></span>
-          <span class="stat">${fmt(r.launches)} <small>launch${r.launches === 1 ? '' : 'es'}</small></span>
-          <span class="stat">${compact(r.burned)} <small>$${ticker()}</small></span>
-          <span class="stat best">${r.best ? `<a href="${pumpUrl(esc(r.best.mint))}" target="_blank" rel="noopener">$${esc(r.best.symbol)}</a>${r.best.mcap ? ` <small>$${compact(r.best.mcap)}</small>` : ''}` : ''}</span>
-        </li>`).join('')}</ol>` : '<p class="muted">No creator yet. Strike the first match and take the top spot.</p>';
-    } catch {
-      body = '<p class="muted">Could not load the leaderboard. Try again in a moment.</p>';
-    }
-  } else if (tab === 'hot') {
-    body = world.hot.length ? `<p class="muted small">WICK coins with the highest market cap launched in the last 24 hours.</p>
-      <ol class="board">${world.hot.map((m, i) => `<li${m.holder ? ' class="holder"' : ''}>
-        <span class="rank">${i + 1}</span>${avatar(m, 30)}
-        <span class="who"><b><a href="${pumpUrl(m.mint)}" target="_blank" rel="noopener">$${esc(m.symbol)}</a>${m.holder ? ' 👑' : ''}</b><em>${esc(m.name)}</em></span>
-        <span class="stat">$${compact(m.mcap)} <small>mcap</small></span>
-        <span class="stat ${m.change >= 0 ? 'up' : 'down'}">${m.change != null ? `${m.change >= 0 ? '+' : ''}${Math.round(m.change)}%` : ''}</span>
-      </li>`).join('')}</ol>` : '<p class="muted">No coin with a market yet. Market caps come from DexScreener once a coin trades.</p>';
-  } else {
-    body = world.hall.length ? `<p class="muted small">Every consumed candle: ${world.candle?.stepPct ?? 0.5}% of the $${ticker()} supply, burned forever.</p>
-      <ol class="hall">${world.hall.map((h) => `<li>
-        <span class="hall-candle" aria-hidden="true"></span>
-        <span class="who"><b>Candle #${h.number}</b><em>${new Date(h.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</em></span>
-        <span class="stat">${pct(h.pct)} <small>burned</small></span>
-        <span class="stat">${fmt(h.launches)} <small>launches</small></span>
-        <span class="stat best">${h.top ? `hottest <a href="${pumpUrl(esc(h.top.mint))}" target="_blank" rel="noopener">$${esc(h.top.symbol)}</a>` : ''}</span>
-      </li>`).join('')}</ol>` : `<p class="muted">No candle consumed yet. Candle #${world.candle?.number ?? 1} is ${Math.floor((world.candle?.melted ?? 0) * 100)}% melted.</p>`;
-  }
-  const el = $('board-body');
-  if (el) el.innerHTML = body;
+const ROUTES = {
+  explore: () => pages.explore(),
+  wick: () => tokenPage.open(),
+  dashboard: () => pages.dashboard(),
+  burns: () => pages.dashboard(),
+  leaderboard: () => pages.leaderboard(),
+  hall: () => pages.leaderboard('hall'),
+  flames: () => pages.flames(),
+  how: () => pages.how(),
+  strike: () => launchForm(),
+};
+function go(page) {
+  if (busy || !ROUTES[page]) return;
+  ROUTES[page]();
+  const hash = `#${page}`;
+  if (location.hash !== hash) history.replaceState(null, '', location.pathname + location.search + hash);
 }
 
 // ------------------------------------------------------------ frapper une allumette
@@ -575,8 +478,8 @@ const ERRORS = {
   tx_failed: 'The transaction failed on Solana. Try again.',
   send_failed: "Couldn't reach Solana. Try again.",
   mint_taken: 'Something got mixed up. Try again.',
-  no_fee_tx: 'The launch fee was not signed. Try again and approve both in your wallet.',
-  bad_fee_tx: 'The launch fee did not check out. Try again.',
+  no_fee_tx: 'The Ignition Fee was not signed. Try again and approve both in your wallet.',
+  bad_fee_tx: 'The Ignition Fee did not check out. Try again.',
   unsigned: 'Your wallet did not sign everything. Try again.',
 };
 
@@ -588,7 +491,7 @@ function launchForm(error = '') {
   const max = world.launch?.maxDevBuy ?? 5;
   openModal(`
     <h2>Strike a match</h2>
-    <p class="muted">Launch a real coin on pump.fun. It joins the orbit around the $${ticker()} candle${world.launch?.feeSol ? ` and burns $${ticker()} right away` : ''}.</p>
+    <p class="muted">Launch a real coin on pump.fun. It becomes a match orbiting the $${ticker()} candle${world.launch?.feeSol ? `, and its Ignition Fee burns $${ticker()} within a minute` : ''}.</p>
     <form id="launch-form" novalidate>
       <div class="lf-top">
         <label class="drop">
@@ -611,8 +514,8 @@ function launchForm(error = '') {
       </label>
       <div class="presets">${[0, 0.1, 0.5, 1].map((v) => `<button type="button" data-sol="${v}">${v}</button>`).join('')}</div>
       <p class="cost">${world.launch?.feeSol
-        ? `≈ 0.02 SOL to create + <b>${world.launch.feeSol} SOL launch fee, burned as $${ticker()}</b> + network fees + dev buy. One signature.`
-        : '≈ 0.02 SOL to create + network fees + dev buy.'} Your wallet signs, your coin, your creator fees.</p>
+        ? `<b>${world.launch.feeSol} SOL WICK Ignition Fee</b>: buys $${ticker()} and burns it. Plus ≈ 0.02 SOL of pump.fun creation and network costs, and your dev buy. One approval.`
+        : '≈ 0.02 SOL of pump.fun creation and network costs, plus your dev buy.'} Your wallet signs, your coin, your pump.fun creator fees.</p>
       <p class="error" id="lf-error"${error ? '' : ' hidden'}>${esc(error)}</p>
       <button class="cta wide" type="submit">${DEMO ? 'Strike (demo)' : 'Connect wallet & strike'}</button>
     </form>`, 'm-launch');
@@ -754,6 +657,7 @@ async function submitLaunch(form) {
     draft = { fields: {}, image: null, preview: null };
     if (m) {
       world.mine.add(m.mint);
+      if (m.creator && !DEMO) remember(m.creator);
       await poll();
       if (!world.matches.some((x) => x.mint === m.mint)) {
         world.matches.push(m);
@@ -776,33 +680,20 @@ async function submitLaunch(form) {
 }
 
 function success(m, signature) {
-  const share = `I just launched $${m.symbol} on WICK: every launch burns $${world.token?.ticker || 'WICK'} 🕯️🔥\n${location.origin}`;
+  const share = `I just launched $${m.symbol} on WICK, the launchpad that burns itself. Every coin melts $${world.token?.ticker || 'WICK'} 🕯️🔥\n${location.origin}`;
   openModal(`
     <div class="lit">${avatar(m, 72)}</div>
     <h2><span class="grad">$${esc(m.symbol)}</span> is lit</h2>
-    <p class="muted">Match #${fmt(m.seq)} is orbiting candle #${world.candle?.number ?? 1}${world.launch?.feeSol
-      ? `, and its ${world.launch.feeSol} SOL fee is buying back $${ticker()} to burn it right now` : ''}. The next buyback just came
+    <p class="muted">Match #${fmt(m.seq)} is orbiting candle #${pad(world.candle?.number ?? 1)}${world.launch?.feeSol
+      ? `, and its ${world.launch.feeSol} SOL Ignition Fee is buying $${ticker()} to burn it right now` : ''}. The next buyback just came
     ${span(world.breath?.matchMs ?? 60_000)} closer. Look for the label.</p>
     <div class="wallets">
       <a class="wbtn primary" href="${pumpUrl(m.mint)}" target="_blank" rel="noopener">See it on pump.fun</a>
       <a class="wbtn" href="https://x.com/intent/post?text=${encodeURIComponent(share)}" target="_blank" rel="noopener">Share on X</a>
       ${signature ? `<a class="wbtn" href="https://solscan.io/tx/${esc(signature)}" target="_blank" rel="noopener">Transaction</a>` : ''}
+      <button class="wbtn" id="see-flames">Your flames 🔥</button>
     </div>`, 'm-done');
-}
-
-// ------------------------------------------------------------ première visite
-function wireIntro() {
-  const intro = $('intro');
-  let seen = false;
-  try { seen = localStorage.getItem('wick.intro') === '1'; } catch { /* pas de stockage : on l'affiche */ }
-  const close = () => {
-    intro.hidden = true;
-    document.body.classList.remove('intro-open');
-    try { localStorage.setItem('wick.intro', '1'); } catch { /* tant pis */ }
-  };
-  if (!seen) { intro.hidden = false; document.body.classList.add('intro-open'); }
-  $('intro-close').addEventListener('click', close);
-  $('intro-strike').addEventListener('click', () => { close(); launchForm(); });
+  $('see-flames').addEventListener('click', () => go('flames'));
 }
 
 // ------------------------------------------------------------ démarrage
@@ -812,11 +703,9 @@ function start() {
     $('demo-bar').innerHTML = 'Demo · a simulated, sped-up world · <a href="/">see the real candle</a>';
   }
   $('strike-btn').addEventListener('click', () => launchForm());
-  wireIntro();
-  $('how-btn').addEventListener('click', howItWorks);
-  $('burns-btn').addEventListener('click', burnTracker);
-  $('board-btn').addEventListener('click', () => leaderboardModal());
-  $('finals-more').addEventListener('click', burnTracker);
+  document.querySelectorAll('[data-go]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); go(a.dataset.go); }));
+  $('menu-btn').addEventListener('click', () => pages.menu(go));
+  $('feed-more').addEventListener('click', () => go('explore'));
   $('feed-toggle').addEventListener('click', () => document.body.classList.toggle('feed-open'));
   wirePointer();
   setInterval(() => {
@@ -830,7 +719,10 @@ function start() {
     if (breathNow().remaining === 0 && !scene?.burning) poll();
   }, 1000);
   startScene();
-  poll(true);
+  // Une page demandée dans l'adresse (trywick.fun/#wick…) s'ouvre une fois l'état chargé.
+  const page = location.hash.slice(1);
+  poll(true).then(() => { if (ROUTES[page]) go(page); });
+  tokenPage.prefetch();
 }
 
 start();

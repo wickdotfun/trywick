@@ -40,6 +40,7 @@ export function createDemo() {
       hall.unshift({
         number: hall.length + 1, startedAt: since, completedAt: Date.now(), launches: during.length || 3 + Math.floor(Math.random() * 9),
         burned: SUPPLY * STEP / 100, pct: (hall.length + 1) * STEP, top: top ? { mint: top.mint, symbol: top.symbol, mcap: top.mcap } : null,
+        sol: Math.round((SUPPLY * STEP / 100 / WICK_PER_SOL) * 100) / 100, burns: 4 + Math.floor(Math.random() * 30), sig: null,
       });
     }
     return b;
@@ -53,12 +54,14 @@ export function createDemo() {
       seq: ++seq, mint: key(), creator: pick(creators), name: `${a} ${b}`, symbol, image: null,
       devBuy: Math.random() < 0.5 ? 0 : Math.round(Math.random() * 20) / 10, at,
       holder: Math.random() < 0.18, mcap, change: mcap ? Math.round((Math.random() - 0.35) * 160) : null, burned: null,
+      volume: mcap ? Math.round(mcap * (0.2 + Math.random() * 1.5)) : null, sig: null, fee: null,
       ...extra,
     };
     all.push(m);
     breath.matches++;
     pot += 0.01 + Math.random() * 0.02;     // les creator fees qui coulent
     // Son frais de lancement est brûlé quelques secondes plus tard.
+    m.fee = FEE;
     setTimeout(() => { m.burned = burn('match', m.mint, FEE - 0.0005, m.symbol).burned; }, 2500 + Math.random() * 3000);
     return m;
   }
@@ -131,9 +134,13 @@ export function createDemo() {
         totals: {
           burned, supplyPct: (burned / SUPPLY) * 100,
           buybacks: burns.filter((b) => b.kind === 'candle').length, matchBurns: burns.filter((b) => b.kind === 'match').length,
+          sol: burns.reduce((n, b) => n + b.sol, 0), launches: seq, ignitionSol: all.filter((m) => m.fee).length * FEE,
+          volume24h: all.reduce((n, m) => n + (m.volume || 0), 0), supply: { original: SUPPLY, current: SUPPLY - burned },
+          lastLaunch: all.length ? { mint: all.at(-1).mint, symbol: all.at(-1).symbol, at: all.at(-1).at, sig: null } : null,
         },
         burns: { full, list: (full ? burns : burns.slice(0, 20)).map((b) => ({ ...b })) },
-        hall: full ? hall.map((h) => ({ ...h })) : null,
+        hall: hall.map((h) => ({ ...h })),
+        recent: full ? all.slice(-30).reverse().map(pub) : null,
         hot: all.filter((m) => m.mcap && m.at > now - 86_400_000).sort((a, b) => b.mcap - a.mcap).slice(0, 5).map(pub),
         markets: full || markets ? inOrbit.filter((m) => m.mcap).map((m) => ({ mint: m.mint, mcap: m.mcap, change: m.change })) : null,
         buyback: { live: true, paused: false, potSol: pot, wallet: null },
@@ -155,6 +162,66 @@ export function createDemo() {
       const rows = [...by.values()].sort((a, b) => b.burned - a.burned || b.launches - a.launches)
         .map((r, i) => ({ ...r, rank: i + 1, title: titles.find(([n]) => r.launches >= n)[1] }));
       return { pyromaniacs: rows };
+    },
+    async launches(sort = 'trending', offset = 0) {
+      const now = Date.now();
+      const by = {
+        trending: (a, b) => (b.volume || 0) - (a.volume || 0),
+        new: (a, b) => b.seq - a.seq,
+        volume: (a, b) => (b.volume || 0) - (a.volume || 0),
+        burner: (a, b) => (b.burned || 0) - (a.burned || 0),
+      }[sort] || ((a, b) => b.seq - a.seq);
+      const list = all.filter((m) => sort !== 'trending' || m.at > now - 3 * 86_400_000).sort(by);
+      return { sort, coins: list.slice(offset, offset + 30).map(pub), more: list.length > offset + 30 };
+    },
+    async profile(wallet) {
+      const mine = all.filter((m) => m.creator === wallet || (wallet.startsWith('YouDemo') && m.creator === creators[0]));
+      const burnedBy = mine.reduce((n, m) => n + (m.burned || 0), 0);
+      const p = {
+        launches: mine.length, holder: mine.some((m) => m.holder), burned: burnedBy,
+        bestMcap: Math.max(0, ...mine.map((m) => m.mcap || 0)), bestVolume: Math.max(0, ...mine.map((m) => m.volume || 0)),
+      };
+      const ach = [
+        ['first', '🔥', 'First Match', 'Launch your first coin', p.launches >= 1],
+        ['firestarter', '🧨', 'Firestarter', 'Launch 3 coins', p.launches >= 3],
+        ['arsonist', '🚒', 'Arsonist', 'Launch 10 coins', p.launches >= 10],
+        ['burn100k', '🕯️', 'Burned 100K $WICK', 'Your launches burn 100K $WICK', burnedBy >= 100_000],
+        ['burn1m', '🌋', 'Burned 1M $WICK', 'Your launches burn 1M $WICK', burnedBy >= 1_000_000],
+        ['golden', '👑', 'Golden Flame', 'Launch a coin while holding $WICK', p.holder],
+        ['busy', '📈', 'Busy Flame', 'One of your coins trades $10K in a day', p.bestVolume >= 10_000],
+        ['viral', '🚀', 'Viral Flame', 'One of your coins reaches a $100K market cap', p.bestMcap >= 100_000],
+      ].map(([id, icon, label, hint, done]) => ({ id, icon, label, hint, done }));
+      const titles = [[25, 'Pyromaniac'], [10, 'Arsonist'], [3, 'Firestarter'], [1, 'Spark']];
+      return {
+        wallet, ...p, volume24h: mine.reduce((n, m) => n + (m.volume || 0), 0), ignitionSol: mine.length * FEE,
+        since: mine[0]?.at ?? null, title: p.launches ? titles.find(([n]) => p.launches >= n)[1] : null,
+        rank: p.launches ? { rank: 1 + Math.floor(Math.random() * 3), of: creators.length } : null,
+        achievements: ach, coins: [...mine].reverse().map(pub),
+      };
+    },
+    // La page $WICK : un faux marché, une fausse courbe, de faux holders.
+    async token() {
+      const price = 0.0000412 * (1 + burned / SUPPLY);
+      const curve = 0.63;
+      return {
+        mint: 'WicKDemo1111111111111111111111111111111pump',
+        market: {
+          priceUsd: price, priceSol: price / 180, mcap: price * (SUPPLY - burned), change: { h24: 18.4 },
+          volume24h: 182_400, liquidity: null, buys24h: 1840, sells24h: 960, dex: 'pumpfun', pair: 'CurveDemo', url: null, image: null,
+        },
+        curve: { progress: curve, complete: false, sol: 52.3 },
+        supply: SUPPLY - burned,
+        holders: [
+          { owner: 'CurveDemo111111111111111111111111111111111', amount: 3.2e8, pct: 32, label: 'bonding curve' },
+          { owner: 'BuyBackDemo11111111111111111111111111111111', amount: 2.1e7, pct: 2.1, label: 'WICK buyback' },
+          ...Array.from({ length: 8 }, (_, i) => ({ owner: creators[i] || key(), amount: 1.8e7 / (i + 1), pct: 1.8 / (i + 1), label: null })),
+        ],
+      };
+    },
+    async trade({ onStep }) {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      for (const [step, ms] of [['build', 600], ['sign', 900], ['send', 500], ['confirm', 1200]]) { onStep(step); await wait(ms); }
+      return { status: 'ok', signature: null };
     },
     // Le lancement factice : les mêmes étapes que le vrai, sans rien signer.
     async launch({ fields, image, onStep }) {

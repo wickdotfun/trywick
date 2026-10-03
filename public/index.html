@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>WICK — strike a match</title>
-  <meta name="description" content="The candle is $WICK. Every coin launched here burns $WICK, and the candle melts forever. Strike a match.">
-  <meta property="og:title" content="WICK — strike a match">
-  <meta property="og:description" content="The candle is $WICK. Every coin launched here burns $WICK, and the candle melts forever.">
+  <title>WICK — the launchpad that burns itself</title>
+  <meta name="description" content="WICK is the launchpad that burns itself. Launch a coin on pump.fun: its Ignition Fee buys $WICK and burns it. The candle is the $WICK supply.">
+  <meta property="og:title" content="WICK — the launchpad that burns itself">
+  <meta property="og:description" content="Every coin is a match. Every match melts $WICK. Launch coins, burn WICK.">
   <meta property="og:image" content="/brand/og.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="/brand/og.png">
@@ -34,12 +34,20 @@
     </a>
     <nav class="top-right">
       <span class="status" id="status" title="Live"><i></i>live</span>
-      <button class="ghost" id="burns-btn">🔥 Burns</button>
-      <button class="ghost" id="board-btn">Leaderboard</button>
-      <button class="ghost hide-sm" id="how-btn">How it works</button>
-      <a class="ghost tick" id="wick-btn" target="_blank" rel="noopener" hidden>$WICK</a>
+      <a class="ghost" href="#explore" data-go="explore">Explore</a>
+      <a class="ghost tick" href="#wick" data-go="wick" id="wick-btn">$WICK</a>
+      <a class="ghost" href="#dashboard" data-go="dashboard">🔥<span class="hide-sm">&nbsp;Dashboard</span></a>
+      <a class="ghost hide-sm" href="#leaderboard" data-go="leaderboard">Leaderboard</a>
+      <a class="ghost hide-sm" href="#flames" data-go="flames">Your flames</a>
+      <a class="ghost hide-sm" href="#how" data-go="how">How it works</a>
+      <button class="icon-btn show-sm" id="menu-btn" aria-label="Menu">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+      </button>
       <a class="icon-btn" id="x-link" href="https://x.com/trywickdotfun" target="_blank" rel="noopener" aria-label="WICK on X">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.8 3h3.1l-6.8 7.8L22 21h-6.2l-4.9-6.4L5.3 21H2.2l7.3-8.3L2 3h6.4l4.4 5.8L17.8 3zm-1.1 16.2h1.7L7.4 4.7H5.6l11.1 14.5z"/></svg>
+      </a>
+      <a class="icon-btn" id="tg-link" href="https://t.me/trywickdotfun" target="_blank" rel="noopener" aria-label="WICK on Telegram">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.9 4.3 18.7 19.4c-.2 1.1-.9 1.3-1.8.8l-4.9-3.6-2.4 2.3c-.3.3-.5.5-1 .5l.4-5 9.1-8.2c.4-.4-.1-.6-.6-.2L6.2 13 1.4 11.5c-1-.3-1.1-1 .2-1.5L20.5 2.9c.9-.3 1.6.2 1.4 1.4z"/></svg>
       </a>
       <a class="icon-btn" href="https://github.com/wickdotfun/trywick" target="_blank" rel="noopener" aria-label="Source code">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.1-1.46-1.1-1.46-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.56 9.56 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.93.36.31.68.92.68 1.85v2.75c0 .27.18.58.69.48A10 10 0 0 0 12 2z"/></svg>
@@ -47,49 +55,42 @@
     </nav>
   </header>
 
-  <!-- La bougie (= la supply de $WICK) et le souffle (le compte à rebours du buyback) -->
-  <section class="meter">
-    <p class="eyebrow">Candle <b id="candle-no">#1</b> · <span id="candle-melt">0% melted</span></p>
-    <div class="bar" title="This candle = 0.5% of the $WICK supply"><i id="bar"></i></div>
-    <p class="supply"><strong id="supply-pct">0%</strong> <span id="supply-label">of $WICK burned forever</span></p>
-    <p class="count-label" id="count-label">Next buyback in</p>
-    <p class="count"><strong id="countdown">30:00</strong></p>
-    <p class="meter-sub" id="meter-sub">&nbsp;</p>
+  <!-- Ce qu'est WICK, en 3 secondes, puis la bougie (= la supply de $WICK) -->
+  <section class="hero">
+    <h1 class="hero-title">The candle is <span class="grad" data-t="ticker">$WICK</span>. <br>Every coin melts it.</h1>
+    <ol class="loop" aria-label="How WICK works">
+      <li><i>🚀</i>Launch a coin</li>
+      <li><i>🔥</i>Ignition Fee</li>
+      <li><i>💱</i>Buy <span data-t="ticker">$WICK</span></li>
+      <li><i>🕯️</i>Burn <span data-t="ticker">$WICK</span></li>
+    </ol>
+    <div class="candle-card" id="candle-card">
+      <p class="eyebrow"><span>Candle <b id="candle-no">#001</b></span><span id="candle-melt">0% melted</span></p>
+      <div class="bar" title="One candle = 0.5% of the $WICK supply"><i id="bar"></i></div>
+      <p class="supply"><strong id="supply-pct">0%</strong> <span id="supply-label">of the $WICK supply burned forever</span></p>
+      <p class="count-line"><span id="count-label">Next buyback in</span> <strong id="countdown">30:00</strong></p>
+      <p class="meter-sub" id="meter-sub">&nbsp;</p>
+    </div>
     <dl class="stats" id="stats">
       <div><dt id="st-burned-label">$WICK burned</dt><dd id="st-burned">0</dd></div>
-      <div><dt>In the wax</dt><dd id="st-pot">—</dd></div>
-      <div><dt>Candles gone</dt><dd id="st-candles">0</dd></div>
+      <div><dt>SOL used</dt><dd id="st-sol">0</dd></div>
+      <div><dt>Coins launched</dt><dd id="st-launches">0</dd></div>
     </dl>
   </section>
 
-  <!-- À la première visite : ce qu'est le site, en trois lignes -->
-  <section class="intro" id="intro" hidden>
-    <p class="eyebrow">What is WICK?</p>
-    <h1>The candle is $WICK.<br><span class="grad">Every coin melts it.</span></h1>
-    <ol class="intro-steps">
-      <li><i>1</i><span><b>Launch a coin from here.</b> A real pump.fun coin, yours. It becomes a match orbiting the candle.</span></li>
-      <li><i>2</i><span><b>Every launch burns $WICK.</b> <span data-t="fee-line">Its launch fee buys back $WICK and burns it within a minute</span>, and the next buyback comes <span data-t="match">1 minute</span> sooner.</span></li>
-      <li><i>3</i><span><b>The candle never comes back.</b> It melts as $WICK burns: one candle = <span data-t="step">0.5%</span> of the supply. Consumed candles go to the hall.</span></li>
-    </ol>
-    <div class="intro-actions">
-      <button class="cta" id="intro-strike">Strike a match</button>
-      <button class="ghost" id="intro-close">Watch the candle</button>
-    </div>
-  </section>
+  <!-- Le reçu d'un burn, au-dessus de la bougie -->
+  <div class="burn-pop" id="burn-pop" hidden></div>
 
-  <!-- Le fil des allumettes -->
+  <!-- Le fil : chaque lancement, chaque SOL ajouté au feu, chaque burn -->
   <aside class="feed" id="feed-panel">
     <header class="feed-head">
-      <span>Latest matches</span>
+      <span>The fire</span>
       <span class="live"><i></i>live</span>
     </header>
     <ol class="feed-list" id="feed"></ol>
-    <section class="finals" id="finals" hidden>
-      <h3>Buybacks <button class="link-btn tiny" id="finals-more">all burns →</button></h3>
-      <ol id="finals-list"></ol>
-    </section>
+    <button class="feed-more" id="feed-more">Explore every coin →</button>
   </aside>
-  <button class="feed-toggle" id="feed-toggle" aria-label="Latest matches">
+  <button class="feed-toggle" id="feed-toggle" aria-label="Live activity">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
   </button>
 
@@ -99,7 +100,7 @@
       <svg class="match-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19 15.5 8.5"/><circle cx="17" cy="7" r="2.6"/></svg>
       Strike a match
     </button>
-    <p class="cta-sub" id="cta-sub">Launch your coin on pump.fun · it burns $WICK</p>
+    <p class="cta-sub" id="cta-sub">Launch your coin on pump.fun · it feeds the flame</p>
   </div>
 
   <div class="tip" id="tip" hidden></div>

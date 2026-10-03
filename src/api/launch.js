@@ -39,14 +39,17 @@ export async function prepare({ request, env }) {
         .bind(ip, now - 3600_000).first();
       if (n >= CONFIG.preparesPerIpPerHour) return json({ error: 'too_many' }, 429);
     }
+    // Une limite pour tout le site : chaque préparation envoie l'image sur Pinata.
+    const { n: all } = await env.DB.prepare('SELECT COUNT(*) AS n FROM matches WHERE created_at > ?').bind(now - 3600_000).first();
+    if (all >= Number(env.UPLOADS_PER_HOUR || CONFIG.uploadsPerHour)) return json({ error: 'busy' }, 429);
     const image = form.get('image');
     const imageError = validateImage(image);
     if (imageError) return json({ error: imageError }, 400);
     try {
-      meta = await uploadMetadata(launch, image);
+      meta = await uploadMetadata(env, launch, image);
     } catch (err) {
       console.error('ipfs', err.detail || err.message);
-      return json({ error: 'ipfs_failed' }, 502);
+      return json({ error: err.message === 'ipfs_not_configured' ? 'ipfs_not_configured' : 'ipfs_failed' }, 502);
     }
     await env.DB.prepare(
       `INSERT INTO matches (mint, creator, name, symbol, image, uri, dev_buy, ip, created_at, twitter, telegram, website)
@@ -90,8 +93,10 @@ export async function prepare({ request, env }) {
       return json({ error: 'build_failed' }, 502);
     }
   }
+  // Un nouvel essai repart de zéro : une ancienne transaction de fee gardée ne partira jamais.
   await env.DB.prepare(`UPDATE matches SET fee_lamports = ?, fee_to = ?, team_to = ?, team_lamports = ?, share_bps = ?,
-      share_team_bps = ?, share_msg = NULL WHERE mint = ?`)
+      share_team_bps = ?, share_msg = NULL, share_tx = NULL, fee_sig = NULL, fee_state = NULL, share_state = NULL
+      WHERE mint = ? AND seq IS NULL`)
     .bind(fee?.lamports ?? 0, fee?.to ?? null, fee?.teamWallet ?? null, fee?.team?.lamports ?? 0, shareBps, shareTeamBps, launch.mint).run();
   return json({
     tx: base64FromBytes(tx),
@@ -146,26 +151,13 @@ export async function submit({ request, env }) {
   await env.DB.prepare('UPDATE matches SET signature = ?, sent_at = ? WHERE mint = ? AND seq IS NULL')
     .bind(signature, Date.now(), row.mint).run();
 
-  // Avec le partage : la transaction attend que le coin existe (elle part à la confirmation du
-  // lancement, voir releaseHeld dans lib/matches.js).
-  if (feeBytes && row.share_bps > 0) {
-    await env.DB.prepare("UPDATE matches SET share_tx = ?, fee_sig = ?, fee_state = 'held', share_state = 'held' WHERE mint = ?")
-      .bind(body.feeTx, signatureOf(feeBytes), row.mint).run();
-    return json({ status: 'pending', signature });
-  }
-
-  // Le lancement est parti : l'Ignition Fee part juste après. (Si elle échoue, le coin est lancé
-  // quand même, sans burn de lancement.)
+  // L'Ignition Fee (et le partage) attend que le lancement soit confirmé : elle part à la
+  // confirmation (releaseHeld dans lib/matches.js). Un lancement raté ne coûte donc pas de fee.
+  // (Le partage a besoin, en plus, que le coin existe.)
   if (feeBytes) {
-    let state = 'sent';
-    try {
-      await sendTransaction(env, feeBytes);
-    } catch (err) {
-      console.error('fee send', row.mint, err.message);
-      state = 'failed';
-    }
-    await env.DB.prepare('UPDATE matches SET fee_sig = ?, fee_state = ? WHERE mint = ?')
-      .bind(signatureOf(feeBytes), state, row.mint).run();
+    await env.DB.prepare(`UPDATE matches SET share_tx = ?, fee_sig = ?, fee_state = 'held',
+        share_state = CASE WHEN share_bps > 0 THEN 'held' ELSE share_state END WHERE mint = ?`)
+      .bind(body.feeTx, signatureOf(feeBytes), row.mint).run();
   }
   return json({ status: 'pending', signature });
 }

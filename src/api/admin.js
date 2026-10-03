@@ -7,6 +7,7 @@ import { supplyCandle } from '../../lib/candle.js';
 import { CONFIG, candlePct, cycleTiming } from '../../lib/config.js';
 import { burnTotals, launchTotals, publicCycle, tickCycle } from '../../lib/cycles.js';
 import { json } from '../../lib/http.js';
+import { pinataStatus } from '../../lib/pump.js';
 import { ensureSchema } from '../../lib/schema.js';
 import { deployer } from '../../lib/announce.js';
 import { PUMP, PUMP_AMM, shareTotals } from '../../lib/sharing.js';
@@ -114,7 +115,7 @@ export const adminStatus = guarded(async ({ env }) => {
     getSetting(db, 'launch.announced'),
     getSetting(db, 'launch.detected'),
   ]);
-  const [heartbeat, burned, launched, supply, day, market, usd, pot, dev, { results: launches }] = await Promise.all([
+  const [heartbeat, burned, launched, supply, day, market, usd, pot, dev, { results: launches }, pinata] = await Promise.all([
     getSetting(db, 'cron.heartbeat'),
     burnTotals(db),
     launchTotals(db, now),
@@ -129,6 +130,7 @@ export const adminStatus = guarded(async ({ env }) => {
         b.status AS burn_status, b.burned_ui AS burned, b.burn_sig
       FROM matches m LEFT JOIN burns b ON b.kind = 'match' AND b.ref = m.mint
       WHERE m.seq IS NOT NULL OR m.signature IS NOT NULL ORDER BY m.created_at DESC LIMIT 15`).all(),
+    pinataStatus(env),
   ]);
   return json({
     now,
@@ -136,6 +138,7 @@ export const adminStatus = guarded(async ({ env }) => {
     checks: {
       tokenMint: env.TOKEN_MINT || null,
       buybackKey: wallet.key,
+      pinata,
       customRpc: Boolean(env.SOLANA_RPC),
       ipSalt: Boolean(env.IP_SALT),
       collectFees: env.BUYBACK_COLLECT_FEES === 'on',

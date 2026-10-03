@@ -8,6 +8,8 @@ DEV_NO_IP_LIMIT=
 # MATCH_MINUTES=0.25
 # Share of the $WICK supply per candle (default 0.5)
 # CANDLE_PCT=0.5
+# Coin uploads to IPFS (a Pinata API key's JWT)
+# PINATA_JWT=
 # Buyback (never with a real wallet locally)
 # TOKEN_MINT=
 # BUYBACK_SECRET_KEY=

@@ -54,19 +54,21 @@ The site never sees a private key and never asks for a seed phrase.
 
 1. **Prepare** (`POST /api/launch/prepare`): the browser generates the new coin's mint keypair and
    sends the form (name, ticker, image, links, dev buy) with the *public* mint address and the creator's
-   wallet address. The Worker uploads the image and metadata to pump.fun's IPFS, then asks
-   [PumpPortal](https://pumpportal.fun/local-trading-api/trading-api) to build the unsigned `create`
-   transaction.
-   When the buyback is live, it also builds the **launch fee** transfer (0.02 SOL from the creator to the
-   buyback wallet).
+   wallet address. The Worker pins the image, then the metadata JSON (name, symbol, description, image,
+   links) to IPFS through [Pinata](https://pinata.cloud) (`PINATA_JWT`; pump.fun no longer accepts direct
+   uploads for API launches), then asks [PumpPortal](https://pumpportal.fun/local-trading-api/trading-api)
+   to build the unsigned `create` transaction with that metadata URI.
+   When the buyback is live, it also builds the **Ignition Fee** transaction (two transfers from the creator:
+   the burn half to the burn wallet, the team half to the dev wallet).
 2. **Sign** (in the browser): the wallet is connected with the Wallet Standard (Phantom, Solflare, Backpack… are
    detected with their icon, `src/client/connect.js`). One transaction per approval, as Phantom recommends for
    multi-signer transactions: the wallet signs the launch first, then the mint keypair signs it; then the wallet signs
    the Ignition Fee (with fee sharing, if chosen). The server checks the fee transaction by its content, so the
    safety instructions a wallet may add when signing (Phantom's Lighthouse) are accepted.
 3. **Submit** (`POST /api/launch/submit`): the Worker checks that it's a pump.fun transaction, paid and
-   signed by that creator, creating that mint, and that the fee is a real transfer of the right amount to
-   the buyback wallet. It sends the launch, then the fee.
+   signed by that creator, creating that mint, and that the fee holds exactly the right transfers. It sends
+   the launch and **holds the fee**: the fee only goes out once the launch is confirmed, so a failed launch
+   costs no fee.
 4. **Confirm** (`GET /api/launch/status`): once the transaction is confirmed on-chain (success, right
    creator, right mint, pump.fun program called, tokens minted), the match is lit and gets its number.
    The creator's $WICK balance is checked then (gold flame for holders). Once the fee is confirmed, its
@@ -199,6 +201,9 @@ Locally, `CYCLE_MINUTES=1` in `.dev.vars` makes the breath (buyback countdown) 1
    | `IP_SALT` (secret) | random string used to hash IPs |
    | `SOLANA_RPC` (secret, recommended) | a Solana RPC URL (Helius, Triton…). Defaults to the public one, which is rate-limited |
    | `TOKEN_MINT` | the $WICK mint address. Optional: when the dev wallet launches $WICK, the address is detected and used by itself (this variable, if set, wins) |
+   | `PINATA_JWT` (secret) | the JWT of a [Pinata](https://pinata.cloud) API key (free plan, Admin): coin images and metadata go to IPFS through it. Without it, launching from the site is off |
+   | `IPFS_GATEWAY` | the IPFS gateway used in metadata links (default `https://ipfs.io`) |
+   | `UPLOADS_PER_HOUR` | launches prepared per hour, all visitors together (default `200`, on top of 12 per IP) |
    | `BUYBACK_SECRET_KEY` (secret) | the burn wallet's private key (Phantom → Show Private Key, base58, or a Solana CLI `[…]` array). Not the recovery phrase, never the dev wallet's |
    | `BURN_WALLET` | the only burn wallet address accepted for that key (default: the one in `lib/config.js`) |
    | `ADMIN_KEY` (secret) | long random password (16+ characters) for `/admin`. Without it, the admin page is off |

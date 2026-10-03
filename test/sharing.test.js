@@ -157,7 +157,7 @@ test('launch with sharing: held until the coin exists, then shared, then distrib
   await ensureSchema(db);
   const env = {
     DB: db, TOKEN_MINT: Keypair.generate().publicKey.toBase58(), BUYBACK_SECRET_KEY: base58(wallet.secretKey), BURN_WALLET: wallet.publicKey.toBase58(),
-    SOLANA_RPC: 'https://rpc.test', IP_SALT: 'x',
+    SOLANA_RPC: 'https://rpc.test', IP_SALT: 'x', PINATA_JWT: 'jwt',
   };
   const a = await sharingAccounts(mint);
   const sent = [];
@@ -165,7 +165,7 @@ test('launch with sharing: held until the coin exists, then shared, then distrib
   let vault = 890_880 + 400_000_000;
   globalThis.fetch = async (url, init) => {
     url = String(url);
-    if (url === CONFIG.ipfsUrl) return Response.json({ metadataUri: 'https://ipfs/meta', metadata: { image: 'https://ipfs/img' } });
+    if (url === CONFIG.pinataUploadUrl) return Response.json({ data: { cid: `bafy${Math.random().toString(36).slice(2)}` } });
     if (url === CONFIG.pumpPortalUrl) {
       const ix = new TransactionInstruction({
         programId: new PublicKey(CONFIG.pumpProgram),

@@ -9,6 +9,7 @@ import { isPubkey, validateImage, validateLaunch } from '../../lib/launch.js';
 import { getMatch, publicMatch, settle } from '../../lib/matches.js';
 import { buildCreateTx, uploadMetadata } from '../../lib/pump.js';
 import { ensureSchema } from '../../lib/schema.js';
+import { buildShareTx, checkSignedShareTx } from '../../lib/sharing.js';
 import {
   base64FromBytes, buildTransferTx, bytesFromBase64, checkFeeTx, checkSignedLaunch, getLatestBlockhash,
   sendTransaction, signatureOf,
@@ -55,10 +56,11 @@ export async function prepare({ request, env }) {
     await env.DB.prepare('UPDATE matches SET dev_buy = ? WHERE mint = ?').bind(launch.devBuy, launch.mint).run();
   }
 
-  // Le frais de lancement (quand le buyback tourne) : un virement à signer avec le lancement.
-  const fee = await launchFee(env);
-  await env.DB.prepare('UPDATE matches SET fee_lamports = ?, fee_to = ? WHERE mint = ?')
-    .bind(fee?.lamports ?? 0, fee?.to ?? null, launch.mint).run();
+  // L'Ignition Fee (quand le buyback tourne) : à signer avec le lancement. Avec le partage des
+  // creator fees (au choix du créateur), elle est réduite et part dans la même transaction que
+  // le partage (lib/sharing.js).
+  const shared = fields.share === '1';
+  const fee = (shared && (await launchFee(env, { shared: true }))) || (await launchFee(env));
 
   // Le nom et le ticker de la transaction sont ceux enregistrés avec les métadonnées.
   const row = existing || launch;
@@ -69,25 +71,32 @@ export async function prepare({ request, env }) {
     console.error('pumpportal', err.detail || err.message);
     return json({ error: 'build_failed' }, 502);
   }
-  let feeTx = null;
+  let feeTx = null, shareMsg = null;
   if (fee) {
     try {
-      feeTx = base64FromBytes(buildTransferTx({
-        from: launch.creator, to: fee.to, lamports: fee.lamports, blockhash: await getLatestBlockhash(env),
-      }));
+      const blockhash = await getLatestBlockhash(env);
+      const bytes = fee.bps
+        ? await buildShareTx({ creator: launch.creator, mint: launch.mint, wick: fee.to, wickBps: fee.bps, feeLamports: fee.lamports, blockhash })
+        : buildTransferTx({ from: launch.creator, to: fee.to, lamports: fee.lamports, blockhash });
+      feeTx = base64FromBytes(bytes);
+      if (fee.bps) shareMsg = base64FromBytes(bytes.subarray(1 + 64));
     } catch (err) {
       console.error('fee tx', err.message);
       return json({ error: 'build_failed' }, 502);
     }
   }
-  return json({ tx: base64FromBytes(tx), feeTx, feeSol: fee ? fee.lamports / 1e9 : 0, image: meta.image });
+  await env.DB.prepare('UPDATE matches SET fee_lamports = ?, fee_to = ?, share_bps = ?, share_msg = ? WHERE mint = ?')
+    .bind(fee?.lamports ?? 0, fee?.to ?? null, fee?.bps ?? 0, shareMsg, launch.mint).run();
+  return json({
+    tx: base64FromBytes(tx), feeTx, feeSol: fee ? fee.lamports / 1e9 : 0, shareBps: fee?.bps ?? 0, image: meta.image,
+  });
 }
 
 export async function submit({ request, env }) {
   await ensureSchema(env.DB);
   const body = await request.json().catch(() => null);
   if (!isPubkey(body?.mint) || typeof body.tx !== 'string' || body.tx.length > 4000
-    || (body.feeTx != null && (typeof body.feeTx !== 'string' || body.feeTx.length > 2000))) {
+    || (body.feeTx != null && (typeof body.feeTx !== 'string' || body.feeTx.length > 2400))) {
     return json({ error: 'bad_request' }, 400);
   }
   const row = await getMatch(env.DB, body.mint);
@@ -100,11 +109,14 @@ export async function submit({ request, env }) {
   const problem = checkSignedLaunch(bytes, row);
   if (problem) return json({ error: problem }, 400);
 
-  // Le frais de lancement, s'il y en a un : un virement signé du créateur vers le wallet de buyback.
+  // L'Ignition Fee, s'il y en a une : un virement signé du créateur vers le wallet de buyback, ou,
+  // avec le partage, exactement la transaction préparée (fee + partage), signée par le créateur.
   let feeBytes = null;
-  if (row.fee_lamports > 0) {
+  if (row.fee_lamports > 0 || row.share_bps > 0) {
     try { feeBytes = body.feeTx ? bytesFromBase64(body.feeTx) : null; } catch { feeBytes = null; }
-    const feeProblem = feeBytes ? checkFeeTx(feeBytes, { from: row.creator, to: row.fee_to, lamports: row.fee_lamports }) : 'no_fee_tx';
+    let feeProblem = 'no_fee_tx';
+    if (feeBytes && row.share_bps > 0) feeProblem = row.share_msg ? checkSignedShareTx(feeBytes, bytesFromBase64(row.share_msg)) : 'bad_share_tx';
+    else if (feeBytes) feeProblem = checkFeeTx(feeBytes, { from: row.creator, to: row.fee_to, lamports: row.fee_lamports });
     if (feeProblem) return json({ error: feeProblem }, 400);
   }
 
@@ -121,8 +133,16 @@ export async function submit({ request, env }) {
   await env.DB.prepare('UPDATE matches SET signature = ?, sent_at = ? WHERE mint = ? AND seq IS NULL')
     .bind(signature, Date.now(), row.mint).run();
 
-  // Le lancement est parti : le frais part juste après. (S'il échoue, le coin est lancé quand
-  // même, sans burn de lancement.)
+  // Avec le partage : la transaction attend que le coin existe (elle part à la confirmation du
+  // lancement, voir releaseHeld dans lib/matches.js).
+  if (feeBytes && row.share_bps > 0) {
+    await env.DB.prepare("UPDATE matches SET share_tx = ?, fee_sig = ?, fee_state = 'held', share_state = 'held' WHERE mint = ?")
+      .bind(body.feeTx, signatureOf(feeBytes), row.mint).run();
+    return json({ status: 'pending', signature });
+  }
+
+  // Le lancement est parti : l'Ignition Fee part juste après. (Si elle échoue, le coin est lancé
+  // quand même, sans burn de lancement.)
   if (feeBytes) {
     let state = 'sent';
     try {

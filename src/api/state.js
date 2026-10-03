@@ -10,6 +10,16 @@ export async function state({ request, env }) {
   const params = new URL(request.url).searchParams;
   const since = Number(params.get('since')) || 0;
   const world = await worldState(env, Date.now(), since, params.has('markets'));
-  const fee = await launchFee(env);
-  return json({ ...world, token: tokenInfo(env), launch: { maxDevBuy: CONFIG.maxDevBuySol, feeSol: fee ? fee.lamports / 1e9 : 0 } });
+  const [fee, shared] = await Promise.all([launchFee(env), launchFee(env, { shared: true })]);
+  return json({
+    ...world,
+    token: tokenInfo(env),
+    // L'Ignition Fee, et celle réduite avec le partage des creator fees (shareBps : la part de WICK).
+    launch: {
+      maxDevBuy: CONFIG.maxDevBuySol,
+      feeSol: fee ? fee.lamports / 1e9 : 0,
+      sharedFeeSol: shared ? shared.lamports / 1e9 : null,
+      shareBps: shared?.bps ?? 0,
+    },
+  });
 }

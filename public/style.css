@@ -730,3 +730,15 @@ details[open] { display: flex; flex-direction: column; gap: 10px; }
   .loop.big { grid-template-columns: 1fr 1fr; }
   .loop.big li:not(:last-child)::after { display: none; }
 }
+
+/* ---------------------------------------------------------------- partage des creator fees */
+.share-opt {
+  flex-direction: row !important; align-items: flex-start; gap: 10px !important; padding: 11px 12px; border-radius: 12px; cursor: pointer;
+  border: 1px solid rgba(255, 154, 46, .35); background: rgba(255, 154, 46, .07);
+}
+.share-opt input { flex: none; width: 18px !important; height: 18px; margin: 1px 0 0; padding: 0 !important; accent-color: #ff9a2e; }
+.share-opt span { display: flex; flex-direction: column; gap: 3px; }
+.share-opt b { color: var(--text); font-size: 13px; font-weight: 600; }
+.share-opt small { font-size: 11.5px; line-height: 1.4; color: var(--muted); font-weight: 400; }
+.share-opt small b { font-size: 11.5px; color: var(--gold); }
+.tag.share { color: #b9f0d0; background: rgba(61, 220, 132, .12); }

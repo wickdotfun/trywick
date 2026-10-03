@@ -12,6 +12,9 @@ DEV_NO_IP_LIMIT=
 # TOKEN_MINT=
 # BUYBACK_SECRET_KEY=
 # LAUNCH_FEE_SOL=0.02
+# Creator fee sharing: Ignition Fee with sharing, and WICK's part (basis points, 1000 = 10%)
+# LAUNCH_FEE_SHARED_SOL=0.01
+# SHARE_BPS=1000
 # Admin page (/admin)
 # ADMIN_KEY=a-long-random-password
 # Telegram bot

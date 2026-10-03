@@ -12,6 +12,7 @@ import { cycleTiming } from '../lib/config.js';
 import { tickCycle } from '../lib/cycles.js';
 import { checkMilestones } from '../lib/hall.js';
 import { refreshMarkets } from '../lib/markets.js';
+import { runShares } from '../lib/sharing.js';
 import { runTelegram } from '../lib/telegram.js';
 import { sweep } from '../lib/matches.js';
 import { ensureSchema } from '../lib/schema.js';
@@ -62,7 +63,7 @@ export default {
   // Chaque minute (voir wrangler.toml) : les allumettes envoyées dont le navigateur a été
   // fermé avant la confirmation s'allument quand même (et leur frais de lancement part au burn),
   // la bougie s'éteint à l'heure même sans visiteurs, les burns avancent, le marché des
-  // allumettes se met à jour et le bot Telegram poste.
+  // allumettes se met à jour, les creator fees partagées sont distribuées et le bot Telegram poste.
   async scheduled(event, env) {
     await ensureSchema(env.DB);
     const now = Date.now();
@@ -73,6 +74,7 @@ export default {
     const steps = [
       checkMilestones(env, Date.now()),
       refreshMarkets(env, Date.now(), open?.id),
+      runShares(env, Date.now()),
       runTelegram(env, Date.now(), { ticker: env.TOKEN_TICKER || 'WICK', matchMinutes: cycleTiming(env).matchMs / 60_000 }),
     ];
     for (const r of await Promise.allSettled(steps)) {

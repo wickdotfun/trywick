@@ -163,6 +163,7 @@
         <dt>IP_SALT</dt><dd>${yes(c.ipSalt, 'set', 'missing', 'warn')}</dd>
         <dt>Collect creator fees</dt><dd>${c.collectFees ? 'on' : 'off'}</dd>
         <dt>Ignition Fee (burned)</dt><dd>${c.launchFeeSol ? `${num(c.launchFeeSol)} SOL` : '<span class="muted">off (buyback not live)</span>'}</dd>
+        <dt>Creator fee sharing</dt><dd>${c.shareBps ? `${num(c.shareBps / 100)}% to WICK · Ignition Fee ${num(c.sharedFeeSol)} SOL with sharing · ${num(d.shares?.sharedSol ?? 0)} SOL received from ${d.shares?.sharingCoins ?? 0} coins` : '<span class="muted">off (buyback not live)</span>'}</dd>
         <dt>Telegram bot</dt><dd>${yes(c.telegram, 'on', 'off (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID)', 'warn')}</dd>
         <dt>Candle</dt><dd>${num(c.cycleMinutes)} min · −${num(c.matchMinutes)} min per match</dd>`;
 

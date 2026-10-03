@@ -284,7 +284,7 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
         is gone for good and the candle joins the hall. A new season begins.</p>
         <ol class="hall">${now}${world.hall.map((h) => `<li class="flame">
           <span class="hall-candle" aria-hidden="true"></span>
-          <span class="who"><b>Candle #${pad(h.number)} · fully melted 🔥</b><em>${day(h.completedAt)} · ${fmt(h.launches)} coins launched${h.top ? ` · hottest <a href="${pumpUrl(esc(h.top.mint))}" target="_blank" rel="noopener">$${esc(h.top.symbol)}</a>` : ''}</em></span>
+          <span class="who"><b>Candle #${pad(h.number)} — fully melted 🔥</b><em>${day(h.completedAt)} · ${fmt(h.launches)} coins launched${h.top ? ` · hottest <a href="${pumpUrl(esc(h.top.mint))}" target="_blank" rel="noopener">$${esc(h.top.symbol)}</a>` : ''}</em></span>
           <span class="stat">${compact(h.burned)} <small>${tk()}</small></span>
           <span class="stat">${h.sol != null ? sol(h.sol) : '—'} <small>spent</small></span>
           <span class="stat best">${h.burns != null ? `${fmt(h.burns)} burns` : ''} ${txLink(h.sig, 'last TX ↗')}</span>
@@ -305,7 +305,7 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
         Every match feeds the flame. The flame burns ${tk()}.</p>
       <ol class="loop big">
         <li><i>🚀</i><b>Launch a coin</b><small>on pump.fun, from your wallet</small></li>
-        <li><i>🔥</i><b>Ignition Fee</b><small>${fee} SOL to the fire</small></li>
+        <li><i>🔥</i><b>Generate fees</b><small>${fee} SOL Ignition Fee + creator fees</small></li>
         <li><i>💱</i><b>Buy ${tk()}</b><small>within a minute</small></li>
         <li><i>🕯️</i><b>Burn ${tk()}</b><small>gone from circulation</small></li>
       </ol>

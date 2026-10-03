@@ -247,6 +247,7 @@ body:has(.demo-bar:not([hidden])) .hero { margin-top: 26px; }
 .cta.wide { width: 100%; margin-top: 6px; }
 .match-ico { width: 20px; height: 20px; stroke: #1a0d03; stroke-width: 2.4; stroke-linecap: round; fill: none; }
 .match-ico circle { fill: #b0200e; stroke: none; }
+#strike-btn { white-space: nowrap; height: 58px; padding: 0 34px; font-size: 17px; font-weight: 750; text-transform: uppercase; letter-spacing: .02em; }
 .cta-sub { margin: 0; font-size: 12px; color: var(--muted); text-shadow: 0 1px 10px #000; }
 
 /* ---------------------------------------------------------------- étiquettes, survol */
@@ -414,6 +415,7 @@ details[open] { display: flex; flex-direction: column; gap: 10px; }
   .feed-toggle svg { width: 18px; height: 18px; stroke: var(--text); stroke-width: 2; stroke-linecap: round; fill: none; }
   .feed-open .feed-toggle { bottom: calc(62dvh + 18px); }
   .cta { height: 50px; padding: 0 24px; font-size: 15px; }
+  #strike-btn { height: 52px; padding: 0 26px; font-size: 15px; }
   .cta-wrap { bottom: calc(30px + var(--safe-b)); }
   .toasts { left: 50%; transform: translateX(-50%); bottom: calc(130px + var(--safe-b)); align-items: center; width: max-content; max-width: calc(100% - 32px); }
   .lf-top { flex-direction: column; align-items: stretch; }

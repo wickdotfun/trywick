@@ -10,13 +10,16 @@ feeds the flame. Every flame burns $WICK: launch a coin → Ignition Fee → buy
 - **Strike a match = launch a coin.** Pick a name, a ticker and an image: the coin is created on
   [pump.fun](https://pump.fun), signed by your own wallet. You are its creator (and you get its creator fees).
 - **Every launch burns $WICK.** The **WICK Ignition Fee** (0.02 SOL, WICK's own fee, not a pump.fun fee), signed
-  together with the launch, buys $WICK and burns it within a minute.
+  together with the launch: **50% burns $WICK, 50% funds the team**. Both transfers are in the same transaction; the
+  burn half buys $WICK and burns it within a minute.
 - **Share the fire (optional).** At launch, the creator can share **10% of the coin's pump.fun creator fees** with
-  WICK, forever, and pays a reduced **0.01 SOL** Ignition Fee instead of 0.02. The split (90% creator, 10% WICK) is set
-  with pump.fun's own fee sharing and locked on-chain: nobody can change it, not even WICK. WICK's part buys $WICK and
-  burns it at the next buyback. See "Creator fee sharing" below.
-- **The breath: a buyback every 30 minutes at most.** The $WICK creator fees buy back and burn $WICK. Every
-  launch brings the next buyback 1 minute closer. The countdown is on screen.
+  WICK, forever, and pays a reduced **0.01 SOL** Ignition Fee instead of 0.02 (also 50/50). The split
+  (**90% creator · 5% burn · 5% team**) is set with pump.fun's own fee sharing and locked on-chain: nobody can change
+  it, not even WICK. The burn part buys $WICK and burns it at the next buyback. See "Creator fee sharing" below.
+- **The breath: a buyback every 30 minutes at most.** Everything waiting in the burn wallet buys back and burns
+  $WICK. Every launch brings the next buyback 1 minute closer. The countdown is on screen.
+- **$WICK's own creator fees** are not part of the burn: they go to the dev wallet that launched $WICK, like any
+  pump.fun coin's creator, and the site never touches them.
 - **Living matches.** Each coin orbits the candle; coins that pump (DexScreener market cap) grow and move closer
   to the flame, dead ones fade. Coins launched by a $WICK holder burn in gold.
 - **The fire** (live feed): every launch and its Ignition Fee, every burn with its transaction. Each burn also pops a
@@ -77,11 +80,12 @@ Every burn goes through one queue (`burns` table), run by the cron every minute,
 (`lib/buyback.js`): **buy** $WICK, then **burn** exactly the $WICK that buy brought (SPL `Burn`). Any other
 $WICK in the wallet (a dev buy, for example) is never touched. Two kinds:
 
-- **Buyback** (end of each breath): first **collect** the $WICK creator fees (PumpPortal `collectCreatorFee`),
-  then buy with everything above a 0.02 SOL reserve, minus the launch fees still waiting for their own burn.
-  Below 0.005 SOL, no buyback this time: the pot carries over.
-- **Launch burn**: the 0.02 SOL launch fee (minus 0.0005 SOL kept for network fees), bought back and burned
-  within a minute, with a smaller priority fee.
+- **Buyback** (end of each breath): buy with everything in the burn wallet above a 0.02 SOL reserve, minus the
+  launch fees still waiting for their own burn. Below 0.005 SOL, no buyback this time: the pot carries over.
+  (`BUYBACK_COLLECT_FEES=on` would also claim the $WICK creator fees first; off by default, since they belong to
+  the dev wallet.)
+- **Launch burn**: the burn half of the Ignition Fee (minus 0.0005 SOL kept for network fees), bought back and
+  burned within a minute, with a smaller priority fee.
 
 Each step is claimed by an atomic database write, so two overlapping crons never buy twice. A failed buy
 leaves the SOL in the wallet. Without `TOKEN_MINT` and `BUYBACK_SECRET_KEY`, the breath still runs, nothing is
@@ -94,16 +98,18 @@ pump.fun lets a coin's creator split its creator fees between up to 10 wallets, 
 WICK uses it, as an option chosen by the creator at launch (`lib/sharing.js`):
 
 1. **Prepare**: with sharing, the Worker builds a second transaction, paid and signed by the creator, that holds the
-   reduced Ignition Fee, `create_fee_sharing_config` and `update_fee_shares_v2` (creator 90%, WICK 10%; this last
-   instruction locks the split forever). The wallet signs it together with the launch: still one approval.
+   reduced Ignition Fee (burn half and team half), `create_fee_sharing_config` and `update_fee_shares_v2` (creator
+   90%, burn wallet 5%, team wallet 5%; this last instruction locks the split forever). The wallet signs it right
+   after the launch (a second approval).
 2. **Submit**: the launch is sent; the sharing transaction is checked (byte for byte the one prepared) and **held**: it
    can only work once the coin exists.
 3. **Confirmed**: as soon as the launch is confirmed, the held transaction is sent. It is atomic: if it fails or
    expires, neither the fee nor the split happen (the coin stays launched, without sharing).
 4. **Distribution** (cron, `runShares`): every 6 hours at most per coin, once at least 0.01 SOL of fees has piled up,
-   the buyback wallet calls the permissionless `distribute_creator_fees_v2` (after `transfer_creator_fees_to_pump_v2`
-   for a coin that graduated to PumpSwap). Each shareholder is paid by pump.fun directly. WICK's part (read from the
-   confirmed transaction) is shown on the dashboard and burns at the next buyback, with the rest of the pot.
+   the burn wallet calls the permissionless `distribute_creator_fees_v2` (after `transfer_creator_fees_to_pump_v2`
+   for a coin that graduated to PumpSwap). Each shareholder is paid by pump.fun directly. The burn and team parts
+   (read from the confirmed transaction) are shown on the dashboard and the admin page; the burn part burns at the
+   next buyback, with the rest of the pot.
 
 The instructions are built by hand (no SDK in the Worker) and `test/sharing.test.js` checks they are byte for byte
 those of the official `@pump-fun/pump-sdk` (`test/fixtures/pump-sdk-sharing.json`).
@@ -121,10 +127,15 @@ buy and burn transactions, and the last cron step and error. It has two buttons:
   its burn. The site shows "Buybacks are paused".
 - **Run buyback now**: moves the buyback forward right away instead of waiting for the next cron.
 
-**The buyback wallet** is a dedicated Solana wallet whose secret key is stored as the
-`BUYBACK_SECRET_KEY` secret. To receive the creator fees, it should be the wallet that launched $WICK on
-pump.fun (or the fee recipient set on pump.fun). Everything it holds above the reserve is spent on
-buybacks: never use it for anything else.
+**Two wallets.**
+
+- **The burn wallet** (`5siQ…M69Z`, `buyback.wallet` in `lib/config.js`) is a dedicated Solana wallet whose private
+  key is stored as the `BUYBACK_SECRET_KEY` secret. It receives the burn half of the Ignition Fees and the 5% burn
+  share of shared creator fees, and only ever buys and burns $WICK: everything it holds above the reserve is spent
+  on buybacks, so never use it for anything else. The Worker refuses any other key (`wrong_burn_wallet`), and
+  always refuses the dev wallet's (`dev_wallet_key`).
+- **The dev wallet** (`7ZMM…eLANN`, `launch.deployer`) launches $WICK and receives the team half of the Ignition
+  Fees, the 5% team share of shared creator fees, and 100% of $WICK's own creator fees. The site never holds its key.
 
 ## How it's built
 
@@ -188,14 +199,17 @@ Locally, `CYCLE_MINUTES=1` in `.dev.vars` makes the breath (buyback countdown) 1
    | `IP_SALT` (secret) | random string used to hash IPs |
    | `SOLANA_RPC` (secret, recommended) | a Solana RPC URL (Helius, Triton…). Defaults to the public one, which is rate-limited |
    | `TOKEN_MINT` | the $WICK mint address. Optional: when the dev wallet launches $WICK, the address is detected and used by itself (this variable, if set, wins) |
-   | `BUYBACK_SECRET_KEY` (secret) | the buyback wallet's secret key (Phantom export, base58, or a Solana CLI `[…]` array) |
+   | `BUYBACK_SECRET_KEY` (secret) | the burn wallet's private key (Phantom → Show Private Key, base58, or a Solana CLI `[…]` array). Not the recovery phrase, never the dev wallet's |
+   | `BURN_WALLET` | the only burn wallet address accepted for that key (default: the one in `lib/config.js`) |
    | `ADMIN_KEY` (secret) | long random password (16+ characters) for `/admin`. Without it, the admin page is off |
-   | `BUYBACK_COLLECT_FEES` | set to `off` to skip collecting creator fees before each buyback |
+   | `BUYBACK_COLLECT_FEES` | `on` makes the burn wallet claim $WICK's creator fees before each buyback (default: off, they stay the dev wallet's) |
    | `CYCLE_MINUTES`, `MATCH_MINUTES` | breath length (default `30`) and how much closer each launch brings the buyback (default `1`) |
    | `CANDLE_PCT` | share of the $WICK supply per candle, in % (default `0.5`) |
-   | `LAUNCH_FEE_SOL` | Ignition Fee burned as $WICK (default `0.02`, `0` to turn it off). Only charged while the buyback is live |
+   | `LAUNCH_FEE_SOL` | Ignition Fee (default `0.02`, `0` to turn it off). Only charged while the buyback is live |
    | `LAUNCH_FEE_SHARED_SOL` | Ignition Fee when the creator shares its creator fees (default `0.01`) |
-   | `SHARE_BPS` | WICK's part of shared creator fees, in basis points (default `1000` = 10%, `0` turns the option off) |
+   | `TEAM_FEE_BPS` | team share of the Ignition Fee, in basis points (default `5000` = 50%) |
+   | `TEAM_WALLET` | where the team share goes (default: the dev wallet) |
+   | `SHARE_BURN_BPS`, `SHARE_TEAM_BPS` | burn and team parts of shared creator fees, in basis points (default `500` + `500`: 90/5/5) |
    | `HOLDER_MIN` | minimum $WICK held for a golden flame (default: any amount) |
    | `TELEGRAM_BOT_TOKEN` (secret), `TELEGRAM_CHAT_ID` | the bot (from @BotFather) and the channel (`@yourchannel` or its numeric id); the bot must be an admin of the channel |
    | `SITE_URL` | the link in Telegram posts (default `https://trywick.fun`) |

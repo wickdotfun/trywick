@@ -28,7 +28,7 @@ const norm = (ix) => ({
 test('the fee sharing instructions are exactly those of the official pump.fun SDK', async () => {
   // test/fixtures/pump-sdk-sharing.json : produit par @pump-fun/pump-sdk 2.0.0 pour ces mêmes comptes.
   const a = await sharingAccounts(SDK.mint);
-  const holders = shareholdersFor(SDK.creator, SDK.wick, 1000);
+  const holders = shareholdersFor(SDK.creator, [{ address: SDK.wick, bps: 1000 }]);
   assert.deepEqual(norm(createConfigIx(a, SDK.creator)), SDK.createFeeSharingConfig);
   assert.deepEqual(norm(updateSharesIx(a, SDK.creator, holders)), SDK.updateFeeSharesV2);
   assert.deepEqual(norm(distributeIx(a, SDK.payer, holders.map((h) => h.address))), SDK.distributeCreatorFeesV2);
@@ -64,38 +64,41 @@ test('a hand-built legacy transaction reads back the same in web3.js', () => {
   })), instructions.map((ix) => ({ ...ix, data: Uint8Array.from(ix.data) })));
 });
 
-test('the launch-with-sharing transaction: Ignition Fee, then the locked 90/10 split', async () => {
-  const creator = Keypair.generate(), mint = Keypair.generate().publicKey.toBase58(), wick = Keypair.generate().publicKey.toBase58();
-  const bytes = await buildShareTx({ creator: creator.publicKey.toBase58(), mint, wick, wickBps: 1000, feeLamports: 10_000_000, blockhash: BLOCKHASH });
+test('the launch-with-sharing transaction: Ignition Fee 50/50, then the locked 90/5/5 split', async () => {
+  const creator = Keypair.generate(), mint = Keypair.generate().publicKey.toBase58();
+  const burn = Keypair.generate().publicKey.toBase58(), team = Keypair.generate().publicKey.toBase58();
+  const transfers = [{ to: burn, lamports: 5_000_000 }, { to: team, lamports: 5_000_000 }];
+  const holders = [{ address: burn, bps: 500 }, { address: team, bps: 500 }];
+  const bytes = await buildShareTx({ creator: creator.publicKey.toBase58(), mint, transfers, holders, blockhash: BLOCKHASH });
   assert.ok(bytes.length <= 1232, `too big: ${bytes.length}`);
   const tx = Transaction.from(Buffer.from(bytes));
-  const [, , transfer, create, update] = tx.instructions;
-  assert.equal(tx.instructions.length, 5);
-  assert.equal(transfer.programId.toBase58(), SystemProgram.programId.toBase58());
-  assert.equal(transfer.keys[1].pubkey.toBase58(), wick);
-  assert.equal(Buffer.from(transfer.data).readBigUInt64LE(4), 10_000_000n);
+  const [, , toBurn, toTeam, create, update] = tx.instructions;
+  assert.equal(tx.instructions.length, 6);
+  for (const [ix, to] of [[toBurn, burn], [toTeam, team]]) {
+    assert.equal(ix.programId.toBase58(), SystemProgram.programId.toBase58());
+    assert.equal(ix.keys[1].pubkey.toBase58(), to);
+    assert.equal(Buffer.from(ix.data).readBigUInt64LE(4), 5_000_000n);
+  }
   assert.equal(create.programId.toBase58(), PUMP_FEES);
-  // update_fee_shares_v2 : 2 bénéficiaires, le créateur 9000, WICK 1000.
+  // update_fee_shares_v2 : 3 bénéficiaires, le créateur 9000, le burn 500, l'équipe 500.
   const d = Buffer.from(update.data);
-  assert.equal(d.readUInt32LE(8), 2);
-  assert.equal(base58(d.subarray(12, 44)), creator.publicKey.toBase58());
-  assert.equal(d.readUInt16LE(44), 9000);
-  assert.equal(base58(d.subarray(46, 78)), wick);
-  assert.equal(d.readUInt16LE(78), 1000);
+  assert.equal(d.readUInt32LE(8), 3);
+  assert.deepEqual([0, 1, 2].map((i) => [base58(d.subarray(12 + i * 34, 44 + i * 34)), d.readUInt16LE(44 + i * 34)]),
+    [[creator.publicKey.toBase58(), 9000], [burn, 500], [team, 500]]);
 
-  // Signée par le créateur : acceptée. Pas signée, ou vers un autre wallet, ou pour un autre coin : refusée.
-  const expect = { creator: creator.publicKey.toBase58(), mint, wick, wickBps: 1000, feeLamports: 10_000_000 };
+  // Signée par le créateur : acceptée. Pas signée, ou d'autres parts, ou pour un autre coin : refusée.
+  const expect = { creator: creator.publicKey.toBase58(), mint, transfers, holders };
   assert.equal(checkSignedShareTx(Uint8Array.from(bytes), expect), 'unsigned');
   const signed = VersionedTransaction.deserialize(bytes);
   signed.sign([creator]);
   assert.equal(checkSignedShareTx(signed.serialize(), expect), null);
-  assert.equal(checkSignedShareTx(signed.serialize(), { ...expect, wickBps: 2000 }), 'bad_share_tx');
-  assert.equal(checkSignedShareTx(signed.serialize(), { ...expect, feeLamports: 20_000_000 }), 'bad_share_tx');
+  assert.equal(checkSignedShareTx(signed.serialize(), { ...expect, holders: [{ address: burn, bps: 1000 }] }), 'bad_share_tx');
+  assert.equal(checkSignedShareTx(signed.serialize(), { ...expect, transfers: [{ to: burn, lamports: 10_000_000 }] }), 'bad_share_tx');
   assert.equal(checkSignedShareTx(signed.serialize(), { ...expect, mint: Keypair.generate().publicKey.toBase58() }), 'bad_share_tx');
-  const other = await buildShareTx({ ...expect, wick: Keypair.generate().publicKey.toBase58(), blockhash: BLOCKHASH });
-  const otherSigned = VersionedTransaction.deserialize(other);
-  otherSigned.sign([creator]);
-  assert.equal(checkSignedShareTx(otherSigned.serialize(), expect), 'bad_share_tx');
+  // Sans la part de l'équipe (ni dans les virements, ni dans le partage) : refusée.
+  const noTeam = VersionedTransaction.deserialize(await buildShareTx({ ...expect, transfers: [transfers[0]], holders: [holders[0]], blockhash: BLOCKHASH }));
+  noTeam.sign([creator]);
+  assert.equal(checkSignedShareTx(noTeam.serialize(), expect), 'bad_share_tx');
 
   // Phantom peut ajouter ses vérifications (Lighthouse) en signant : toujours accepté.
   const lighthouse = Transaction.from(Buffer.from(bytes));
@@ -132,11 +135,16 @@ test('the reduced Ignition Fee only exists with sharing', async () => {
   const wallet = Keypair.generate();
   const db = fakeD1();
   await ensureSchema(db);
-  const env = { DB: db, TOKEN_MINT: Keypair.generate().publicKey.toBase58(), BUYBACK_SECRET_KEY: base58(wallet.secretKey) };
-  assert.deepEqual(await launchFee(env, { shared: true }), { lamports: 10_000_000, to: wallet.publicKey.toBase58(), bps: 1000 });
-  assert.deepEqual(await launchFee(env), { lamports: 20_000_000, to: wallet.publicKey.toBase58() });
-  assert.equal(await launchFee({ ...env, SHARE_BPS: '0' }, { shared: true }), null);
-  assert.equal((await launchFee({ ...env, SHARE_BPS: '2000', LAUNCH_FEE_SHARED_SOL: '0' }, { shared: true })).bps, 2000);
+  const env = { DB: db, TOKEN_MINT: Keypair.generate().publicKey.toBase58(), BUYBACK_SECRET_KEY: base58(wallet.secretKey), BURN_WALLET: wallet.publicKey.toBase58() };
+  const burn = wallet.publicKey.toBase58(), team = CONFIG.launch.deployer;
+  assert.deepEqual(await launchFee(env, { shared: true }), {
+    lamports: 10_000_000, to: burn, burn: 5_000_000, team: { to: team, lamports: 5_000_000 }, teamWallet: team,
+    holders: [{ address: burn, bps: 500 }, { address: team, bps: 500 }],
+  });
+  assert.equal((await launchFee(env)).lamports, 20_000_000);
+  assert.equal(await launchFee({ ...env, SHARE_BURN_BPS: '5000', SHARE_TEAM_BPS: '5000' }, { shared: true }), null);
+  const free = await launchFee({ ...env, SHARE_BURN_BPS: '1000', SHARE_TEAM_BPS: '0', LAUNCH_FEE_SHARED_SOL: '0' }, { shared: true });
+  assert.deepEqual([free.lamports, free.team, free.holders], [0, null, [{ address: burn, bps: 1000 }]]);
 });
 
 // Le parcours complet, avec une fausse chaîne : préparer, signer, soumettre, confirmer, partager,
@@ -148,7 +156,7 @@ test('launch with sharing: held until the coin exists, then shared, then distrib
   const db = fakeD1();
   await ensureSchema(db);
   const env = {
-    DB: db, TOKEN_MINT: Keypair.generate().publicKey.toBase58(), BUYBACK_SECRET_KEY: base58(wallet.secretKey),
+    DB: db, TOKEN_MINT: Keypair.generate().publicKey.toBase58(), BUYBACK_SECRET_KEY: base58(wallet.secretKey), BURN_WALLET: wallet.publicKey.toBase58(),
     SOLANA_RPC: 'https://rpc.test', IP_SALT: 'x',
   };
   const a = await sharingAccounts(mint);
@@ -183,8 +191,11 @@ test('launch with sharing: held until the coin exists, then shared, then distrib
         const s = sent.find((x) => x.sig === params[0]);
         const tx = readTransaction(s.bytes);
         if (tx.keys[0] === wallet.publicKey.toBase58()) {
-          // La distribution : WICK paie 5000 lamports de frais et reçoit 10 %.
-          return ok({ transaction: { message: { accountKeys: tx.keys } }, meta: { err: null, fee: 5000, preBalances: [1e9], postBalances: [1e9 - 5000 + 40_000_000] } });
+          // La distribution de 0,4 SOL : le wallet burn paie 5000 lamports de frais et reçoit 5 %,
+          // l'équipe reçoit 5 %.
+          const pre = tx.keys.map(() => 1e9);
+          const post = tx.keys.map((k, i) => (i === 0 ? 1e9 - 5000 + 20_000_000 : k === CONFIG.launch.deployer ? 1e9 + 20_000_000 : 1e9));
+          return ok({ transaction: { message: { accountKeys: tx.keys } }, meta: { err: null, fee: 5000, preBalances: pre, postBalances: post } });
         }
         return ok({
           transaction: { message: { accountKeys: tx.keys, header: { numRequiredSignatures: tx.header.required }, instructions: tx.instructions.map((ix) => ({ programIdIndex: ix.program })) } },
@@ -194,7 +205,7 @@ test('launch with sharing: held until the coin exists, then shared, then distrib
       case 'getTokenAccountsByOwner': return ok({ value: [] });
       case 'getAccountInfo': {
         if (params[0] === a.sharingConfig) {
-          const cfg = sharingConfigBytes({ mint, admin: creator.publicKey.toBase58(), shareholders: shareholdersFor(creator.publicKey.toBase58(), wallet.publicKey.toBase58(), 1000) });
+          const cfg = sharingConfigBytes({ mint, admin: creator.publicKey.toBase58(), shareholders: shareholdersFor(creator.publicKey.toBase58(), [{ address: wallet.publicKey.toBase58(), bps: 500 }, { address: CONFIG.launch.deployer, bps: 500 }]) });
           return ok({ value: { data: [cfg.toString('base64'), 'base64'], owner: PUMP_FEES } });
         }
         if (params[0] === a.bondingCurve) return ok({ value: { data: [Buffer.alloc(150).toString('base64'), 'base64'], owner: CONFIG.pumpProgram } });
@@ -239,16 +250,19 @@ test('launch with sharing: held until the coin exists, then shared, then distrib
   assert.equal(row.fee_state, 'paid');
   assert.equal(row.share_state, 'shared');
   const burn = await db.prepare("SELECT * FROM burns WHERE kind = 'match'").first();
-  assert.ok(Math.abs(burn.sol - 0.0095) < 1e-9);       // 0,01 SOL moins ce qui paie ses frais réseau
-  assert.deepEqual(st.match.share, { bps: 1000, live: true });
+  assert.equal(row.team_lamports, 5_000_000);           // la moitié de l'Ignition Fee pour l'équipe
+  assert.ok(Math.abs(burn.sol - 0.0045) < 1e-9);       // l'autre moitié, moins ce qui paie ses frais réseau
+  assert.deepEqual(st.match.share, { bps: 1000, teamBps: 500, live: true });
+  assert.deepEqual([st.match.fee, st.match.burnFee], [0.01, 0.005]);
 
   // 5. Le cron distribue les fees accumulées (0,4 SOL), puis note la part reçue par WICK.
   assert.equal(await runShares(env, Date.now() + 7 * 3600_000), 1);
   const dist = readTransaction(sent[2].bytes);
   assert.equal(dist.keys[0], wallet.publicKey.toBase58());
   assert.ok(dist.keys.includes(creator.publicKey.toBase58()));
+  assert.ok(dist.keys.includes(CONFIG.launch.deployer));
   assert.equal(await runShares(env, Date.now() + 7 * 3600_000 + 60_000), 0);   // déjà distribué : on attend 6 h
-  assert.deepEqual(await shareTotals(db), { sharedSol: 0.04, sharingCoins: 1 });
+  assert.deepEqual(await shareTotals(db), { sharedSol: 0.02, teamSharedSol: 0.02, sharingCoins: 1 });
 
   // Trop peu accumulé : pas de distribution.
   vault = 890_880 + 1000;

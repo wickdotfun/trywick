@@ -2,7 +2,7 @@
 //   POST /api/launch/prepare  (formulaire + image)  → la transaction à signer
 //   POST /api/launch/submit   (transaction signée)  → envoyée sur Solana
 //   GET  /api/launch/status?mint=…                  → allumée ou pas encore
-import { launchFee } from '../../lib/buyback.js';
+import { expectedFee, feeTransfers, launchFee } from '../../lib/buyback.js';
 import { CONFIG } from '../../lib/config.js';
 import { ipHash, json } from '../../lib/http.js';
 import { isPubkey, validateImage, validateLaunch } from '../../lib/launch.js';
@@ -11,7 +11,7 @@ import { buildCreateTx, uploadMetadata } from '../../lib/pump.js';
 import { ensureSchema } from '../../lib/schema.js';
 import { buildShareTx, checkSignedShareTx } from '../../lib/sharing.js';
 import {
-  base64FromBytes, buildTransferTx, bytesFromBase64, checkFeeTx, checkSignedLaunch, getLatestBlockhash,
+  base64FromBytes, buildFeeTx, bytesFromBase64, checkFeeTx, checkSignedLaunch, getLatestBlockhash,
   sendTransaction, signatureOf,
 } from '../../lib/solana.js';
 
@@ -57,9 +57,10 @@ export async function prepare({ request, env }) {
     await env.DB.prepare('UPDATE matches SET dev_buy = ? WHERE mint = ?').bind(launch.devBuy, launch.mint).run();
   }
 
-  // L'Ignition Fee (quand le buyback tourne) : à signer avec le lancement. Avec le partage des
-  // creator fees (au choix du créateur), elle est réduite et part dans la même transaction que
-  // le partage (lib/sharing.js).
+  // L'Ignition Fee (quand le buyback tourne) : une seconde transaction à signer, avec deux
+  // virements (la part brûlée vers le wallet burn, la part de l'équipe vers son wallet). Avec le
+  // partage des creator fees (au choix du créateur), elle est réduite et part dans la même
+  // transaction que le partage (lib/sharing.js).
   const shared = fields.share === '1';
   const fee = (shared && (await launchFee(env, { shared: true }))) || (await launchFee(env));
 
@@ -72,24 +73,34 @@ export async function prepare({ request, env }) {
     console.error('pumpportal', err.detail || err.message);
     return json({ error: 'build_failed' }, 502);
   }
-  let feeTx = null, shareMsg = null;
+  let feeTx = null;
+  const holders = fee?.holders || [];
+  const shareBps = holders.reduce((n, h) => n + h.bps, 0);
+  const shareTeamBps = holders.find((h) => h.address === fee?.teamWallet)?.bps ?? 0;
   if (fee) {
     try {
       const blockhash = await getLatestBlockhash(env);
-      const bytes = fee.bps
-        ? await buildShareTx({ creator: launch.creator, mint: launch.mint, wick: fee.to, wickBps: fee.bps, feeLamports: fee.lamports, blockhash })
-        : buildTransferTx({ from: launch.creator, to: fee.to, lamports: fee.lamports, blockhash });
+      const transfers = feeTransfers(fee);
+      const bytes = holders.length
+        ? await buildShareTx({ creator: launch.creator, mint: launch.mint, transfers, holders, blockhash })
+        : buildFeeTx({ from: launch.creator, transfers, blockhash });
       feeTx = base64FromBytes(bytes);
-      if (fee.bps) shareMsg = base64FromBytes(bytes.subarray(1 + 64));
     } catch (err) {
       console.error('fee tx', err.message);
       return json({ error: 'build_failed' }, 502);
     }
   }
-  await env.DB.prepare('UPDATE matches SET fee_lamports = ?, fee_to = ?, share_bps = ?, share_msg = ? WHERE mint = ?')
-    .bind(fee?.lamports ?? 0, fee?.to ?? null, fee?.bps ?? 0, shareMsg, launch.mint).run();
+  await env.DB.prepare(`UPDATE matches SET fee_lamports = ?, fee_to = ?, team_to = ?, team_lamports = ?, share_bps = ?,
+      share_team_bps = ?, share_msg = NULL WHERE mint = ?`)
+    .bind(fee?.lamports ?? 0, fee?.to ?? null, fee?.teamWallet ?? null, fee?.team?.lamports ?? 0, shareBps, shareTeamBps, launch.mint).run();
   return json({
-    tx: base64FromBytes(tx), feeTx, feeSol: fee ? fee.lamports / 1e9 : 0, shareBps: fee?.bps ?? 0, image: meta.image,
+    tx: base64FromBytes(tx),
+    feeTx,
+    feeSol: fee ? fee.lamports / 1e9 : 0,
+    burnSol: fee ? fee.burn / 1e9 : 0,
+    teamSol: fee?.team ? fee.team.lamports / 1e9 : 0,
+    shareBps,
+    image: meta.image,
   });
 }
 
@@ -116,8 +127,9 @@ export async function submit({ request, env }) {
   if (row.fee_lamports > 0 || row.share_bps > 0) {
     try { feeBytes = body.feeTx ? bytesFromBase64(body.feeTx) : null; } catch { feeBytes = null; }
     let feeProblem = 'no_fee_tx';
-    if (feeBytes && row.share_bps > 0) feeProblem = checkSignedShareTx(feeBytes, { creator: row.creator, mint: row.mint, wick: row.fee_to, wickBps: row.share_bps, feeLamports: row.fee_lamports });
-    else if (feeBytes) feeProblem = checkFeeTx(feeBytes, { from: row.creator, to: row.fee_to, lamports: row.fee_lamports });
+    const { transfers, holders } = expectedFee(row);
+    if (feeBytes && row.share_bps > 0) feeProblem = checkSignedShareTx(feeBytes, { creator: row.creator, mint: row.mint, transfers, holders });
+    else if (feeBytes) feeProblem = checkFeeTx(feeBytes, { from: row.creator, transfers });
     if (feeProblem) return json({ error: feeProblem }, 400);
   }
 

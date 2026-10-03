@@ -159,9 +159,10 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
         <div><strong>${t.supply ? compact(t.supply.current) : '—'}</strong><span>current supply</span></div>
         <div><strong>${sol(t.sol || 0)}</strong><span>SOL spent on buybacks</span></div>
         <div><strong>${fmt(t.launches ?? world.total ?? 0)}</strong><span>coins launched</span></div>
-        <div><strong>${sol(t.ignitionSol || 0)}</strong><span>Ignition Fees paid</span></div>
+        <div><strong>${sol(t.ignitionSol || 0)}</strong><span>Ignition Fees paid · ${sol(t.ignitionBurnSol ?? t.ignitionSol ?? 0)} to the burn</span></div>
         <div><strong>${usd(t.volume24h)}</strong><span>WICK coins volume, 24h</span></div>
-        <div><strong>${sol(t.sharedSol || 0)}</strong><span>creator fees shared with WICK${t.sharingCoins ? ` · ${fmt(t.sharingCoins)} coins` : ''}</span></div>
+        <div><strong>${sol((t.sharedSol || 0) + (t.teamSharedSol || 0))}</strong><span>creator fees shared with WICK${t.sharingCoins ? ` · ${fmt(t.sharingCoins)} coins` : ''}</span></div>
+        <div><strong>${sol((t.ignitionTeamSol || 0) + (t.teamSharedSol || 0))}</strong><span>to the WICK team (its half of the fees)</span></div>
       </div>
       <div class="lasts">
         <div><span class="m-sub">Last burn</span>${last
@@ -298,7 +299,9 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
   // ---------------------------------------------------------- comment ça marche
   function how() {
     const b = world.breath, c = world.candle;
-    const fee = world.launch?.feeSol || 0.02;
+    const l = world.launch || {};
+    const fee = l.feeSol || 0.02;
+    const s = l.split || { creatorBps: 9000, burnBps: 500, teamBps: 500 };
     openModal(`
       <h2>How WICK works</h2>
       <p class="muted"><b class="gold">WICK is the launchpad that burns itself.</b> Every coin launched here is a match.
@@ -313,12 +316,14 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
         <li><b>Launch a coin.</b> Name, ticker, image, socials: your coin is created on pump.fun, signed
           by your own wallet. You are its creator and you get its pump.fun creator fees.</li>
         <li><b>The Ignition Fee.</b> A ${fee} SOL fee that belongs to WICK (it is not a pump.fun fee), signed together with
-          your launch. WICK uses it to buy ${tk()} and burns what it bought, within a minute.</li>
-        <li><b>Share the fire (optional).</b> When you launch, you can share ${world.launch?.shareBps ? world.launch.shareBps / 100 : 10}% of
-          your coin's pump.fun creator fees with WICK, forever. Your Ignition Fee drops to ${world.launch?.sharedFeeSol ?? 0.01} SOL.
-          The split is locked on pump.fun itself: nobody can change it, not even WICK. WICK's part buys ${tk()} and burns it.</li>
-        <li><b>The breath.</b> Every ${span(b?.durationMs ?? 1_800_000)} at most, the creator fees of ${tk()} itself buy
-          ${tk()} back and burn it. Every launch brings the next one ${span(b?.matchMs ?? 60_000)} closer.</li>
+          your launch. <b>50% burns ${tk()}, 50% funds the team</b>: the burn half buys ${tk()} and burns it within a minute,
+          the other half goes to the WICK team wallet, in the same transaction.</li>
+        <li><b>Share the fire (optional).</b> When you launch, you can share ${(10_000 - s.creatorBps) / 100}% of
+          your coin's pump.fun creator fees with WICK, forever. Your Ignition Fee drops to ${l.sharedFeeSol ?? 0.01} SOL.
+          The split is <b>${s.creatorBps / 100}% creator · ${s.burnBps / 100}% burn · ${s.teamBps / 100}% team</b>, locked on
+          pump.fun itself: nobody can change it, not even WICK.</li>
+        <li><b>The breath.</b> Every ${span(b?.durationMs ?? 1_800_000)} at most, everything waiting in the WICK burn wallet
+          (the burn share of the fees) buys ${tk()} back and burns it. Every launch brings the next one ${span(b?.matchMs ?? 60_000)} closer.</li>
         <li><b>The candle is the supply.</b> One candle = ${c?.stepPct ?? 0.5}% of the ${tk()} supply. It melts with every
           burn and never comes back. Fully melted, it enters the Hall of Flames, and the next season starts.</li>
         <li><b>Your flames.</b> Coins launched by a ${tk()} holder burn in gold. Creators climb the Pyromaniacs

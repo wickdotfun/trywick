@@ -121,7 +121,7 @@ function renderMeter() {
       ? 'Buybacks are paused for now. The candle waits.'
       : `The candle starts melting once ${esc(tk)} is live.`;
   $('cta-sub').innerHTML = fee
-    ? `Launch your coin on pump.fun · <b>Ignition Fee ${from < fee ? `from ${from}` : fee} SOL</b>, burns ${esc(tk)}`
+    ? `Launch your coin on pump.fun · <b>Ignition Fee ${from < fee ? `from ${from}` : fee} SOL</b>, ${world.launch.teamSol ? 'half of it burns' : 'burns'} ${esc(tk)}`
     : 'Launch your coin on pump.fun · it feeds the flame';
   document.querySelectorAll('[data-t="ticker"]').forEach((el) => { el.textContent = tk; });
   if (!scene?.burning) scene?.setCandle({ melted: c.melted, heat: world.heat / HEAT_FULL });
@@ -140,7 +140,12 @@ function renderStats() {
 }
 
 // Le fil : chaque lancement (et son Ignition Fee ajoutée au feu), chaque burn, le buyback en cours.
-const shareTag = (m) => (m.share ? `<i class="tag share" title="Shares ${m.share.bps / 100}% of its creator fees with the fire, forever">${m.share.bps / 100}% shared</i>` : '');
+const shareTag = (m) => (m.share ? `<i class="tag share" title="${esc(shareText(m.share))}">${m.share.bps / 100}% shared</i>` : '');
+// « 10% of its creator fees go to WICK, forever (5% burn $WICK, 5% team) »
+function shareText(s) {
+  const burn = (s.bps - (s.teamBps || 0)) / 100;
+  return `${s.bps / 100}% of its creator fees go to WICK, forever${s.teamBps ? ` (${burn}% burn $${ticker()}, ${s.teamBps / 100}% team)` : ''}`;
+}
 const holderTag = (m) => (m.holder ? `<i class="tag gold" title="Launched by a $WICK holder">${icon('crown')}</i>` : '');
 function launchCard(m) {
   const fee = m.fee ?? null;
@@ -148,7 +153,7 @@ function launchCard(m) {
     <a href="${pumpUrl(m.mint)}" target="_blank" rel="noopener">
       ${avatar(m)}
       <span class="ev-main"><b>$${esc(m.symbol)} launched ${holderTag(m)}</b>
-        <span>${fee ? `<em class="fire">+${fee} SOL</em> added to the fire` : esc(m.name)}${m.share ? ` · ${m.share.bps / 100}% fees shared` : ''}</span></span>
+        <span>${fee ? `<em class="fire">+${m.burnFee ?? fee} SOL</em> added to the fire` : esc(m.name)}${m.share ? ` · ${m.share.bps / 100}% fees shared` : ''}</span></span>
       <span class="ev-meta"><span class="mono">${m.mcap ? `$${compact(m.mcap)}` : `#${fmt(m.seq)}`}</span><time data-at="${m.at}">${ago(m.at)}</time></span>
     </a></li>`;
 }
@@ -491,13 +496,24 @@ const ERRORS = {
 let busy = false;
 let draft = { fields: {}, image: null, preview: null, share: true };
 
+// « 90% you · 5% burn $WICK · 5% WICK team »
+function splitText(s) {
+  if (!s) return '';
+  return [`${s.creatorBps / 100}% you`, s.burnBps && `${s.burnBps / 100}% burn $${ticker()}`, s.teamBps && `${s.teamBps / 100}% WICK team`]
+    .filter(Boolean).join(' · ');
+}
+
 // Ce que coûte un lancement, avec ou sans partage des creator fees.
 function costLine(shared) {
   const l = world.launch;
-  const fee = shared && l?.shareBps ? l.sharedFeeSol : l?.feeSol;
+  const withShare = Boolean(shared && l?.shareBps);
+  const fee = withShare ? l.sharedFeeSol : l?.feeSol;
+  const burn = withShare ? l.sharedBurnSol : l?.burnSol;
+  const team = withShare ? l.sharedTeamSol : l?.teamSol;
+  const split = team ? `${burn} SOL buys $${ticker()} and burns it, ${team} SOL funds the WICK team` : `buys $${ticker()} and burns it`;
   return `${fee
-    ? `<b>${fee} SOL WICK Ignition Fee</b>: buys $${ticker()} and burns it. Plus ≈ 0.02 SOL of pump.fun creation and network costs, and your dev buy. One approval.`
-    : '≈ 0.02 SOL of pump.fun creation and network costs, plus your dev buy.'} Your wallet signs, your coin${shared && l?.shareBps ? `, ${100 - l.shareBps / 100}% of your creator fees` : ', your pump.fun creator fees'}.`;
+    ? `<b>${fee} SOL WICK Ignition Fee</b>: ${split}. Plus ≈ 0.02 SOL of pump.fun creation and network costs, and your dev buy.`
+    : '≈ 0.02 SOL of pump.fun creation and network costs, plus your dev buy.'} Your wallet signs, your coin${withShare ? `, ${(l.split?.creatorBps ?? 10_000 - l.shareBps) / 100}% of your creator fees` : ', your pump.fun creator fees'}.`;
 }
 
 function launchForm(error = '') {
@@ -505,7 +521,7 @@ function launchForm(error = '') {
   const max = world.launch?.maxDevBuy ?? 5;
   openModal(`
     <h2>Launch a coin</h2>
-    <p class="muted">Launch a real coin on pump.fun. It becomes a match orbiting the $${ticker()} candle${world.launch?.feeSol ? `, and its Ignition Fee burns $${ticker()} within a minute` : ''}.</p>
+    <p class="muted">Launch a real coin on pump.fun. It becomes a match orbiting the $${ticker()} candle${world.launch?.feeSol ? `, and ${world.launch.teamSol ? 'half of its Ignition Fee burns' : 'its Ignition Fee burns'} $${ticker()} within a minute` : ''}.</p>
     <form id="launch-form" novalidate>
       <div class="lf-top">
         <label class="drop">
@@ -529,10 +545,10 @@ function launchForm(error = '') {
       <div class="presets">${[0, 0.1, 0.5, 1].map((v) => `<button type="button" data-sol="${v}">${v}</button>`).join('')}</div>
       ${world.launch?.shareBps ? `<label class="share-opt">
         <input type="checkbox" name="share" value="1" id="lf-share"${draft.share ? ' checked' : ''}>
-        <span><b>Share ${world.launch.shareBps / 100}% of your creator fees with the fire</b>
+        <span><b>Share ${world.launch.shareBps / 100}% of your creator fees with WICK</b>
           <small>Your Ignition Fee drops to <b>${world.launch.sharedFeeSol} SOL</b> (instead of ${world.launch.feeSol}).
-          ${100 - world.launch.shareBps / 100}% of your pump.fun creator fees stay yours, ${world.launch.shareBps / 100}% buy $${ticker()}
-          and burn it, forever. Locked on pump.fun: nobody can change it, not even WICK.</small></span>
+          Your pump.fun creator fees split <b>${splitText(world.launch.split)}</b>, forever.
+          Locked on pump.fun: nobody can change it, not even WICK.</small></span>
       </label>` : ''}
       <p class="cost" id="lf-cost">${costLine(draft.share)}</p>
       <p class="error" id="lf-error"${error ? '' : ' hidden'}>${esc(error)}</p>
@@ -680,8 +696,8 @@ function success(m, signature) {
     <div class="lit">${avatar(m, 72)}</div>
     <h2><span class="grad">$${esc(m.symbol)}</span> is lit</h2>
     <p class="muted">Match #${fmt(m.seq)} is orbiting candle #${pad(world.candle?.number ?? 1)}${world.launch?.feeSol
-      ? `, and its ${m.share ? world.launch.sharedFeeSol : world.launch.feeSol} SOL Ignition Fee is buying $${ticker()} to burn it right now` : ''}.${m.share
-      ? ` ${m.share.bps / 100}% of its creator fees will feed the fire, forever.` : ''} The next buyback just came
+      ? `, and ${m.burnFee ?? (m.share ? world.launch.sharedBurnSol : world.launch.burnSol)} SOL of its Ignition Fee is buying $${ticker()} to burn it right now` : ''}.${m.share
+      ? ` ${shareText(m.share)}.` : ''} The next buyback just came
     ${span(world.breath?.matchMs ?? 60_000)} closer. Look for the label.</p>
     <div class="wallets">
       <a class="wbtn primary" href="${pumpUrl(m.mint)}" target="_blank" rel="noopener">See it on pump.fun</a>

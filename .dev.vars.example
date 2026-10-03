@@ -11,10 +11,14 @@ DEV_NO_IP_LIMIT=
 # Buyback (never with a real wallet locally)
 # TOKEN_MINT=
 # BUYBACK_SECRET_KEY=
+# BURN_WALLET=              (the address of that test key; empty = any)
 # LAUNCH_FEE_SOL=0.02
-# Creator fee sharing: Ignition Fee with sharing, and WICK's part (basis points, 1000 = 10%)
+# TEAM_FEE_BPS=5000         (team share of the Ignition Fee, 5000 = 50%)
+# TEAM_WALLET=              (default: the dev wallet)
+# Creator fee sharing: Ignition Fee with sharing, burn and team parts (basis points, 500 = 5%)
 # LAUNCH_FEE_SHARED_SOL=0.01
-# SHARE_BPS=1000
+# SHARE_BURN_BPS=500
+# SHARE_TEAM_BPS=500
 # Admin page (/admin)
 # ADMIN_KEY=a-long-random-password
 # Telegram bot

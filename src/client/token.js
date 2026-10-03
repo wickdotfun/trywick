@@ -94,8 +94,8 @@ export function createTokenPage({ api, openModal, isOpen, world, ticker, breathT
               <button class="link-btn tiny" id="tk-burns">burn tracker →</button>
             </section>
             <ul class="tk-why">
-              <li>${icon('flame', 'fire')}<span><b>Every launch burns it.</b> Each coin launched on WICK pays a ${world.launch?.feeSol || 0.02} SOL Ignition Fee that buys $${tk} and burns it, within a minute.</span></li>
-              <li>${icon('wind', 'fire')}<span><b>Buybacks, all day.</b> The creator fees of $${tk} buy it back and burn it every ${Math.round((world.breath?.durationMs ?? 1_800_000) / 60_000)} minutes at most.</span></li>
+              <li>${icon('flame', 'fire')}<span><b>Every launch burns it.</b> Each coin launched on WICK pays a ${world.launch?.feeSol || 0.02} SOL Ignition Fee: 50% buys $${tk} and burns it within a minute, 50% funds the team.</span></li>
+              <li>${icon('wind', 'fire')}<span><b>Buybacks, all day.</b> The burn share of the fees, including the creator fees shared by WICK coins, buys $${tk} back and burns it every ${Math.round((world.breath?.durationMs ?? 1_800_000) / 60_000)} minutes at most.</span></li>
               <li>${icon('crown', 'gold')}<span><b>Holders burn in gold.</b> Hold $${tk} and your launches get a golden flame around the candle.</span></li>
             </ul>
           </div>
@@ -155,8 +155,8 @@ export function createTokenPage({ api, openModal, isOpen, world, ticker, breathT
             <h3>The candle is $${tk}. When it launches, this page becomes its home.</h3>
             <p class="muted">The live chart, buy and sell right here, the bonding curve, the top holders, and every $${tk} burned.</p>
             <ul class="tk-why">
-              <li>${icon('flame', 'fire')}<span><b>Every launch burns it.</b> Each coin launched on WICK pays an Ignition Fee that buys $${tk} and burns it, within a minute.</span></li>
-              <li>${icon('wind', 'fire')}<span><b>Buybacks, all day.</b> Its creator fees buy it back and burn it every 30 minutes at most.</span></li>
+              <li>${icon('flame', 'fire')}<span><b>Every launch burns it.</b> Each coin launched on WICK pays an Ignition Fee: 50% buys $${tk} and burns it within a minute, 50% funds the team.</span></li>
+              <li>${icon('wind', 'fire')}<span><b>Buybacks, all day.</b> The burn share of the fees, including the creator fees shared by WICK coins, buys $${tk} back and burns it every 30 minutes at most.</span></li>
               <li>${icon('candle', 'fire')}<span><b>Supply only goes down.</b> The candle shows it: each one is 0.5% of the supply, gone forever.</span></li>
             </ul>
             <p class="note"><b>The only official address</b> will be posted here, on X and on Telegram at launch. Anything before that is fake.</p>

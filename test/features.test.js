@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 import { Keypair, SystemInstruction, Transaction } from '@solana/web3.js';
 import { launchFee } from '../lib/buyback.js';
+import { CONFIG } from '../lib/config.js';
 import { supplyCandle } from '../lib/candle.js';
 import { checkMilestones, hallList } from '../lib/hall.js';
 import { leaderboard, titleFor } from '../lib/leaderboard.js';
@@ -9,7 +10,7 @@ import { pickMarkets } from '../lib/markets.js';
 import { settleFee } from '../lib/matches.js';
 import { ensureSchema } from '../lib/schema.js';
 import { setSetting } from '../lib/settings.js';
-import { base58, buildTransferTx, checkFeeTx, signTransaction } from '../lib/solana.js';
+import { base58, buildFeeTx, checkFeeTx, signTransaction } from '../lib/solana.js';
 import { buybackWallet } from '../lib/buyback.js';
 import { matchCaption, runTelegram } from '../lib/telegram.js';
 import { fakeD1 } from './helpers/d1.js';
@@ -56,32 +57,52 @@ test('a consumed candle enters the hall once, with its story', async () => {
 
 test('the launch fee only exists while the buyback runs', async () => {
   const kp = Keypair.generate();
-  const env = { DB: await db(), BUYBACK_SECRET_KEY: base58(kp.secretKey) };
+  const env = { DB: await db(), BUYBACK_SECRET_KEY: base58(kp.secretKey), BURN_WALLET: kp.publicKey.toBase58() };
   assert.equal(await launchFee(env), null);                                   // pas de $WICK encore
   env.TOKEN_MINT = Keypair.generate().publicKey.toBase58();
-  assert.deepEqual(await launchFee(env), { lamports: 20_000_000, to: kp.publicKey.toBase58() });
+  // 50 % pour le burn, 50 % pour l'équipe (le dev wallet), dans la même transaction.
+  assert.deepEqual(await launchFee(env), {
+    lamports: 20_000_000,
+    to: kp.publicKey.toBase58(),
+    burn: 10_000_000,
+    team: { to: CONFIG.launch.deployer, lamports: 10_000_000 },
+    teamWallet: CONFIG.launch.deployer,
+  });
+  assert.equal((await launchFee({ ...env, TEAM_FEE_BPS: '0' })).burn, 20_000_000);
+  assert.equal((await launchFee({ ...env, TEAM_FEE_BPS: '0' })).team, null);
   assert.equal(await launchFee({ ...env, LAUNCH_FEE_SOL: '0' }), null);
   await setSetting(env.DB, 'buyback.paused', true);
   assert.equal(await launchFee(env), null);                                   // en pause : gratuit
 });
 
-test('the fee transfer is a real System transfer, and only the right one is accepted', async () => {
-  const payer = Keypair.generate(), to = Keypair.generate().publicKey.toBase58();
-  const bytes = buildTransferTx({ from: payer.publicKey.toBase58(), to, lamports: 20_000_000, blockhash: BLOCKHASH });
-  const ix = Transaction.from(bytes).instructions[0];
-  const decoded = SystemInstruction.decodeTransfer(ix);
-  assert.equal(decoded.fromPubkey.toBase58(), payer.publicKey.toBase58());
-  assert.equal(decoded.toPubkey.toBase58(), to);
-  assert.equal(Number(decoded.lamports), 20_000_000);
+test('the fee transfer is two real System transfers, and only the right ones are accepted', async () => {
+  const payer = Keypair.generate(), burn = Keypair.generate().publicKey.toBase58(), team = Keypair.generate().publicKey.toBase58();
+  const transfers = [{ to: burn, lamports: 10_000_000 }, { to: team, lamports: 10_000_000 }];
+  const bytes = buildFeeTx({ from: payer.publicKey.toBase58(), transfers, blockhash: BLOCKHASH });
+  const ixs = Transaction.from(bytes).instructions.map((ix) => SystemInstruction.decodeTransfer(ix));
+  assert.deepEqual(ixs.map((d) => [d.fromPubkey.toBase58(), d.toPubkey.toBase58(), Number(d.lamports)]),
+    [[payer.publicKey.toBase58(), burn, 10_000_000], [payer.publicKey.toBase58(), team, 10_000_000]]);
 
-  const want = { from: payer.publicKey.toBase58(), to, lamports: 20_000_000 };
+  const want = { from: payer.publicKey.toBase58(), transfers };
   assert.equal(checkFeeTx(bytes, want), 'unsigned');
-  const wallet = await buybackWallet({ BUYBACK_SECRET_KEY: base58(payer.secretKey) });
+  const wallet = await buybackWallet({ BUYBACK_SECRET_KEY: base58(payer.secretKey), BURN_WALLET: payer.publicKey.toBase58() });
   const signed = await signTransaction(bytes, wallet);
   assert.equal(checkFeeTx(signed, want), null);
-  assert.equal(checkFeeTx(signed, { ...want, lamports: 30_000_000 }), 'bad_fee_tx');
-  assert.equal(checkFeeTx(signed, { ...want, to: Keypair.generate().publicKey.toBase58() }), 'bad_fee_tx');
+  assert.equal(checkFeeTx(signed, { ...want, transfers: [{ to: burn, lamports: 20_000_000 }] }), 'bad_fee_tx');
+  assert.equal(checkFeeTx(signed, { ...want, transfers: [transfers[0], { to: Keypair.generate().publicKey.toBase58(), lamports: 10_000_000 }] }), 'bad_fee_tx');
+  // Le créateur ne peut pas garder la part de l'équipe (ni celle du burn).
+  const burnOnly = await signTransaction(buildFeeTx({ from: payer.publicKey.toBase58(), transfers: [transfers[0]], blockhash: BLOCKHASH }), wallet);
+  assert.equal(checkFeeTx(burnOnly, want), 'bad_fee_tx');
   assert.equal(checkFeeTx(new Uint8Array([1, 2]), want), 'bad_fee_tx');
+});
+
+test('the burn wallet key can only be the planned burn wallet, never the dev wallet', async () => {
+  const kp = Keypair.generate();
+  const secret = base58(kp.secretKey);
+  await assert.rejects(buybackWallet({ BUYBACK_SECRET_KEY: secret }), /wrong_burn_wallet/);
+  await assert.rejects(buybackWallet({ BUYBACK_SECRET_KEY: secret, BURN_WALLET: '', DEPLOYER_WALLET: kp.publicKey.toBase58() }), /dev_wallet_key/);
+  assert.equal((await buybackWallet({ BUYBACK_SECRET_KEY: secret, BURN_WALLET: kp.publicKey.toBase58() })).publicKey, kp.publicKey.toBase58());
+  assert.equal(CONFIG.buyback.wallet, '5siQxef4aUDVRpYDjiSsjQrxju7xMXTRhfdD1KgXM69Z');
 });
 
 test('a paid launch fee joins the burn queue, once', async () => {

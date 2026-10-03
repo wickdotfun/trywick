@@ -113,13 +113,14 @@ function renderMeter() {
     : (live ? `Buying back ${tk}…` : 'Breathing…');
   $('countdown').textContent = clockText(p.remaining);
   $('countdown').classList.toggle('hot', p.remaining < 60_000);
+  const from = world.launch?.shareBps && world.launch.sharedFeeSol != null ? world.launch.sharedFeeSol : fee;
   $('meter-sub').innerHTML = live
-    ? `Every launch removes ${fee ? `<b>${fee} SOL of ${esc(tk)}</b>` : esc(tk)} from circulation and brings the buyback <b>${off}</b> closer.`
+    ? `Every launch removes <b>${esc(tk)}</b> from circulation and brings the buyback <b>${off}</b> closer.`
     : world.buyback.paused
       ? 'Buybacks are paused for now. The candle waits.'
       : `The candle starts melting once ${esc(tk)} is live.`;
   $('cta-sub').innerHTML = fee
-    ? `Launch your coin on pump.fun · <b>${fee} SOL Ignition Fee</b> burns ${esc(tk)}`
+    ? `Launch your coin on pump.fun · <b>Ignition Fee ${from < fee ? `from ${from}` : fee} SOL</b>, burns ${esc(tk)}`
     : 'Launch your coin on pump.fun · it feeds the flame';
   document.querySelectorAll('[data-t="ticker"]').forEach((el) => { el.textContent = tk; });
   if (!scene?.burning) scene?.setCandle({ melted: c.melted, heat: world.heat / HEAT_FULL });
@@ -138,12 +139,13 @@ function renderStats() {
 }
 
 // Le fil : chaque lancement (et son Ignition Fee ajoutée au feu), chaque burn, le buyback en cours.
+const shareTag = (m) => (m.share ? `<i class="tag share" title="Shares ${m.share.bps / 100}% of its creator fees with the fire, forever">🤝 ${m.share.bps / 100}%</i>` : '');
 function launchCard(m) {
   const fee = m.fee ?? null;
   return `<li class="ev launch${world.mine.has(m.mint) ? ' mine' : ''}${m.holder ? ' holder' : ''}">
     <a href="${pumpUrl(m.mint)}" target="_blank" rel="noopener">
       ${avatar(m)}
-      <span class="ev-main"><b>$${esc(m.symbol)} launched${m.holder ? ' <i class="tag gold" title="Launched by a $WICK holder">👑</i>' : ''}</b>
+      <span class="ev-main"><b>$${esc(m.symbol)} launched${m.holder ? ' <i class="tag gold" title="Launched by a $WICK holder">👑</i>' : ''}${shareTag(m)}</b>
         <span>${fee ? `<em class="fire">+${fee} SOL</em> added to the fire` : esc(m.name)}</span></span>
       <span class="ev-meta"><span class="mono">${m.mcap ? `$${compact(m.mcap)}` : `#${fmt(m.seq)}`}</span><time data-at="${m.at}">${ago(m.at)}</time></span>
     </a></li>`;
@@ -434,7 +436,7 @@ const tokenPage = createTokenPage({
   onBurns: () => go('dashboard'),
 });
 const pages = createPages({
-  api, openModal, isOpen, world, ticker, avatar, pct, demo: DEMO,
+  api, openModal, isOpen, world, ticker, avatar, pct, shareTag, demo: DEMO,
   onStrike: () => launchForm(),
   onToken: () => go('wick'),
 });
@@ -480,11 +482,21 @@ const ERRORS = {
   mint_taken: 'Something got mixed up. Try again.',
   no_fee_tx: 'The Ignition Fee was not signed. Try again and approve both in your wallet.',
   bad_fee_tx: 'The Ignition Fee did not check out. Try again.',
+  bad_share_tx: 'The fee sharing did not check out. Try again.',
   unsigned: 'Your wallet did not sign everything. Try again.',
 };
 
 let busy = false;
-let draft = { fields: {}, image: null, preview: null };
+let draft = { fields: {}, image: null, preview: null, share: true };
+
+// Ce que coûte un lancement, avec ou sans partage des creator fees.
+function costLine(shared) {
+  const l = world.launch;
+  const fee = shared && l?.shareBps ? l.sharedFeeSol : l?.feeSol;
+  return `${fee
+    ? `<b>${fee} SOL WICK Ignition Fee</b>: buys $${ticker()} and burns it. Plus ≈ 0.02 SOL of pump.fun creation and network costs, and your dev buy. One approval.`
+    : '≈ 0.02 SOL of pump.fun creation and network costs, plus your dev buy.'} Your wallet signs, your coin${shared && l?.shareBps ? `, ${100 - l.shareBps / 100}% of your creator fees` : ', your pump.fun creator fees'}.`;
+}
 
 function launchForm(error = '') {
   const f = draft.fields;
@@ -513,9 +525,14 @@ function launchForm(error = '') {
         <span class="sol"><input name="devBuy" type="number" min="0" max="${max}" step="0.01" value="${esc(f.devBuy ?? '0')}"><b>SOL</b></span>
       </label>
       <div class="presets">${[0, 0.1, 0.5, 1].map((v) => `<button type="button" data-sol="${v}">${v}</button>`).join('')}</div>
-      <p class="cost">${world.launch?.feeSol
-        ? `<b>${world.launch.feeSol} SOL WICK Ignition Fee</b>: buys $${ticker()} and burns it. Plus ≈ 0.02 SOL of pump.fun creation and network costs, and your dev buy. One approval.`
-        : '≈ 0.02 SOL of pump.fun creation and network costs, plus your dev buy.'} Your wallet signs, your coin, your pump.fun creator fees.</p>
+      ${world.launch?.shareBps ? `<label class="share-opt">
+        <input type="checkbox" name="share" value="1" id="lf-share"${draft.share ? ' checked' : ''}>
+        <span><b>🤝 Share ${world.launch.shareBps / 100}% of your creator fees with the fire</b>
+          <small>Your Ignition Fee drops to <b>${world.launch.sharedFeeSol} SOL</b> (instead of ${world.launch.feeSol}).
+          ${100 - world.launch.shareBps / 100}% of your pump.fun creator fees stay yours, ${world.launch.shareBps / 100}% buy $${ticker()}
+          and burn it, forever. Locked on pump.fun: nobody can change it, not even WICK.</small></span>
+      </label>` : ''}
+      <p class="cost" id="lf-cost">${costLine(draft.share)}</p>
       <p class="error" id="lf-error"${error ? '' : ' hidden'}>${esc(error)}</p>
       <button class="cta wide" type="submit">${DEMO ? 'Strike (demo)' : 'Connect wallet & strike'}</button>
     </form>`, 'm-launch');
@@ -534,6 +551,7 @@ function launchForm(error = '') {
   });
   form.querySelectorAll('[data-sol]').forEach((b) => b.addEventListener('click', () => { form.devBuy.value = b.dataset.sol; }));
   form.addEventListener('input', () => { draft.fields = Object.fromEntries(new FormData(form)); });
+  $('lf-share')?.addEventListener('change', (e) => { draft.share = e.target.checked; $('lf-cost').innerHTML = costLine(draft.share); });
   form.addEventListener('submit', (e) => { e.preventDefault(); submitLaunch(form); });
 }
 
@@ -654,7 +672,7 @@ async function submitLaunch(form) {
     const result = await run({ wallet, creator, fields, image: draft.image, onStep: setStep });
     busy = false;
     const m = result.match;
-    draft = { fields: {}, image: null, preview: null };
+    draft = { fields: {}, image: null, preview: null, share: true };
     if (m) {
       world.mine.add(m.mint);
       if (m.creator && !DEMO) remember(m.creator);
@@ -685,7 +703,8 @@ function success(m, signature) {
     <div class="lit">${avatar(m, 72)}</div>
     <h2><span class="grad">$${esc(m.symbol)}</span> is lit</h2>
     <p class="muted">Match #${fmt(m.seq)} is orbiting candle #${pad(world.candle?.number ?? 1)}${world.launch?.feeSol
-      ? `, and its ${world.launch.feeSol} SOL Ignition Fee is buying $${ticker()} to burn it right now` : ''}. The next buyback just came
+      ? `, and its ${m.share ? world.launch.sharedFeeSol : world.launch.feeSol} SOL Ignition Fee is buying $${ticker()} to burn it right now` : ''}.${m.share
+      ? ` ${m.share.bps / 100}% of its creator fees will feed the fire, forever.` : ''} The next buyback just came
     ${span(world.breath?.matchMs ?? 60_000)} closer. Look for the label.</p>
     <div class="wallets">
       <a class="wbtn primary" href="${pumpUrl(m.mint)}" target="_blank" rel="noopener">See it on pump.fun</a>

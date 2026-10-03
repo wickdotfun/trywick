@@ -11,6 +11,10 @@ feeds the flame. Every flame burns $WICK: launch a coin → Ignition Fee → buy
   [pump.fun](https://pump.fun), signed by your own wallet. You are its creator (and you get its creator fees).
 - **Every launch burns $WICK.** The **WICK Ignition Fee** (0.02 SOL, WICK's own fee, not a pump.fun fee), signed
   together with the launch, buys $WICK and burns it within a minute.
+- **Share the fire (optional).** At launch, the creator can share **10% of the coin's pump.fun creator fees** with
+  WICK, forever, and pays a reduced **0.01 SOL** Ignition Fee instead of 0.02. The split (90% creator, 10% WICK) is set
+  with pump.fun's own fee sharing and locked on-chain: nobody can change it, not even WICK. WICK's part buys $WICK and
+  burns it at the next buyback. See "Creator fee sharing" below.
 - **The breath: a buyback every 30 minutes at most.** The $WICK creator fees buy back and burn $WICK. Every
   launch brings the next buyback 1 minute closer. The countdown is on screen.
 - **Living matches.** Each coin orbits the candle; coins that pump (DexScreener market cap) grow and move closer
@@ -75,6 +79,27 @@ Each step is claimed by an atomic database write, so two overlapping crons never
 leaves the SOL in the wallet. Without `TOKEN_MINT` and `BUYBACK_SECRET_KEY`, the breath still runs, nothing is
 bought ("no buyback yet"), and launching costs nothing extra.
 
+## Creator fee sharing
+
+pump.fun lets a coin's creator split its creator fees between up to 10 wallets, once and for all
+([pump.fun docs](https://github.com/pump-fun/pump-public-docs/blob/main/docs/instructions/CREATOR_FEE_SHARING.md)).
+WICK uses it, as an option chosen by the creator at launch (`lib/sharing.js`):
+
+1. **Prepare**: with sharing, the Worker builds a second transaction, paid and signed by the creator, that holds the
+   reduced Ignition Fee, `create_fee_sharing_config` and `update_fee_shares_v2` (creator 90%, WICK 10%; this last
+   instruction locks the split forever). The wallet signs it together with the launch: still one approval.
+2. **Submit**: the launch is sent; the sharing transaction is checked (byte for byte the one prepared) and **held**: it
+   can only work once the coin exists.
+3. **Confirmed**: as soon as the launch is confirmed, the held transaction is sent. It is atomic: if it fails or
+   expires, neither the fee nor the split happen (the coin stays launched, without sharing).
+4. **Distribution** (cron, `runShares`): every 6 hours at most per coin, once at least 0.01 SOL of fees has piled up,
+   the buyback wallet calls the permissionless `distribute_creator_fees_v2` (after `transfer_creator_fees_to_pump_v2`
+   for a coin that graduated to PumpSwap). Each shareholder is paid by pump.fun directly. WICK's part (read from the
+   confirmed transaction) is shown on the dashboard and burns at the next buyback, with the rest of the pot.
+
+The instructions are built by hand (no SDK in the Worker) and `test/sharing.test.js` checks they are byte for byte
+those of the official `@pump-fun/pump-sdk` (`test/fixtures/pump-sdk-sharing.json`).
+
 **The candle** is computed from the burns: % burned = $WICK burned by WICK ÷ the original supply (current
 supply read on-chain + what WICK burned). Each 0.5% crossed is a consumed candle, recorded once in the `hall`
 table.
@@ -118,6 +143,7 @@ small JSON API, backed by a [D1](https://developers.cloudflare.com/d1/) database
 | The candle (% of supply) and the candle hall | `lib/candle.js`, `lib/supply.js`, `lib/hall.js` |
 | The breath (30-minute buyback countdown) | `lib/cycles.js` |
 | Burn queue: buybacks and launch burns | `lib/buyback.js` |
+| Creator fee sharing (pump.fun fee sharing, distributions) | `lib/sharing.js` |
 | Living matches (DexScreener market caps) | `lib/markets.js` |
 | Pyromaniacs leaderboard | `lib/leaderboard.js`, `src/api/leaderboard.js` |
 | Telegram bot | `lib/telegram.js` |
@@ -159,7 +185,9 @@ Locally, `CYCLE_MINUTES=1` in `.dev.vars` makes the breath (buyback countdown) 1
    | `BUYBACK_COLLECT_FEES` | set to `off` to skip collecting creator fees before each buyback |
    | `CYCLE_MINUTES`, `MATCH_MINUTES` | breath length (default `30`) and how much closer each launch brings the buyback (default `1`) |
    | `CANDLE_PCT` | share of the $WICK supply per candle, in % (default `0.5`) |
-   | `LAUNCH_FEE_SOL` | launch fee burned as $WICK (default `0.02`, `0` to turn it off). Only charged while the buyback is live |
+   | `LAUNCH_FEE_SOL` | Ignition Fee burned as $WICK (default `0.02`, `0` to turn it off). Only charged while the buyback is live |
+   | `LAUNCH_FEE_SHARED_SOL` | Ignition Fee when the creator shares its creator fees (default `0.01`) |
+   | `SHARE_BPS` | WICK's part of shared creator fees, in basis points (default `1000` = 10%, `0` turns the option off) |
    | `HOLDER_MIN` | minimum $WICK held for a golden flame (default: any amount) |
    | `TELEGRAM_BOT_TOKEN` (secret), `TELEGRAM_CHAT_ID` | the bot (from @BotFather) and the channel (`@yourchannel` or its numeric id); the bot must be an admin of the channel |
    | `SITE_URL` | the link in Telegram posts (default `https://trywick.fun`) |

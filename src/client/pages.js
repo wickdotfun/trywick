@@ -13,7 +13,7 @@ const txLink = (sig, text = 'TX ↗') => (sig ? `<a class="tx" href="${solscan(e
 
 export const SORTS = [['trending', 'Trending'], ['new', 'New'], ['volume', 'Top volume'], ['burner', 'Biggest burner']];
 
-export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct, demo, onStrike, onToken }) {
+export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct, shareTag, demo, onStrike, onToken }) {
   const tk = () => `$${ticker()}`;
 
   // ---------------------------------------------------------- Explore
@@ -39,7 +39,7 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
     if (!body) return;
     const rows = data.coins.map((m) => `<li class="ex-row${m.holder ? ' holder' : ''}">
       ${avatar(m, 38)}
-      <span class="ex-name"><b>$${esc(m.symbol)}${m.holder ? ' 👑' : ''}</b><em>${esc(m.name)}</em></span>
+      <span class="ex-name"><b>$${esc(m.symbol)}${m.holder ? ' 👑' : ''} ${shareTag(m)}</b><em>${esc(m.name)}</em></span>
       <span class="ex-stat"><b>${usd(m.mcap)}</b><small>mcap</small></span>
       <span class="ex-stat"><b>${usd(m.volume)}</b><small>vol 24h</small></span>
       <span class="ex-stat hide-sm"><b>${ago(m.at).replace(' ago', '')}</b><small>age</small></span>
@@ -133,7 +133,7 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
       <h3 class="m-sub">Coins</h3>
       ${p.coins.length ? `<ol class="ex-list">${p.coins.map((m) => `<li class="ex-row${m.holder ? ' holder' : ''}">
         ${avatar(m, 34)}
-        <span class="ex-name"><b>$${esc(m.symbol)}${m.holder ? ' 👑' : ''}</b><em>${esc(m.name)} · ${ago(m.at)}</em></span>
+        <span class="ex-name"><b>$${esc(m.symbol)}${m.holder ? ' 👑' : ''} ${shareTag(m)}</b><em>${esc(m.name)} · ${ago(m.at)}</em></span>
         <span class="ex-stat"><b>${usd(m.mcap)}</b><small>mcap</small></span>
         <span class="ex-stat fire"><b>${m.burned ? compact(m.burned) : '—'}</b><small>${tk()} burned</small></span>
         <a class="wbtn small-btn" href="${pumpUrl(esc(m.mint))}" target="_blank" rel="noopener">Trade</a></li>`).join('')}</ol>`
@@ -151,8 +151,8 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
     const live = Boolean(world.token?.mint) || demo;
     openModal(`
       <h2>🔥 ${tk()} dashboard</h2>
-      <p class="muted small">Real data only: WICK's own burns (each with its transaction), the ${tk()} supply read on Solana,
-        and DexScreener for volumes.${live ? '' : ` Most of it starts once ${tk()} is live.`}</p>
+      <p class="muted small">Real data only: WICK's own burns and fee distributions (each with its transaction), the ${tk()}
+        supply read on Solana, and DexScreener for volumes.${live ? '' : ` Most of it starts once ${tk()} is live.`}</p>
       <div class="tiles">
         <div><strong class="gold">${compact(t.burned || 0)}</strong><span>${tk()} burned</span></div>
         <div><strong>${t.supplyPct != null ? pct(t.supplyPct) : '—'}</strong><span>of the supply burned</span></div>
@@ -161,7 +161,7 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
         <div><strong>${fmt(t.launches ?? world.total ?? 0)}</strong><span>coins launched</span></div>
         <div><strong>${sol(t.ignitionSol || 0)}</strong><span>Ignition Fees paid</span></div>
         <div><strong>${usd(t.volume24h)}</strong><span>WICK coins volume, 24h</span></div>
-        <div><strong class="dim">soon</strong><span>creator fees shared</span></div>
+        <div><strong>${sol(t.sharedSol || 0)}</strong><span>creator fees shared with WICK${t.sharingCoins ? ` · ${fmt(t.sharingCoins)} coins` : ''}</span></div>
       </div>
       <div class="lasts">
         <div><span class="m-sub">Last burn</span>${last
@@ -284,7 +284,7 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
         is gone for good and the candle joins the hall. A new season begins.</p>
         <ol class="hall">${now}${world.hall.map((h) => `<li class="flame">
           <span class="hall-candle" aria-hidden="true"></span>
-          <span class="who"><b>Candle #${pad(h.number)} · fully melted 🔥</b><em>${day(h.completedAt)} · ${fmt(h.launches)} coins launched${h.top ? ` · hottest <a href="${pumpUrl(esc(h.top.mint))}" target="_blank" rel="noopener">$${esc(h.top.symbol)}</a>` : ''}</em></span>
+          <span class="who"><b>Candle #${pad(h.number)} — fully melted 🔥</b><em>${day(h.completedAt)} · ${fmt(h.launches)} coins launched${h.top ? ` · hottest <a href="${pumpUrl(esc(h.top.mint))}" target="_blank" rel="noopener">$${esc(h.top.symbol)}</a>` : ''}</em></span>
           <span class="stat">${compact(h.burned)} <small>${tk()}</small></span>
           <span class="stat">${h.sol != null ? sol(h.sol) : '—'} <small>spent</small></span>
           <span class="stat best">${h.burns != null ? `${fmt(h.burns)} burns` : ''} ${txLink(h.sig, 'last TX ↗')}</span>
@@ -305,15 +305,18 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
         Every match feeds the flame. The flame burns ${tk()}.</p>
       <ol class="loop big">
         <li><i>🚀</i><b>Launch a coin</b><small>on pump.fun, from your wallet</small></li>
-        <li><i>🔥</i><b>Ignition Fee</b><small>${fee} SOL to the fire</small></li>
+        <li><i>🔥</i><b>Generate fees</b><small>Ignition Fee + shared creator fees</small></li>
         <li><i>💱</i><b>Buy ${tk()}</b><small>within a minute</small></li>
         <li><i>🕯️</i><b>Burn ${tk()}</b><small>gone from circulation</small></li>
       </ol>
       <ol class="how">
         <li><b>Strike a match = launch a coin.</b> Name, ticker, image, socials: your coin is created on pump.fun, signed
-          by your own wallet. You are its creator and you keep its pump.fun creator fees.</li>
+          by your own wallet. You are its creator and you get its pump.fun creator fees.</li>
         <li><b>The Ignition Fee.</b> A ${fee} SOL fee that belongs to WICK (it is not a pump.fun fee), signed together with
           your launch. WICK uses it to buy ${tk()} and burns what it bought, within a minute.</li>
+        <li><b>Share the fire (optional).</b> When you launch, you can share ${world.launch?.shareBps ? world.launch.shareBps / 100 : 10}% of
+          your coin's pump.fun creator fees with WICK, forever. Your Ignition Fee drops to ${world.launch?.sharedFeeSol ?? 0.01} SOL.
+          The split is locked on pump.fun itself: nobody can change it, not even WICK. WICK's part buys ${tk()} and burns it.</li>
         <li><b>The breath.</b> Every ${span(b?.durationMs ?? 1_800_000)} at most, the creator fees of ${tk()} itself buy
           ${tk()} back and burn it. Every launch brings the next one ${span(b?.matchMs ?? 60_000)} closer.</li>
         <li><b>The candle is the supply.</b> One candle = ${c?.stepPct ?? 0.5}% of the ${tk()} supply. It melts with every

@@ -7,6 +7,7 @@ import { CONFIG, cycleTiming } from '../../lib/config.js';
 import { publicCycle, tickCycle } from '../../lib/cycles.js';
 import { json } from '../../lib/http.js';
 import { ensureSchema } from '../../lib/schema.js';
+import { shareTotals } from '../../lib/sharing.js';
 import { buybackPaused, getSetting, setSetting } from '../../lib/settings.js';
 import { getBalance, tokenHolding } from '../../lib/solana.js';
 import { telegramReady } from '../../lib/telegram.js';
@@ -64,7 +65,7 @@ export const adminStatus = guarded(async ({ env }) => {
   const now = Date.now();
   const timing = cycleTiming(env);
   const open = await tickCycle(env, now);
-  const [wallet, paused, lastRun, lastError, { results: cycles }, pending, { results: burns }, fee] = await Promise.all([
+  const [wallet, paused, lastRun, lastError, { results: cycles }, pending, { results: burns }, fee, sharedFee, shares] = await Promise.all([
     walletInfo(env),
     buybackPaused(db),
     getSetting(db, 'cron.lastRun'),
@@ -79,6 +80,8 @@ export const adminStatus = guarded(async ({ env }) => {
     db.prepare(`SELECT b.id, b.kind, b.ref, b.created_at, b.status, b.note, b.sol, b.buy_sig, b.burn_sig, b.burned_ui, m.symbol
       FROM burns b LEFT JOIN matches m ON b.kind = 'match' AND m.mint = b.ref ORDER BY b.id DESC LIMIT 20`).all(),
     launchFee(env),
+    launchFee(env, { shared: true }),
+    shareTotals(db),
   ]);
   return json({
     now,
@@ -92,9 +95,12 @@ export const adminStatus = guarded(async ({ env }) => {
       cycleMinutes: timing.durationMs / 60_000,
       matchMinutes: timing.matchMs / 60_000,
       launchFeeSol: fee ? fee.lamports / 1e9 : 0,
+      sharedFeeSol: sharedFee ? sharedFee.lamports / 1e9 : null,
+      shareBps: sharedFee?.bps ?? 0,
       telegram: telegramReady(env),
     },
     wallet,
+    shares,
     candle: publicCycle(open, env, now),
     cycles,
     burns,

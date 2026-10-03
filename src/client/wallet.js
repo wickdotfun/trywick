@@ -1,32 +1,14 @@
-// Le wallet et le lancement du coin, chargés seulement au moment où on frappe une allumette
-// (la bibliothèque Solana est lourde, inutile de la charger pour regarder la bougie).
+// Le lancement d'un coin, et l'achat / la vente de $WICK, chargés seulement au moment où on en a
+// besoin (la bibliothèque Solana est lourde, inutile de la charger pour regarder la bougie).
 //
 // Les clés ne quittent jamais le navigateur :
 // - le mint (l'adresse du nouveau coin) est une clé générée ici, qui signe ici ;
-// - le créateur signe dans son wallet (Phantom, Solflare, Backpack…).
-// Le serveur prépare la transaction (pump.fun) et relaie la transaction signée.
+// - le créateur signe dans son wallet (connect.js, par le Wallet Standard).
+// L'ordre des signatures suit la recommandation de Phantom pour les transactions à plusieurs
+// signataires : le wallet signe d'abord, le mint ensuite. Une transaction par demande de
+// signature (jamais plusieurs d'un coup).
 import { Keypair, VersionedTransaction } from '@solana/web3.js';
-
-export function findWallets() {
-  const found = [];
-  const add = (id, name, provider) => {
-    if (provider && !found.some((w) => w.provider === provider)) found.push({ id, name, provider });
-  };
-  add('phantom', 'Phantom', window.phantom?.solana?.isPhantom ? window.phantom.solana : null);
-  add('solflare', 'Solflare', window.solflare?.isSolflare ? window.solflare : null);
-  add('backpack', 'Backpack', window.backpack?.isBackpack ? window.backpack : null);
-  if (window.solana && !found.some((w) => w.provider === window.solana)) {
-    add('wallet', window.solana.isPhantom ? 'Phantom' : 'Solana wallet', window.solana);
-  }
-  return found;
-}
-
-export async function connect(wallet) {
-  const res = await wallet.provider.connect();
-  const key = res?.publicKey ?? wallet.provider.publicKey;
-  if (!key) throw new Error('no_public_key');
-  return key.toString();
-}
+import { signBytes } from './connect.js';
 
 const b64 = {
   from(s) { return Uint8Array.from(atob(s), (c) => c.charCodeAt(0)); },
@@ -43,6 +25,7 @@ async function call(url, init) {
   if (data.error) throw Object.assign(new Error(data.error), { code: data.error });
   return data;
 }
+const post = (url, body) => call(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 
 // Le même mint est gardé pour les nouveaux essais (transaction expirée, wallet fermé…),
 // jusqu'à ce que le coin soit lancé : les métadonnées déjà envoyées resservent.
@@ -50,8 +33,8 @@ let mintKey = null;
 export function resetMint() { mintKey = null; }
 
 // fields : les textes du formulaire ; image : le fichier (Blob).
-// onStep('upload' | 'sign' | 'send' | 'confirm')
-export async function strike({ wallet, creator, fields, image, onStep }) {
+// onStep('upload' | 'sign' | 'sign2' | 'send' | 'confirm')
+export async function strike({ creator, fields, image, onStep }) {
   mintKey ??= Keypair.generate();
   const mint = mintKey.publicKey.toBase58();
 
@@ -63,30 +46,21 @@ export async function strike({ wallet, creator, fields, image, onStep }) {
   form.append('image', image, image.name || 'image.png');
   const prepared = await call('/api/launch/prepare', { method: 'POST', body: form });
 
+  // 1. La création du coin : le wallet signe d'abord, puis la clé du mint.
   onStep('sign');
-  const tx = VersionedTransaction.deserialize(b64.from(prepared.tx));
-  const feeTx = prepared.feeTx ? VersionedTransaction.deserialize(b64.from(prepared.feeTx)) : null;
-  // Le wallet signe d'abord (c'est ce que demande Phantom), puis la clé du mint. Avec un frais de
-  // lancement, les deux transactions sont signées d'un coup (une seule validation).
-  let signed, signedFee = null;
-  try {
-    if (feeTx && wallet.provider.signAllTransactions) {
-      [signed, signedFee] = await wallet.provider.signAllTransactions([tx, feeTx]);
-    } else {
-      signed = (await wallet.provider.signTransaction(tx)) || tx;
-      if (feeTx) signedFee = (await wallet.provider.signTransaction(feeTx)) || feeTx;
-    }
-  } catch (err) {
-    throw Object.assign(new Error('rejected'), { code: 'rejected', cause: err });
+  const signedByWallet = await signBytes(b64.from(prepared.tx));
+  const tx = VersionedTransaction.deserialize(signedByWallet);
+  tx.sign([mintKey]);
+
+  // 2. L'Ignition Fee (et le partage des creator fees, s'il est choisi) : le wallet seul.
+  let feeTx = null;
+  if (prepared.feeTx) {
+    onStep('sign2');
+    feeTx = await signBytes(b64.from(prepared.feeTx));
   }
-  signed.sign([mintKey]);
 
   onStep('send');
-  const sent = await call('/api/launch/submit', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ mint, tx: b64.to(signed.serialize()), feeTx: signedFee ? b64.to(signedFee.serialize()) : null }),
-  });
+  const sent = await post('/api/launch/submit', { mint, tx: b64.to(tx.serialize()), feeTx: feeTx ? b64.to(feeTx) : null });
 
   onStep('confirm');
   const until = Date.now() + 120_000;
@@ -103,27 +77,13 @@ export async function strike({ wallet, creator, fields, image, onStep }) {
 
 // Acheter ou vendre $WICK depuis le site. PumpPortal construit la transaction (côté serveur),
 // le wallet la signe, le serveur la relaie. onStep('build' | 'sign' | 'send' | 'confirm')
-export async function trade({ wallet, owner, side, amount, slippage, onStep }) {
+export async function trade({ owner, side, amount, slippage, onStep }) {
   onStep('build');
-  const prepared = await call('/api/trade/prepare', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ owner, side, amount, slippage }),
-  });
+  const prepared = await post('/api/trade/prepare', { owner, side, amount, slippage });
   onStep('sign');
-  const tx = VersionedTransaction.deserialize(b64.from(prepared.tx));
-  let signed;
-  try {
-    signed = (await wallet.provider.signTransaction(tx)) || tx;
-  } catch (err) {
-    throw Object.assign(new Error('rejected'), { code: 'rejected', cause: err });
-  }
+  const signed = await signBytes(b64.from(prepared.tx));
   onStep('send');
-  const { signature } = await call('/api/trade/send', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ owner, tx: b64.to(signed.serialize()) }),
-  });
+  const { signature } = await post('/api/trade/send', { owner, tx: b64.to(signed) });
   onStep('confirm');
   const until = Date.now() + 60_000;
   while (Date.now() < until) {

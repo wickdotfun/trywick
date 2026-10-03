@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 import { Keypair, PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
-import { announceText, launchIn, readCreate, runAnnounce } from '../lib/announce.js';
+import { announceText, detectLaunch, launchIn, readCreate, runAnnounce, withLaunch } from '../lib/announce.js';
 import { CONFIG } from '../lib/config.js';
 import { ensureSchema } from '../lib/schema.js';
 import { getSetting } from '../lib/settings.js';
@@ -101,4 +101,26 @@ test('with TOKEN_MINT already set, that address is announced', async () => {
   assert.equal(await runAnnounce({ DB: db, TELEGRAM_BOT_TOKEN: 'T', TELEGRAM_CHAT_ID: '@w', TOKEN_MINT: 'SetMint' }, 1), 'SetMint');
   assert.match(texts[0], /<code>SetMint<\/code>/);
   assert.equal(await runAnnounce({ DB: db }, 2), null);                   // sans bot : rien
+});
+
+test('the site goes live by itself once the launch is detected, even without Telegram', async () => {
+  const dev = Keypair.generate().publicKey, wick = Keypair.generate().publicKey;
+  const db = fakeD1();
+  await ensureSchema(db);
+  const env = { DB: db, DEPLOYER_WALLET: dev.toBase58(), SOLANA_RPC: 'https://rpc' };
+  let launched = false;
+  globalThis.fetch = async (url, init) => {
+    const { method } = JSON.parse(init.body);
+    const ok = (result) => Response.json({ jsonrpc: '2.0', id: 1, result });
+    if (method === 'getSignaturesForAddress') return ok(launched ? [{ signature: 'L1', err: null }] : []);
+    if (method === 'getTransaction') return ok(createTx(dev, wick, 'wick'));
+    throw new Error(method);
+  };
+  assert.equal((await withLaunch(env)).TOKEN_MINT, undefined);
+  assert.equal(await runAnnounce(env, 1), null);             // pas de bot, pas de lancement : rien
+  launched = true;
+  assert.equal(await runAnnounce(env, 2), null);             // pas de bot : pas d'annonce…
+  assert.equal((await detectLaunch(env, 3)).mint, wick.toBase58());   // … mais le lancement est noté
+  assert.equal((await withLaunch(env)).TOKEN_MINT, wick.toBase58());
+  assert.equal((await withLaunch({ ...env, TOKEN_MINT: 'Manual' })).TOKEN_MINT, 'Manual');   // Cloudflare passe avant
 });

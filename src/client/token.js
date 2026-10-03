@@ -1,7 +1,8 @@
 // La page $WICK : le vrai coin. Sa chart en direct (DexScreener), son prix, sa courbe pump.fun,
 // ses plus gros holders, ce que WICK en a brûlé, et l'achat / la vente directement ici
 // (PumpPortal construit la transaction, le wallet du visiteur la signe, le serveur la relaie).
-import { compact, esc, fmt, pumpUrl, short, solscan } from './util.js';
+import * as connect from './connect.js';
+import { compact, esc, fmt, icon, pumpUrl, short, solscan } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 const REFRESH_MS = 15_000;
@@ -32,30 +33,6 @@ export function remembered() {
   try { return localStorage.getItem('wick.wallet'); } catch { return null; }
 }
 
-// Connecter un wallet sans quitter la fenêtre : les boutons s'affichent dans `box`.
-// Renvoie { wallet, owner } ou null (pas de wallet installé : liens pour en ouvrir un).
-export async function connectInline(mod, box, back = location.href) {
-  const found = mod.findWallets();
-  if (!found.length) {
-    const here = encodeURIComponent(back);
-    const ref = encodeURIComponent(location.origin);
-    box.innerHTML = `<p class="muted small">You need a Solana wallet.</p><div class="wallets">
-      <a class="wbtn" href="https://phantom.app/ul/browse/${here}?ref=${ref}">Open in Phantom</a>
-      <a class="wbtn" href="https://solflare.com/ul/v1/browse/${here}?ref=${ref}">Open in Solflare</a></div>`;
-    return null;
-  }
-  const pick = found.length === 1 ? found[0] : await new Promise((resolve) => {
-    box.innerHTML = `<div class="wallets">${found.map((w, i) => `<button class="wbtn" data-w="${i}">${esc(w.name)}</button>`).join('')}</div>`;
-    box.querySelectorAll('[data-w]').forEach((b) => b.addEventListener('click', () => resolve(found[Number(b.dataset.w)])));
-  });
-  box.innerHTML = '';
-  try {
-    return { wallet: pick, owner: await mod.connect(pick) };
-  } catch {
-    throw Object.assign(new Error('connect'), { code: 'no_connect' });
-  }
-}
-
 // Les prix des memecoins sont minuscules : 0.00002134 plutôt que 0.
 function price(n) {
   if (n == null) return '—';
@@ -69,8 +46,7 @@ export function createTokenPage({ api, openModal, isOpen, world, ticker, breathT
   let data = null;
   let side = 'buy';
   let slippage = 10;
-  let wallet = null;      // { provider, name } une fois connecté
-  let owner = null;
+  const owner = () => connect.current()?.address || null;
   let busy = false;
   let timer = null;
 
@@ -118,9 +94,9 @@ export function createTokenPage({ api, openModal, isOpen, world, ticker, breathT
               <button class="link-btn tiny" id="tk-burns">burn tracker →</button>
             </section>
             <ul class="tk-why">
-              <li><i>🔥</i><span><b>Every launch burns it.</b> Each coin launched on WICK pays a ${world.launch?.feeSol || 0.02} SOL Ignition Fee that buys $${tk} and burns it, within a minute.</span></li>
-              <li><i>💨</i><span><b>Buybacks, all day.</b> The creator fees of $${tk} buy it back and burn it every ${Math.round((world.breath?.durationMs ?? 1_800_000) / 60_000)} minutes at most.</span></li>
-              <li><i>👑</i><span><b>Holders burn in gold.</b> Hold $${tk} and your launches get a golden flame around the candle.</span></li>
+              <li>${icon('flame', 'fire')}<span><b>Every launch burns it.</b> Each coin launched on WICK pays a ${world.launch?.feeSol || 0.02} SOL Ignition Fee that buys $${tk} and burns it, within a minute.</span></li>
+              <li>${icon('wind', 'fire')}<span><b>Buybacks, all day.</b> The creator fees of $${tk} buy it back and burn it every ${Math.round((world.breath?.durationMs ?? 1_800_000) / 60_000)} minutes at most.</span></li>
+              <li>${icon('crown', 'gold')}<span><b>Holders burn in gold.</b> Hold $${tk} and your launches get a golden flame around the candle.</span></li>
             </ul>
           </div>
           <aside class="tk-side">
@@ -136,10 +112,9 @@ export function createTokenPage({ api, openModal, isOpen, world, ticker, breathT
                 <div class="presets">${SLIPPAGES.map((s) => `<button type="button" data-slip="${s}"${s === slippage ? ' class="on"' : ''}>${s}%</button>`).join('')}</div>
               </details>
               <button class="cta wide" id="tk-go">Buy $${tk}</button>
-              <div id="tk-wallets"></div>
               <p class="error" id="tk-err" hidden></p>
               <p class="tk-done" id="tk-done" hidden></p>
-              <p class="tk-who" id="tk-who">${owner ? `Wallet ${esc(short(owner))}` : ''}</p>
+              <p class="tk-who" id="tk-who">${owner() ? `Wallet ${esc(short(owner()))}` : ''}</p>
               <p class="muted tiny">Traded on pump.fun (PumpSwap once it graduates), built by PumpPortal, which takes a small fee per
                 trade. Your wallet shows everything before you sign. WICK never holds your funds.</p>
             </div>
@@ -180,9 +155,9 @@ export function createTokenPage({ api, openModal, isOpen, world, ticker, breathT
             <h3>The candle is $${tk}. When it launches, this page becomes its home.</h3>
             <p class="muted">The live chart, buy and sell right here, the bonding curve, the top holders, and every $${tk} burned.</p>
             <ul class="tk-why">
-              <li><i>🔥</i><span><b>Every launch burns it.</b> Each coin launched on WICK pays an Ignition Fee that buys $${tk} and burns it, within a minute.</span></li>
-              <li><i>💨</i><span><b>Buybacks, all day.</b> Its creator fees buy it back and burn it every 30 minutes at most.</span></li>
-              <li><i>🕯️</i><span><b>Supply only goes down.</b> The candle shows it: each one is 0.5% of the supply, gone forever.</span></li>
+              <li>${icon('flame', 'fire')}<span><b>Every launch burns it.</b> Each coin launched on WICK pays an Ignition Fee that buys $${tk} and burns it, within a minute.</span></li>
+              <li>${icon('wind', 'fire')}<span><b>Buybacks, all day.</b> Its creator fees buy it back and burn it every 30 minutes at most.</span></li>
+              <li>${icon('candle', 'fire')}<span><b>Supply only goes down.</b> The candle shows it: each one is 0.5% of the supply, gone forever.</span></li>
             </ul>
             <p class="note"><b>The only official address</b> will be posted here, on X and on Telegram at launch. Anything before that is fake.</p>
             <div class="wallets">
@@ -196,7 +171,7 @@ export function createTokenPage({ api, openModal, isOpen, world, ticker, breathT
 
   function wire(mint) {
     $('tk-copy').addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText(mint); $('tk-copy').textContent = 'Copied ✓'; } catch { $('tk-copy').textContent = 'Select it'; }
+      try { await navigator.clipboard.writeText(mint); $('tk-copy').textContent = 'Copied'; } catch { $('tk-copy').textContent = 'Select it'; }
       setTimeout(() => { if ($('tk-copy')) $('tk-copy').textContent = 'Copy'; }, 1800);
     });
     $('tk-burns').addEventListener('click', onBurns);
@@ -259,7 +234,7 @@ export function createTokenPage({ api, openModal, isOpen, world, ticker, breathT
     if (m?.image && /^https:/.test(m.image)) $('tk-logo').src = m.image;
 
     const c = d.curve;
-    $('tk-curve-pct').textContent = c ? (c.complete ? 'Graduated 🎓' : `${(c.progress * 100).toFixed(1)}%`) : '—';
+    $('tk-curve-pct').textContent = c ? (c.complete ? 'Graduated' : `${(c.progress * 100).toFixed(1)}%`) : '—';
     $('tk-curve-bar').style.width = `${((c?.progress ?? 0) * 100).toFixed(1)}%`;
     $('tk-curve-note').textContent = !c ? 'Shown once $WICK trades.'
       : c.complete ? `$${ticker()} graduated from pump.fun: it now trades on PumpSwap.`
@@ -271,7 +246,7 @@ export function createTokenPage({ api, openModal, isOpen, world, ticker, breathT
         : h.map((x, i) => `<li><span class="rank">${i + 1}</span>
             <a class="mono" href="https://solscan.io/account/${esc(x.owner || '')}" target="_blank" rel="noopener">${esc(short(x.owner || '?'))}</a>
             ${x.label ? `<i class="tag${x.label === 'WICK buyback' ? ' fire' : ''}">${esc(x.label)}</i>` : ''}
-            ${x.owner && x.owner === owner ? '<i class="tag gold">you</i>' : ''}
+            ${x.owner && x.owner === owner() ? '<i class="tag gold">you</i>' : ''}
             <b>${x.pct != null ? `${x.pct.toFixed(2)}%` : compact(x.amount)}</b></li>`).join('');
     estimate();
     tick();
@@ -295,14 +270,6 @@ export function createTokenPage({ api, openModal, isOpen, world, ticker, breathT
     el.hidden = !msg;
   }
 
-  async function connectWallet(mod) {
-    const res = await connectInline(mod, $('tk-wallets'), `${location.origin}/#wick`);
-    if (!res) return null;
-    ({ wallet, owner } = res);
-    remember(owner);
-    $('tk-who').textContent = `Wallet ${short(owner)}`;
-    return wallet;
-  }
 
   async function go() {
     if (busy) return;
@@ -320,17 +287,18 @@ export function createTokenPage({ api, openModal, isOpen, world, ticker, breathT
       let mod = null;
       if (!demo) {
         btn.textContent = 'Connecting…';
-        mod = await import('./wallet.js');
-        if (!wallet && !(await connectWallet(mod))) return;
+        [mod] = await Promise.all([import('./wallet.js'), connect.ensure()]);
+        if (!owner()) { showError('Connect a wallet to trade.'); return; }
+        $('tk-who').textContent = `Wallet ${short(owner())}`;
       }
       const step = (s) => { if ($('tk-go')) $('tk-go').textContent = { build: 'Preparing…', sign: 'Sign in your wallet…', send: 'Sending…', confirm: 'Confirming…' }[s]; };
       const run = demo ? api.trade : mod.trade;
-      const res = await run({ wallet, owner, side, amount, slippage, onStep: step });
+      const res = await run({ owner: owner(), side, amount, slippage, onStep: step });
       const done = $('tk-done');
       if (done) {
         done.hidden = false;
         done.innerHTML = res.status === 'ok'
-          ? `${side === 'buy' ? `✓ Bought. Welcome to the holders: your next launch on WICK burns in gold 👑` : '✓ Sold.'}
+          ? `${side === 'buy' ? 'Bought. Welcome to the holders: your next launch on WICK burns in gold.' : 'Sold.'}
              ${res.signature ? ` <a href="${solscan(esc(res.signature))}" target="_blank" rel="noopener">Transaction ↗</a>` : ''}`
           : `Sent. Solana hasn't confirmed it yet. <a href="${solscan(esc(res.signature))}" target="_blank" rel="noopener">Follow it ↗</a>`;
       }

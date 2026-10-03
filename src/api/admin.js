@@ -2,16 +2,19 @@
 //   GET  /api/admin/status  → tout l'état du buyback
 //   POST /api/admin/pause   { paused: true | false } → l'interrupteur d'urgence
 //   POST /api/admin/run     → fait avancer le buyback tout de suite
-import { buybackWallet, launchFee, runBuyback } from '../../lib/buyback.js';
-import { CONFIG, cycleTiming } from '../../lib/config.js';
-import { publicCycle, tickCycle } from '../../lib/cycles.js';
+import { buybackWallet, launchFee, potSol, runBuyback } from '../../lib/buyback.js';
+import { supplyCandle } from '../../lib/candle.js';
+import { CONFIG, candlePct, cycleTiming } from '../../lib/config.js';
+import { burnTotals, launchTotals, publicCycle, tickCycle } from '../../lib/cycles.js';
 import { json } from '../../lib/http.js';
 import { ensureSchema } from '../../lib/schema.js';
 import { deployer } from '../../lib/announce.js';
-import { shareTotals } from '../../lib/sharing.js';
+import { PUMP, PUMP_AMM, shareTotals } from '../../lib/sharing.js';
 import { buybackPaused, getSetting, setSetting } from '../../lib/settings.js';
-import { getBalance, tokenHolding } from '../../lib/solana.js';
-import { telegramReady } from '../../lib/telegram.js';
+import { WSOL, ataAddress, findPda, fromBase58, getBalance, rpc, tokenHolding } from '../../lib/solana.js';
+import { supplyBurned } from '../../lib/supply.js';
+import { dailyStats, solUsd, telegramReady } from '../../lib/telegram.js';
+import { tokenView } from '../../lib/token.js';
 
 async function digest(text) {
   return new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
@@ -61,12 +64,38 @@ async function walletInfo(env) {
   return info;
 }
 
+const RENT_EXEMPT_EMPTY = 890_880;
+
+// Le dev wallet (celui qui lance $WICK) : ses SOL, ses $WICK, et les creator fees de $WICK qui
+// l'attendent sur pump.fun (dans le coffre du créateur, et, une fois gradué, sur PumpSwap).
+async function devInfo(env, buyback) {
+  const address = deployer(env);
+  if (!address) return null;
+  const info = { address, isBuyback: address === buyback };
+  const [sol, holding, vault, ammVault] = await Promise.all([
+    getBalance(env, address).then((l) => l / 1e9).catch(() => null),
+    env.TOKEN_MINT ? tokenHolding(env, address, env.TOKEN_MINT).catch(() => null) : null,
+    findPda(['creator-vault', fromBase58(address)], PUMP).then((v) => getBalance(env, v)).catch(() => null),
+    findPda(['creator_vault', fromBase58(address)], PUMP_AMM).then((auth) => ataAddress(auth, WSOL))
+      .then((ata) => rpc(env, 'getTokenAccountBalance', [ata, { commitment: 'confirmed' }])).catch(() => null),
+  ]);
+  info.sol = sol;
+  info.wick = holding && holding.decimals != null ? Number(holding.raw) / 10 ** holding.decimals : env.TOKEN_MINT ? 0 : null;
+  const curve = vault == null ? null : Math.max(0, vault - RENT_EXEMPT_EMPTY) / 1e9;
+  const amm = ammVault?.value ? Number(ammVault.value.amount) / 1e9 : 0;
+  info.feesPending = curve == null ? null : curve + amm;
+  return info;
+}
+
+// Une partie des données peut manquer (RPC lent, DexScreener) : la page s'affiche quand même.
+const soft = (p) => Promise.resolve(p).catch(() => null);
+
 export const adminStatus = guarded(async ({ env }) => {
   const db = env.DB;
   const now = Date.now();
   const timing = cycleTiming(env);
   const open = await tickCycle(env, now);
-  const [wallet, paused, lastRun, lastError, { results: cycles }, pending, { results: burns }, fee, sharedFee, shares, announced] = await Promise.all([
+  const [wallet, paused, lastRun, lastError, { results: cycles }, pending, { results: burns }, fee, sharedFee, shares, announced, detected] = await Promise.all([
     walletInfo(env),
     buybackPaused(db),
     getSetting(db, 'cron.lastRun'),
@@ -84,6 +113,23 @@ export const adminStatus = guarded(async ({ env }) => {
     launchFee(env, { shared: true }),
     shareTotals(db),
     getSetting(db, 'launch.announced'),
+    getSetting(db, 'launch.detected'),
+  ]);
+  const [heartbeat, burned, launched, supply, day, market, usd, pot, dev, { results: launches }] = await Promise.all([
+    getSetting(db, 'cron.heartbeat'),
+    burnTotals(db),
+    launchTotals(db, now),
+    soft(supplyBurned(env, now)),
+    dailyStats(db, now),
+    env.TOKEN_MINT ? soft(tokenView(env, now)) : null,
+    soft(solUsd(now)),
+    soft(potSol(env, now)),
+    soft(devInfo(env, wallet.address)),
+    db.prepare(`SELECT m.seq, m.mint, m.symbol, m.name, m.creator, m.created_at, m.lit_at, m.signature, m.fee_lamports, m.fee_state,
+        m.fee_sig, m.share_bps, m.share_state, m.tg_state, m.holder, m.mcap,
+        b.status AS burn_status, b.burned_ui AS burned, b.burn_sig
+      FROM matches m LEFT JOIN burns b ON b.kind = 'match' AND b.ref = m.mint
+      WHERE m.seq IS NOT NULL OR m.signature IS NOT NULL ORDER BY m.created_at DESC LIMIT 15`).all(),
   ]);
   return json({
     now,
@@ -102,6 +148,11 @@ export const adminStatus = guarded(async ({ env }) => {
       telegram: telegramReady(env),
       deployer: deployer(env),
       announced,
+      detected,
+      ticker: env.TOKEN_TICKER || 'WICK',
+      site: env.SITE_URL || 'https://trywick.fun',
+      dailyHour: env.TELEGRAM_DAILY_HOUR ?? '18',
+      reserveSol: CONFIG.buyback.reserveSol,
     },
     wallet,
     shares,
@@ -111,6 +162,16 @@ export const adminStatus = guarded(async ({ env }) => {
     pendingLaunches: pending.n,
     lastRun,
     lastError,
+    // Le tableau de bord du jour J.
+    heartbeat,
+    totals: { ...burned, ...launched, ...shares },
+    supply: supply?.original ? { ...supply, candle: supplyCandle(supply.pct, candlePct(env)) } : null,
+    day,
+    market: market?.market ? { ...market.market, curve: market.curve, holders: market.holders } : null,
+    solUsd: usd ?? (market?.market?.priceUsd && market.market.priceSol ? market.market.priceUsd / market.market.priceSol : null),
+    potSol: pot,
+    dev,
+    launches,
   });
 });
 

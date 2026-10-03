@@ -2,8 +2,9 @@
 import { createDemo } from './demo.js';
 import { createPages } from './pages.js';
 import { createScene, headColor } from './scene.js';
+import * as connect from './connect.js';
 import { createTokenPage, remember } from './token.js';
-import { ago, compact, esc, fmt, pumpUrl, short, sol, solscan, span } from './util.js';
+import { ago, compact, esc, fmt, icon, pumpUrl, short, sol, solscan, span } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 const DEMO = new URLSearchParams(location.search).has('demo');
@@ -139,21 +140,22 @@ function renderStats() {
 }
 
 // Le fil : chaque lancement (et son Ignition Fee ajoutée au feu), chaque burn, le buyback en cours.
-const shareTag = (m) => (m.share ? `<i class="tag share" title="Shares ${m.share.bps / 100}% of its creator fees with the fire, forever">🤝 ${m.share.bps / 100}%</i>` : '');
+const shareTag = (m) => (m.share ? `<i class="tag share" title="Shares ${m.share.bps / 100}% of its creator fees with the fire, forever">${m.share.bps / 100}% shared</i>` : '');
+const holderTag = (m) => (m.holder ? `<i class="tag gold" title="Launched by a $WICK holder">${icon('crown')}</i>` : '');
 function launchCard(m) {
   const fee = m.fee ?? null;
   return `<li class="ev launch${world.mine.has(m.mint) ? ' mine' : ''}${m.holder ? ' holder' : ''}">
     <a href="${pumpUrl(m.mint)}" target="_blank" rel="noopener">
       ${avatar(m)}
-      <span class="ev-main"><b>$${esc(m.symbol)} launched${m.holder ? ' <i class="tag gold" title="Launched by a $WICK holder">👑</i>' : ''}${shareTag(m)}</b>
-        <span>${fee ? `<em class="fire">+${fee} SOL</em> added to the fire` : esc(m.name)}</span></span>
+      <span class="ev-main"><b>$${esc(m.symbol)} launched ${holderTag(m)}</b>
+        <span>${fee ? `<em class="fire">+${fee} SOL</em> added to the fire` : esc(m.name)}${m.share ? ` · ${m.share.bps / 100}% fees shared` : ''}</span></span>
       <span class="ev-meta"><span class="mono">${m.mcap ? `$${compact(m.mcap)}` : `#${fmt(m.seq)}`}</span><time data-at="${m.at}">${ago(m.at)}</time></span>
     </a></li>`;
 }
 
 function burnCard(b) {
   const what = b.kind === 'match' ? `$${esc(b.symbol || '?')}'s Ignition Fee` : `buyback #${esc(b.ref)}`;
-  const inner = `<span class="ev-ico">🔥</span>
+  const inner = `<span class="ev-ico">${icon('flame')}</span>
       <span class="ev-main"><b>${compact(b.burned)} $${ticker()} burned</b><span>${sol(b.sol)} used · ${what}</span></span>
       <span class="ev-meta">${b.sig ? '<span class="mono">TX ↗</span>' : ''}<time data-at="${b.at}">${ago(b.at)}</time></span>`;
   return `<li class="ev burn">${b.sig ? `<a href="${solscan(esc(b.sig))}" target="_blank" rel="noopener">${inner}</a>` : `<div>${inner}</div>`}</li>`;
@@ -162,7 +164,7 @@ function burnCard(b) {
 function pendingCard() {
   const h = world.history[0];
   if (!h || !['ended', 'buying', 'bought', 'burning_tx'].includes(h.status) || !world.buyback.live || world.buyback.paused) return '';
-  return `<li class="ev pending"><div><span class="ev-ico">💨</span>
+  return `<li class="ev pending"><div><span class="ev-ico">${icon('wind')}</span>
     <span class="ev-main"><b>Buyback #${h.number}</b><span class="pulse-text">buying $${ticker()}…</span></span></div></li>`;
 }
 
@@ -173,7 +175,7 @@ function renderFeed() {
   ].sort((a, b) => b.at - a.at).slice(0, 50);
   $('feed').innerHTML = pendingCard() + (events.length
     ? events.map((e) => e.html()).join('')
-    : `<li class="fi-empty">The fire is quiet.<br>Strike the first match.</li>`);
+    : `<li class="fi-empty">The fire is quiet.<br>Launch the first coin.</li>`);
 }
 
 function renderToken() {
@@ -196,7 +198,7 @@ function nextPop() {
   const el = $('burn-pop');
   if (!b) { popping = false; return; }
   popping = true;
-  el.innerHTML = `<strong>🔥 ${fmt(Math.round(b.burned))} $${ticker()} burned</strong>
+  el.innerHTML = `<strong>${icon('flame')} ${fmt(Math.round(b.burned))} $${ticker()} burned</strong>
     <span>${sol(b.sol)} used · ${b.kind === 'match' ? `$${esc(b.symbol || '?')}'s Ignition Fee` : `buyback #${esc(b.ref)}`}</span>
     ${b.sig ? `<a href="${solscan(esc(b.sig))}" target="_blank" rel="noopener">View TX ↗</a>` : ''}`;
   el.hidden = false;
@@ -266,7 +268,7 @@ function applyState(data, first) {
 
   if (breathed && !first && world.buyback.live && !world.buyback.paused) {
     scene?.flare();
-    toast(`<span>💨 <b>Buyback #${world.history[0]?.number ?? ''}</b> is buying back $${ticker()}…</span>`, 5000);
+    toast(`<span><b>Buyback #${world.history[0]?.number ?? ''}</b> is buying back $${ticker()}…</span>`, 5000);
   }
 
   if (world.burningOut) {
@@ -279,7 +281,7 @@ function applyState(data, first) {
     // Une bougie entière a fondu : ce palier de $WICK est brûlé pour de bon. Les allumettes
     // plongent dans la flamme, la bougie rejoint la salle, la suivante sort de la cire.
     const done = world.candle.number;
-    toast(`<span>🕯️ <b>Candle #${pad(done)} fully melted 🔥</b> ${pct(data.candle.burnedPct)} of $${ticker()} burned forever. It joins the Hall of Flames.</span>`, 8000);
+    toast(`<span><b>Candle #${pad(done)} fully melted.</b> ${pct(data.candle.burnedPct)} of $${ticker()} burned forever. It joins the Hall of Flames.</span>`, 8000);
     world.burningOut = true;
     world.candle = { ...world.candle, melted: 1 };
     scene?.setCandle({ melted: 1, heat: data.heat / HEAT_FULL });
@@ -306,7 +308,7 @@ function applyState(data, first) {
       world.matches.push(m);
       scene?.addMatch(m);
       world.fresh.set(m.mint, performance.now());
-      if (!world.mine.has(m.mint)) toast(`${avatar(m, 22)}<span><b>$${esc(m.symbol)}</b> struck a match${m.holder ? ' 👑' : ''}</span>`);
+      if (!world.mine.has(m.mint)) toast(`${avatar(m, 22)}<span><b>$${esc(m.symbol)}</b> launched ${holderTag(m)}</span>`);
     }
   }
   if (data.markets) applyMarkets(data.markets);
@@ -377,9 +379,9 @@ function showTip(m, x, y) {
   const tip = $('tip');
   if (!m) { tip.hidden = true; document.body.style.cursor = ''; scene?.pause(false); return; }
   tip.innerHTML = `${avatar(m, 44)}
-    <div><b>$${esc(m.symbol)}${m.holder ? ' 👑' : ''}</b><span>${esc(m.name)}</span>
+    <div><b>$${esc(m.symbol)} ${holderTag(m)}</b><span>${esc(m.name)}</span>
     <small class="mono">${m.mcap ? `mcap $${compact(m.mcap)}${m.change != null ? ` · ${m.change >= 0 ? '+' : ''}${Math.round(m.change)}%` : ''} · ` : ''}by ${esc(short(m.creator))} · ${ago(m.at)}</small>
-    ${m.burned > 0 ? `<small class="mono fire">🔥 burned ${compact(m.burned)} $${ticker()}</small>` : ''}</div>`;
+    ${m.burned > 0 ? `<small class="mono fire">${icon('flame')} burned ${compact(m.burned)} $${ticker()}</small>` : ''}</div>`;
   tip.hidden = false;
   document.body.style.cursor = 'pointer';
   scene?.pause(true);
@@ -436,7 +438,7 @@ const tokenPage = createTokenPage({
   onBurns: () => go('dashboard'),
 });
 const pages = createPages({
-  api, openModal, isOpen, world, ticker, avatar, pct, shareTag, demo: DEMO,
+  api, openModal, isOpen, world, ticker, avatar, pct, shareTag, holderTag, demo: DEMO,
   onStrike: () => launchForm(),
   onToken: () => go('wick'),
 });
@@ -502,7 +504,7 @@ function launchForm(error = '') {
   const f = draft.fields;
   const max = world.launch?.maxDevBuy ?? 5;
   openModal(`
-    <h2>Strike a match</h2>
+    <h2>Launch a coin</h2>
     <p class="muted">Launch a real coin on pump.fun. It becomes a match orbiting the $${ticker()} candle${world.launch?.feeSol ? `, and its Ignition Fee burns $${ticker()} within a minute` : ''}.</p>
     <form id="launch-form" novalidate>
       <div class="lf-top">
@@ -527,14 +529,14 @@ function launchForm(error = '') {
       <div class="presets">${[0, 0.1, 0.5, 1].map((v) => `<button type="button" data-sol="${v}">${v}</button>`).join('')}</div>
       ${world.launch?.shareBps ? `<label class="share-opt">
         <input type="checkbox" name="share" value="1" id="lf-share"${draft.share ? ' checked' : ''}>
-        <span><b>🤝 Share ${world.launch.shareBps / 100}% of your creator fees with the fire</b>
+        <span><b>Share ${world.launch.shareBps / 100}% of your creator fees with the fire</b>
           <small>Your Ignition Fee drops to <b>${world.launch.sharedFeeSol} SOL</b> (instead of ${world.launch.feeSol}).
           ${100 - world.launch.shareBps / 100}% of your pump.fun creator fees stay yours, ${world.launch.shareBps / 100}% buy $${ticker()}
           and burn it, forever. Locked on pump.fun: nobody can change it, not even WICK.</small></span>
       </label>` : ''}
       <p class="cost" id="lf-cost">${costLine(draft.share)}</p>
       <p class="error" id="lf-error"${error ? '' : ' hidden'}>${esc(error)}</p>
-      <button class="cta wide" type="submit">${DEMO ? 'Strike (demo)' : 'Connect wallet & strike'}</button>
+      <button class="cta wide" type="submit">${DEMO ? 'Launch (demo)' : connect.current() ? 'Launch your coin' : 'Connect wallet & launch'}</button>
     </form>`, 'm-launch');
 
   const form = $('launch-form');
@@ -592,49 +594,28 @@ function checkForm(fields) {
   return null;
 }
 
-const STEPS = [
-  ['upload', 'Sending your image to pump.fun'],
-  ['sign', 'Sign in your wallet'],
-  ['send', 'Sending to Solana'],
-  ['confirm', 'Lighting your match'],
-];
+// Les étapes d'un lancement : deux signatures quand il y a une Ignition Fee (une transaction à la
+// fois, le wallet d'abord : c'est ce que demande Phantom).
+let STEPS = [];
 function progress(symbol) {
+  const fee = Boolean(world.launch?.feeSol);
+  STEPS = [
+    ['upload', 'Sending your image to pump.fun'],
+    ['sign', fee ? 'Approve 1/2 in your wallet: create your coin' : 'Approve in your wallet: create your coin'],
+    ...(fee ? [['sign2', `Approve 2/2: the Ignition Fee${draft.share && world.launch?.shareBps ? ' and fee sharing' : ''}`]] : []),
+    ['send', 'Sending to Solana'],
+    ['confirm', 'Lighting your match'],
+  ];
   openModal(`
-    <h2>Striking <span class="grad">$${esc(symbol)}</span></h2>
+    <h2>Launching <span class="grad">$${esc(symbol)}</span></h2>
     <ol class="steps">${STEPS.map(([k, t]) => `<li data-step="${k}">${t}</li>`).join('')}</ol>
-    <p class="muted small">Keep this window open.</p>`, 'm-progress');
+    <p class="muted small">Keep this window open. Each transaction shows up in your wallet before you sign.</p>`, 'm-progress');
 }
 function setStep(step) {
   const i = STEPS.findIndex(([k]) => k === step);
   document.querySelectorAll('.steps li').forEach((li, j) => {
     li.classList.toggle('done', j < i);
     li.classList.toggle('now', j === i);
-  });
-}
-
-async function chooseWallet(mod) {
-  const wallets = mod.findWallets();
-  if (wallets.length === 1) return wallets[0];
-  if (!wallets.length) {
-    const here = encodeURIComponent(location.href);
-    const ref = encodeURIComponent(location.origin);
-    openModal(`
-      <h2>No Solana wallet found</h2>
-      <p class="muted">You need a Solana wallet to launch a coin.</p>
-      <div class="wallets">
-        <a class="wbtn" href="https://phantom.app/ul/browse/${here}?ref=${ref}">Open in Phantom</a>
-        <a class="wbtn" href="https://solflare.com/ul/v1/browse/${here}?ref=${ref}">Open in Solflare</a>
-      </div>
-      <button class="link-btn" id="back-form">Back</button>`, 'm-wallet');
-    $('back-form').addEventListener('click', () => launchForm());
-    return null;
-  }
-  return new Promise((resolve) => {
-    openModal(`<h2>Choose a wallet</h2><div class="wallets">${
-      wallets.map((w, i) => `<button class="wbtn" data-w="${i}">${esc(w.name)}</button>`).join('')
-    }</div>`, 'm-wallet');
-    document.querySelectorAll('[data-w]').forEach((b) => b.addEventListener('click', () => resolve(wallets[Number(b.dataset.w)])));
-    modal.addEventListener('close', () => resolve(null), { once: true });
   });
 }
 
@@ -645,31 +626,27 @@ async function submitLaunch(form) {
   const problem = checkForm(fields);
   if (problem) { showFormError(problem); return; }
 
-  let mod = null, wallet = null, creator = null;
+  let mod = null, creator = null;
   if (!DEMO) {
-    form.querySelector('[type=submit]').disabled = true;
+    const submitBtn = form.querySelector('[type=submit]');
+    submitBtn.disabled = true;
     try {
-      mod = await import('./wallet.js');
+      [mod] = await Promise.all([import('./wallet.js'), connect.ensure()]);
     } catch {
       showFormError('Could not load the wallet code. Check your connection.');
-      form.querySelector('[type=submit]').disabled = false;
+      submitBtn.disabled = false;
       return;
     }
-    wallet = await chooseWallet(mod);
-    if (!wallet) return;
-    try {
-      creator = await mod.connect(wallet);
-    } catch {
-      launchForm('Wallet connection cancelled.');
-      return;
-    }
+    creator = connect.current()?.address;
+    submitBtn.disabled = false;
+    if (!creator) { showFormError('Connect a wallet to launch your coin.'); return; }
   }
 
   busy = true;
   progress(fields.symbol);
   try {
     const run = DEMO ? api.launch : mod.strike;
-    const result = await run({ wallet, creator, fields, image: draft.image, onStep: setStep });
+    const result = await run({ creator, fields, image: draft.image, onStep: setStep });
     busy = false;
     const m = result.match;
     draft = { fields: {}, image: null, preview: null, share: true };
@@ -698,7 +675,7 @@ async function submitLaunch(form) {
 }
 
 function success(m, signature) {
-  const share = `I just launched $${m.symbol} on WICK, the launchpad that burns itself. Every coin melts $${world.token?.ticker || 'WICK'} 🕯️🔥\n${location.origin}`;
+  const share = `I just launched $${m.symbol} on WICK, the launchpad that burns itself. Every coin melts $${world.token?.ticker || 'WICK'}.\n${location.origin}`;
   openModal(`
     <div class="lit">${avatar(m, 72)}</div>
     <h2><span class="grad">$${esc(m.symbol)}</span> is lit</h2>
@@ -710,7 +687,7 @@ function success(m, signature) {
       <a class="wbtn primary" href="${pumpUrl(m.mint)}" target="_blank" rel="noopener">See it on pump.fun</a>
       <a class="wbtn" href="https://x.com/intent/post?text=${encodeURIComponent(share)}" target="_blank" rel="noopener">Share on X</a>
       ${signature ? `<a class="wbtn" href="https://solscan.io/tx/${esc(signature)}" target="_blank" rel="noopener">Transaction</a>` : ''}
-      <button class="wbtn" id="see-flames">Your flames 🔥</button>
+      <button class="wbtn" id="see-flames">Your flames</button>
     </div>`, 'm-done');
   $('see-flames').addEventListener('click', () => go('flames'));
 }
@@ -724,6 +701,13 @@ function start() {
   $('strike-btn').addEventListener('click', () => launchForm());
   document.querySelectorAll('[data-go]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); go(a.dataset.go); }));
   $('menu-btn').addEventListener('click', () => pages.menu(go));
+  // Le wallet : le bouton en haut, et la reconnexion silencieuse au wallet déjà autorisé.
+  if (!DEMO) {
+    connect.mountButton($('wallet-btn'), { onFlames: (address) => pages.flames(address) });
+    connect.restore();
+  } else {
+    $('wallet-btn').hidden = true;
+  }
   $('feed-more').addEventListener('click', () => go('explore'));
   $('feed-toggle').addEventListener('click', () => document.body.classList.toggle('feed-open'));
   wirePointer();

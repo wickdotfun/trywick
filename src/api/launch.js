@@ -49,9 +49,10 @@ export async function prepare({ request, env }) {
       return json({ error: 'ipfs_failed' }, 502);
     }
     await env.DB.prepare(
-      `INSERT INTO matches (mint, creator, name, symbol, image, uri, dev_buy, ip, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(launch.mint, launch.creator, launch.name, launch.symbol, meta.image, meta.uri, launch.devBuy, ip, now).run();
+      `INSERT INTO matches (mint, creator, name, symbol, image, uri, dev_buy, ip, created_at, twitter, telegram, website)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(launch.mint, launch.creator, launch.name, launch.symbol, meta.image, meta.uri, launch.devBuy, ip, now,
+      launch.twitter || null, launch.telegram || null, launch.website || null).run();
   } else {
     await env.DB.prepare('UPDATE matches SET dev_buy = ? WHERE mint = ?').bind(launch.devBuy, launch.mint).run();
   }

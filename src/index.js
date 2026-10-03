@@ -8,7 +8,6 @@ import { state } from './api/state.js';
 import { token, tradePrepare, tradeSend, tradeStatus } from './api/token.js';
 import { json } from '../lib/http.js';
 import { runBuyback } from '../lib/buyback.js';
-import { cycleTiming } from '../lib/config.js';
 import { tickCycle } from '../lib/cycles.js';
 import { checkMilestones } from '../lib/hall.js';
 import { refreshMarkets } from '../lib/markets.js';
@@ -75,7 +74,7 @@ export default {
       checkMilestones(env, Date.now()),
       refreshMarkets(env, Date.now(), open?.id),
       runShares(env, Date.now()),
-      runTelegram(env, Date.now(), { ticker: env.TOKEN_TICKER || 'WICK', matchMinutes: cycleTiming(env).matchMs / 60_000 }),
+      runTelegram(env, Date.now()),
     ];
     for (const r of await Promise.allSettled(steps)) {
       if (r.status === 'rejected') console.error('cron', r.reason?.message ?? r.reason);

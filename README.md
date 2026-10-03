@@ -32,8 +32,10 @@ feeds the flame. Every flame burns $WICK: launch a coin → Ignition Fee → buy
   rank and achievements (First Match, Burned 100K $WICK, Golden Flame, Viral Flame…).
 - **Leaderboard and Hall of Flames** (`/#leaderboard`, `/#hall`): the Pyromaniacs, and every fully melted candle with
   its $WICK burned, SOL spent, coins launched, burns and last transaction.
-- **Telegram bot**: every new coin is posted in the channel with its picture, then updated once its launch fee
-  is burned; every buyback and every consumed candle is announced.
+- **Telegram bot** (launch and burn bot style): every new coin with its picture, contract address, creator, dev buy,
+  Ignition Fee and socials, updated with the burn transaction once its fee is burned; every buyback & burn (SOL
+  spent with its dollar value, $WICK burned, supply left, Buy/Burn TX); every fully melted candle with its season
+  stats; and a daily report (launches, burns, hottest coins, pyromaniac of the day).
 
 **Demo mode**: add `?demo` to the address for a simulated, sped-up world (90-second breaths, tiny candles, fake
 burns, a fake launch with no wallet), running entirely in your browser, with a permanent "Demo" banner.
@@ -191,6 +193,7 @@ Locally, `CYCLE_MINUTES=1` in `.dev.vars` makes the breath (buyback countdown) 1
    | `HOLDER_MIN` | minimum $WICK held for a golden flame (default: any amount) |
    | `TELEGRAM_BOT_TOKEN` (secret), `TELEGRAM_CHAT_ID` | the bot (from @BotFather) and the channel (`@yourchannel` or its numeric id); the bot must be an admin of the channel |
    | `SITE_URL` | the link in Telegram posts (default `https://trywick.fun`) |
+   | `TELEGRAM_DAILY_HOUR` | hour (UTC) of the daily report in the channel (default `18`, `off` to turn it off) |
    | `TOKEN_TICKER` | defaults to `WICK` |
    | `X_URL` | the X link in the header |
 

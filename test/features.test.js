@@ -128,6 +128,7 @@ test('Telegram: one clean post per match with its photo, updated once its fee is
     VALUES ('M1', 'C', 'Frog <Wick>', 'FROG', 'https://ipfs.io/ipfs/x', 'x', 'i', 0, 1, 1000, 1, 20000000, 'paid', 3)`).run();
   const calls = [];
   globalThis.fetch = async (url, init) => {
+    if (!String(url).startsWith('https://api.telegram.org/')) return Response.json([]);
     const method = String(url).split('/').pop();
     calls.push({ method, body: JSON.parse(init.body) });
     return Response.json({ ok: true, result: { message_id: 77 } });
@@ -135,29 +136,62 @@ test('Telegram: one clean post per match with its photo, updated once its fee is
   assert.equal(await runTelegram(env, 2000), 1);
   assert.equal(calls[0].method, 'sendPhoto');
   assert.equal(calls[0].body.photo, 'https://ipfs.io/ipfs/x');
-  assert.match(calls[0].body.caption, /\$FROG<\/b> · Frog &lt;Wick&gt;/);
-  assert.match(calls[0].body.caption, /\$WICK holder/);
-  assert.match(calls[0].body.caption, /on its way to burn/);
+  assert.match(calls[0].body.caption, /NEW MATCH STRUCK<\/b> · #1/);
+  assert.match(calls[0].body.caption, /<b>Frog &lt;Wick&gt;<\/b> · <b>\$FROG<\/b>/);
+  assert.match(calls[0].body.caption, /<code>M1<\/code>/);
+  assert.match(calls[0].body.caption, /👑 \$WICK holder/);
+  assert.match(calls[0].body.caption, /Ignition Fee: 0.02 SOL → <i>buying \$WICK to burn…<\/i>/);
   assert.equal(calls[0].body.reply_markup.inline_keyboard[0][0].url, 'https://pump.fun/coin/M1');
   assert.equal(await runTelegram(env, 3000), 0);                         // jamais deux fois
 
-  await env.DB.prepare("INSERT INTO burns (kind, ref, created_at, status, burned_ui, burned_at) VALUES ('match', 'M1', 0, 'burned', 12345, 4000)").run();
+  await env.DB.prepare("INSERT INTO burns (kind, ref, created_at, status, burned_ui, burned_at, burn_sig) VALUES ('match', 'M1', 0, 'burned', 12345, 4000, 'BurnSig')").run();
   assert.equal(await runTelegram(env, 5000), 1);
   assert.equal(calls[1].method, 'editMessageCaption');
   assert.equal(calls[1].body.message_id, 77);
-  assert.match(calls[1].body.caption, /burned <b>12.3K \$WICK<\/b>/);
+  assert.match(calls[1].body.caption, /<b>12.3K \$WICK burned<\/b> ✅ <a href="https:\/\/solscan.io\/tx\/BurnSig">TX<\/a>/);
   assert.equal(await runTelegram(env, 6000), 0);
 
   // Une bougie consumée.
   await env.DB.prepare("INSERT INTO hall (number, started_at, completed_at, launches, burned, pct, top_symbol) VALUES (1, 0, 5500, 12, 5000000, 0.5, 'FROG')").run();
   assert.equal(await runTelegram(env, 7000), 1);
-  assert.match(calls[2].body.text, /Candle #1 is fully consumed/);
-  assert.match(calls[2].body.text, /0.5% of the \$WICK supply/);
+  assert.match(calls[2].body.text, /CANDLE #001 — FULLY MELTED/);
+  assert.match(calls[2].body.text, /0.50% of the \$WICK supply<\/b> just went up in smoke/);
+  assert.match(calls[2].body.text, /Hottest coin: <b>\$FROG<\/b>/);
+
+  // Un buyback, façon bot de burn.
+  await env.DB.prepare("INSERT INTO burns (kind, ref, created_at, status, burned_ui, burned_at, sol, buy_sig, burn_sig) VALUES ('candle', '42', 0, 'burned', 3120431, 7500, 0.84, 'B1', 'B2')").run();
+  assert.equal(await runTelegram(env, 8000), 1);
+  assert.match(calls[3].body.text, /^(🔥){17}\n<b>\$WICK BUYBACK &amp; BURN<\/b> · #42/u);
+  assert.match(calls[3].body.text, /Burned: <b>3,120,431 \$WICK<\/b>/);
+  assert.match(calls[3].body.text, /Buy TX<\/a> · <a href="https:\/\/solscan.io\/tx\/B2">Burn TX/);
+});
+
+test('Telegram: the daily report, once a day', async () => {
+  const env = { DB: await db(), TELEGRAM_BOT_TOKEN: 'T', TELEGRAM_CHAT_ID: '@wick' };
+  const day = Date.UTC(2026, 9, 3, 18, 30);
+  await env.DB.prepare(`INSERT INTO matches (mint, creator, name, symbol, uri, ip, created_at, seq, lit_at, mcap, tg_state)
+    VALUES ('A', 'Alice1111', 'A', 'AAA', 'x', 'i', 0, 1, ?, 245000, 'photo'), ('B', 'Alice1111', 'B', 'BBB', 'x', 'i', 0, 2, ?, 98000, 'photo')`).bind(day - 3600_000, day - 7200_000).run();
+  await env.DB.prepare("INSERT INTO burns (kind, ref, created_at, status, burned_ui, burned_at, sol, tg_done) VALUES ('candle', '1', 0, 'burned', 4200000, ?, 1.5, 1)").bind(day - 60_000).run();
+  const texts = [];
+  globalThis.fetch = async (url, init) => {
+    if (!String(url).startsWith('https://api.telegram.org/')) return Response.json([]);
+    texts.push(JSON.parse(init.body).text);
+    return Response.json({ ok: true, result: { message_id: 1 } });
+  };
+  assert.equal(await runTelegram(env, Date.UTC(2026, 9, 3, 17, 0)), 0);       // avant 18 h UTC : rien
+  assert.equal(await runTelegram(env, day), 1);
+  assert.match(texts[0], /WICK DAILY REPORT<\/b> · Oct 3/);
+  assert.match(texts[0], /Coins launched: <b>2<\/b>/);
+  assert.match(texts[0], /\$WICK burned: <b>4.2M<\/b>/);
+  assert.match(texts[0], /🥇 \$AAA · \$245K mcap\n🥈 \$BBB · \$98K mcap/);
+  assert.match(texts[0], /Pyromaniac of the day/);
+  assert.equal(await runTelegram(env, day + 3600_000), 0);                       // une seule fois par jour
 });
 
 test('Telegram: without an image, a text post; without a token, nothing', async () => {
-  const caption = matchCaption({ symbol: 'X', name: 'Y', mint: 'M', fee_lamports: 0, dev_buy: 0.5 });
+  const caption = matchCaption({ symbol: 'X', name: 'Y', mint: 'M', fee_lamports: 0, dev_buy: 0.5, twitter: 'https://x.com/y' });
   assert.match(caption, /Dev buy: 0.5 SOL/);
-  assert.doesNotMatch(caption, /burn/);
+  assert.doesNotMatch(caption, /Ignition/);
+  assert.match(caption, /<a href="https:\/\/x.com\/y">𝕏 Twitter<\/a>/);
   assert.equal(await runTelegram({ DB: await db() }, 0), 0);
 });

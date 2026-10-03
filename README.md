@@ -1,22 +1,33 @@
-# WICK — strike a match 🕯️
+# WICK — the launchpad that burns itself 🕯️
 
-**[trywick.fun](https://trywick.fun)** · [@trywickdotfun](https://x.com/trywickdotfun)
+**[trywick.fun](https://trywick.fun)** · [@trywickdotfun](https://x.com/trywickdotfun) · [Telegram](https://t.me/trywickdotfun)
 
-**The candle is $WICK.** It melts as $WICK is burned, and it never comes back.
+**The candle is $WICK. Every coin melts it.** Every token launched through WICK becomes a match. Every match
+feeds the flame. Every flame burns $WICK: launch a coin → Ignition Fee → buy $WICK → burn $WICK.
 
 - **One candle = 0.5% of the $WICK supply.** When it's fully consumed, that slice of $WICK is gone forever:
   the candle joins the **candle hall** (with its story: launches, hottest coin) and the next one is lit.
 - **Strike a match = launch a coin.** Pick a name, a ticker and an image: the coin is created on
   [pump.fun](https://pump.fun), signed by your own wallet. You are its creator (and you get its creator fees).
-- **Every launch burns $WICK.** A 0.02 SOL launch fee, signed together with the launch, buys back $WICK and
-  burns it within a minute.
+- **Every launch burns $WICK.** The **WICK Ignition Fee** (0.02 SOL, WICK's own fee, not a pump.fun fee), signed
+  together with the launch, buys $WICK and burns it within a minute.
 - **The breath: a buyback every 30 minutes at most.** The $WICK creator fees buy back and burn $WICK. Every
   launch brings the next buyback 1 minute closer. The countdown is on screen.
 - **Living matches.** Each coin orbits the candle; coins that pump (DexScreener market cap) grow and move closer
   to the flame, dead ones fade. Coins launched by a $WICK holder burn in gold.
-- **Burn tracker**: % of the supply burned, the cumulative burn chart and every burn with its Solscan link.
-- **Leaderboard**: the Pyromaniacs (creators ranked by the $WICK their launches burned), the hottest coins, the
-  candle hall.
+- **The fire** (live feed): every launch and its Ignition Fee, every burn with its transaction. Each burn also pops a
+  receipt above the candle (`🔥 124,820 $WICK burned · 0.014 SOL used · View TX ↗`).
+- **$WICK page** (`/#wick`): the live chart (DexScreener), price, market cap, volume, the pump.fun bonding curve, the
+  top holders read on-chain, and **buy / sell right on the site** (PumpPortal builds the trade, your wallet signs it).
+  Before `TOKEN_MINT` is set, a "launching soon" page.
+- **Dashboard** (`/#dashboard`): $WICK burned, % of the supply, current supply, SOL spent on buybacks, coins launched,
+  Ignition Fees paid, 24h volume of WICK coins, last burn, last launch, the burn chart and every burn. Real data only.
+- **Explore** (`/#explore`): every WICK coin (logo, market cap, 24h volume, age, creator, $WICK burned, Trade), sorted by
+  Trending / New / Top volume / Biggest burner.
+- **Your flames** (`/#flames`): any wallet's profile: coins launched, $WICK burned thanks to them, volume, Ignition Fees,
+  rank and achievements (First Match, Burned 100K $WICK, Golden Flame, Viral Flame…).
+- **Leaderboard and Hall of Flames** (`/#leaderboard`, `/#hall`): the Pyromaniacs, and every fully melted candle with
+  its $WICK burned, SOL spent, coins launched, burns and last transaction.
 - **Telegram bot**: every new coin is posted in the channel with its picture, then updated once its launch fee
   is burned; every buyback and every consumed candle is announced.
 
@@ -91,7 +102,9 @@ small JSON API, backed by a [D1](https://developers.cloudflare.com/d1/) database
 | What | Where |
 |---|---|
 | Static site (HTML, CSS, self-hosted Geist fonts, brand assets) | `public/` |
-| Page logic, feed, launch form | `src/client/app.js` |
+| Page logic, feed, launch form, routes (`#wick`, `#explore`…) | `src/client/app.js` |
+| Explore, Your flames, dashboard, leaderboard, Hall of Flames, How it works | `src/client/pages.js`, `lib/explore.js`, `src/api/explore.js` |
+| The $WICK page (chart, curve, holders, buy / sell) | `src/client/token.js`, `lib/token.js`, `src/api/token.js` |
 | 3D scene (the candle, the orbiting matches, the burnout) | `src/client/scene.js` |
 | Wallet + signing (loaded only when you strike) | `src/client/wallet.js` |
 | Demo mode | `src/client/demo.js` |

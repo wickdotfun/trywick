@@ -100,3 +100,37 @@ export async function strike({ wallet, creator, fields, image, onStep }) {
   mintKey = null;
   return { match: null, signature: sent.signature, mint };
 }
+
+// Acheter ou vendre $WICK depuis le site. PumpPortal construit la transaction (côté serveur),
+// le wallet la signe, le serveur la relaie. onStep('build' | 'sign' | 'send' | 'confirm')
+export async function trade({ wallet, owner, side, amount, slippage, onStep }) {
+  onStep('build');
+  const prepared = await call('/api/trade/prepare', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ owner, side, amount, slippage }),
+  });
+  onStep('sign');
+  const tx = VersionedTransaction.deserialize(b64.from(prepared.tx));
+  let signed;
+  try {
+    signed = (await wallet.provider.signTransaction(tx)) || tx;
+  } catch (err) {
+    throw Object.assign(new Error('rejected'), { code: 'rejected', cause: err });
+  }
+  onStep('send');
+  const { signature } = await call('/api/trade/send', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ owner, tx: b64.to(signed.serialize()) }),
+  });
+  onStep('confirm');
+  const until = Date.now() + 60_000;
+  while (Date.now() < until) {
+    const s = await call(`/api/trade/status?sig=${signature}`).catch(() => ({ status: 'pending' }));
+    if (s.status === 'ok') return { status: 'ok', signature };
+    if (s.status === 'failed') throw Object.assign(new Error('tx_failed'), { code: 'tx_failed' });
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  return { status: 'pending', signature };
+}

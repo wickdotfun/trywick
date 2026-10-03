@@ -37,7 +37,7 @@ test('the candle is the $WICK supply: 0.5% per candle, never rebuilt', () => {
 test('a consumed candle enters the hall once, with its story', async () => {
   const env = { DB: await db(), TOKEN_MINT: 'Mint', SOLANA_RPC: 'https://rpc.test' };
   // 10 M de $WICK brûlés sur une supply de départ de 1 Md : 1 % = 2 bougies consumées.
-  await env.DB.prepare("INSERT INTO burns (kind, ref, created_at, status, burned_ui) VALUES ('candle', '1', 0, 'burned', 10000000)").run();
+  await env.DB.prepare("INSERT INTO burns (kind, ref, created_at, status, burned_ui, sol, burned_at, burn_sig) VALUES ('candle', '1', 0, 'burned', 10000000, 1.5, 50, 'Sig1')").run();
   await env.DB.prepare(`INSERT INTO matches (mint, creator, name, symbol, uri, ip, created_at, seq, lit_at, mcap)
     VALUES ('HotMint', 'C1', 'Hot', 'HOT', 'x', 'i', 0, 1, 5, 90000), ('ColdMint', 'C2', 'Cold', 'COLD', 'x', 'i', 0, 2, 6, 1000)`).run();
   globalThis.fetch = async () => rpcOk({ value: { uiAmountString: '990000000' } });
@@ -49,6 +49,9 @@ test('a consumed candle enters the hall once, with its story', async () => {
   assert.equal(hall[1].top.symbol, 'HOT');
   assert.equal(hall[1].pct, 0.5);
   assert.equal(hall[1].burned, 5_000_000);
+  assert.equal(hall[1].sol, 1.5);
+  assert.equal(hall[1].burns, 1);
+  assert.equal(hall[1].sig, 'Sig1');
 });
 
 test('the launch fee only exists while the buyback runs', async () => {
@@ -98,10 +101,10 @@ test('a paid launch fee joins the burn queue, once', async () => {
 test('DexScreener: the most liquid pair of each coin', () => {
   const m = pickMarkets([
     { baseToken: { address: 'A' }, liquidity: { usd: 10 }, marketCap: 5000, priceChange: { h24: -3 } },
-    { baseToken: { address: 'A' }, liquidity: { usd: 900 }, marketCap: 80000, priceChange: { h24: 42 } },
+    { baseToken: { address: 'A' }, liquidity: { usd: 900 }, marketCap: 80000, priceChange: { h24: 42 }, volume: { h24: 1234 } },
     { baseToken: { address: 'B' }, fdv: 12000 },
   ]);
-  assert.deepEqual({ ...m.get('A'), liq: undefined }, { liq: undefined, mcap: 80000, change: 42 });
+  assert.deepEqual({ ...m.get('A'), liq: undefined }, { liq: undefined, mcap: 80000, change: 42, vol: 1234 });
   assert.equal(m.get('B').mcap, 12000);
 });
 

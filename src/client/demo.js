@@ -185,14 +185,14 @@ export function createDemo() {
         bestMcap: Math.max(0, ...mine.map((m) => m.mcap || 0)), bestVolume: Math.max(0, ...mine.map((m) => m.volume || 0)),
       };
       const ach = [
-        ['first', '🔥', 'First Match', 'Launch your first coin', p.launches >= 1],
-        ['firestarter', '🧨', 'Firestarter', 'Launch 3 coins', p.launches >= 3],
-        ['arsonist', '🚒', 'Arsonist', 'Launch 10 coins', p.launches >= 10],
-        ['burn100k', '🕯️', 'Burned 100K $WICK', 'Your launches burn 100K $WICK', burnedBy >= 100_000],
-        ['burn1m', '🌋', 'Burned 1M $WICK', 'Your launches burn 1M $WICK', burnedBy >= 1_000_000],
-        ['golden', '👑', 'Golden Flame', 'Launch a coin while holding $WICK', p.holder],
-        ['busy', '📈', 'Busy Flame', 'One of your coins trades $10K in a day', p.bestVolume >= 10_000],
-        ['viral', '🚀', 'Viral Flame', 'One of your coins reaches a $100K market cap', p.bestMcap >= 100_000],
+        ['first', 'flame', 'First Match', 'Launch your first coin', p.launches >= 1],
+        ['firestarter', 'zap', 'Firestarter', 'Launch 3 coins', p.launches >= 3],
+        ['arsonist', 'flame', 'Arsonist', 'Launch 10 coins', p.launches >= 10],
+        ['burn100k', 'candle', 'Burned 100K $WICK', 'Your launches burn 100K $WICK', burnedBy >= 100_000],
+        ['burn1m', 'mountain', 'Burned 1M $WICK', 'Your launches burn 1M $WICK', burnedBy >= 1_000_000],
+        ['golden', 'crown', 'Golden Flame', 'Launch a coin while holding $WICK', p.holder],
+        ['busy', 'chart', 'Busy Flame', 'One of your coins trades $10K in a day', p.bestVolume >= 10_000],
+        ['viral', 'rocket', 'Viral Flame', 'One of your coins reaches a $100K market cap', p.bestMcap >= 100_000],
       ].map(([id, icon, label, hint, done]) => ({ id, icon, label, hint, done }));
       const titles = [[25, 'Pyromaniac'], [10, 'Arsonist'], [3, 'Firestarter'], [1, 'Spark']];
       return {

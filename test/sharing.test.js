@@ -83,17 +83,30 @@ test('the launch-with-sharing transaction: Ignition Fee, then the locked 90/10 s
   assert.equal(base58(d.subarray(46, 78)), wick);
   assert.equal(d.readUInt16LE(78), 1000);
 
-  // Signée par le créateur : acceptée. Modifiée ou pas signée : refusée.
-  const message = bytes.subarray(1 + 64);
-  const unsigned = Uint8Array.from(bytes);
-  assert.equal(checkSignedShareTx(unsigned, message), 'unsigned');
+  // Signée par le créateur : acceptée. Pas signée, ou vers un autre wallet, ou pour un autre coin : refusée.
+  const expect = { creator: creator.publicKey.toBase58(), mint, wick, wickBps: 1000, feeLamports: 10_000_000 };
+  assert.equal(checkSignedShareTx(Uint8Array.from(bytes), expect), 'unsigned');
   const signed = VersionedTransaction.deserialize(bytes);
   signed.sign([creator]);
-  assert.equal(checkSignedShareTx(signed.serialize(), message), null);
-  const other = await buildShareTx({ creator: creator.publicKey.toBase58(), mint, wick: Keypair.generate().publicKey.toBase58(), wickBps: 1000, feeLamports: 10_000_000, blockhash: BLOCKHASH });
+  assert.equal(checkSignedShareTx(signed.serialize(), expect), null);
+  assert.equal(checkSignedShareTx(signed.serialize(), { ...expect, wickBps: 2000 }), 'bad_share_tx');
+  assert.equal(checkSignedShareTx(signed.serialize(), { ...expect, feeLamports: 20_000_000 }), 'bad_share_tx');
+  assert.equal(checkSignedShareTx(signed.serialize(), { ...expect, mint: Keypair.generate().publicKey.toBase58() }), 'bad_share_tx');
+  const other = await buildShareTx({ ...expect, wick: Keypair.generate().publicKey.toBase58(), blockhash: BLOCKHASH });
   const otherSigned = VersionedTransaction.deserialize(other);
   otherSigned.sign([creator]);
-  assert.equal(checkSignedShareTx(otherSigned.serialize(), message), 'bad_share_tx');
+  assert.equal(checkSignedShareTx(otherSigned.serialize(), expect), 'bad_share_tx');
+
+  // Phantom peut ajouter ses vérifications (Lighthouse) en signant : toujours accepté.
+  const lighthouse = Transaction.from(Buffer.from(bytes));
+  lighthouse.add(new TransactionInstruction({ programId: new PublicKey('L2TExMFKdjpN9kozasaurPirfHy9P8sbXoAN1qA3S95'), keys: [], data: Buffer.from([1]) }));
+  lighthouse.sign(creator);
+  assert.equal(checkSignedShareTx(lighthouse.serialize(), expect), null);
+  // Mais pas un autre programme.
+  const sneaky = Transaction.from(Buffer.from(bytes));
+  sneaky.add(new TransactionInstruction({ programId: Keypair.generate().publicKey, keys: [], data: Buffer.from([1]) }));
+  sneaky.sign(creator);
+  assert.equal(checkSignedShareTx(sneaky.serialize(), expect), 'bad_share_tx');
 });
 
 function sharingConfigBytes({ mint, admin, shareholders, locked = true, status = 1 }) {

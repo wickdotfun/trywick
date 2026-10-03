@@ -2,8 +2,9 @@
 // d'un wallet), le tableau de bord de $WICK, le classement et le Hall of Flames, et « How it works ».
 // Tous les chiffres sont réels : la base de WICK (lancements confirmés on-chain, burns avec
 // leur transaction), la chaîne (supply) et DexScreener (market cap, volume).
-import { connectInline, remember, remembered } from './token.js';
-import { ago, compact, esc, fmt, pumpUrl, short, sol, solscan, span } from './util.js';
+import * as connect from './connect.js';
+import { remember, remembered } from './token.js';
+import { ago, compact, esc, fmt, icon, pumpUrl, short, sol, solscan, span } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 const usd = (n) => (n ? `$${compact(n)}` : '—');
@@ -13,7 +14,7 @@ const txLink = (sig, text = 'TX ↗') => (sig ? `<a class="tx" href="${solscan(e
 
 export const SORTS = [['trending', 'Trending'], ['new', 'New'], ['volume', 'Top volume'], ['burner', 'Biggest burner']];
 
-export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct, shareTag, demo, onStrike, onToken }) {
+export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct, shareTag, holderTag, demo, onStrike, onToken }) {
   const tk = () => `$${ticker()}`;
 
   // ---------------------------------------------------------- Explore
@@ -39,7 +40,7 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
     if (!body) return;
     const rows = data.coins.map((m) => `<li class="ex-row${m.holder ? ' holder' : ''}">
       ${avatar(m, 38)}
-      <span class="ex-name"><b>$${esc(m.symbol)}${m.holder ? ' 👑' : ''} ${shareTag(m)}</b><em>${esc(m.name)}</em></span>
+      <span class="ex-name"><b>$${esc(m.symbol)} ${holderTag(m)}${shareTag(m)}</b><em>${esc(m.name)}</em></span>
       <span class="ex-stat"><b>${usd(m.mcap)}</b><small>mcap</small></span>
       <span class="ex-stat"><b>${usd(m.volume)}</b><small>vol 24h</small></span>
       <span class="ex-stat hide-sm"><b>${ago(m.at).replace(' ago', '')}</b><small>age</small></span>
@@ -52,7 +53,7 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
     else {
       body.innerHTML = data.coins.length
         ? `<ol class="ex-list">${rows}</ol>`
-        : `<p class="muted">${sort === 'trending' ? 'No coin launched in the last 3 days yet.' : 'No coin launched yet.'} Strike the first match.</p>`;
+        : `<p class="muted">${sort === 'trending' ? 'No coin launched in the last 3 days yet.' : 'No coin launched yet.'} Launch the first coin.</p>`;
     }
     body.querySelector('.ex-more')?.remove();
     if (data.more) {
@@ -71,7 +72,7 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
   }
 
   // ---------------------------------------------------------- Your flames
-  async function flames(wallet = remembered()) {
+  async function flames(wallet = connect.current()?.address || remembered()) {
     if (!wallet) {
       openModal(`
         <h2>Your flames</h2>
@@ -91,9 +92,8 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
       $('fl-connect').addEventListener('click', async () => {
         if (demo) { flames('YouDemo1111111111111111111111111111111111111'); return; }
         try {
-          const mod = await import('./wallet.js');
-          const res = await connectInline(mod, $('fl-wallets'), `${location.origin}/#flames`);
-          if (res) { remember(res.owner); flames(res.owner); }
+          const s = await connect.ensure();
+          if (s) flames(s.address);
         } catch {
           $('fl-err').textContent = 'Wallet connection cancelled.';
           $('fl-err').hidden = false;
@@ -110,11 +110,11 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
       return;
     }
     if (!isOpen('m-flames')) return;
-    const mine = wallet === remembered() || (demo && wallet.startsWith('YouDemo'));
+    const mine = wallet === (connect.current()?.address || remembered()) || (demo && wallet.startsWith('YouDemo'));
     const got = p.achievements.filter((a) => a.done).length;
     openModal(`
       <div class="fl-head">
-        <span class="fl-flame" aria-hidden="true">🔥</span>
+        <span class="fl-flame" aria-hidden="true">${icon('flame')}</span>
         <div>
           <h2>${mine ? 'Your flames' : 'Flames of'} <span class="mono fl-addr">${esc(short(wallet))}</span></h2>
           <p class="muted small">${p.title ? `<b class="gold">${esc(p.title)}</b>` : 'No match yet'}${p.rank ? ` · #${p.rank.rank} of ${p.rank.of} Pyromaniacs` : ''}${p.since ? ` · first match ${ago(p.since)}` : ''}</p>
@@ -129,18 +129,18 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
       </div>
       <h3 class="m-sub">Achievements · ${got}/${p.achievements.length}</h3>
       <ul class="badges">${p.achievements.map((a) => `<li class="${a.done ? 'done' : ''}" title="${esc(a.hint)}">
-        <i>${a.icon}</i><b>${esc(a.label)}</b><small>${a.done ? 'unlocked' : esc(a.hint)}</small></li>`).join('')}</ul>
+        ${icon(a.icon)}<b>${esc(a.label)}</b><small>${a.done ? 'unlocked' : esc(a.hint)}</small></li>`).join('')}</ul>
       <h3 class="m-sub">Coins</h3>
       ${p.coins.length ? `<ol class="ex-list">${p.coins.map((m) => `<li class="ex-row${m.holder ? ' holder' : ''}">
         ${avatar(m, 34)}
-        <span class="ex-name"><b>$${esc(m.symbol)}${m.holder ? ' 👑' : ''} ${shareTag(m)}</b><em>${esc(m.name)} · ${ago(m.at)}</em></span>
+        <span class="ex-name"><b>$${esc(m.symbol)} ${holderTag(m)}${shareTag(m)}</b><em>${esc(m.name)} · ${ago(m.at)}</em></span>
         <span class="ex-stat"><b>${usd(m.mcap)}</b><small>mcap</small></span>
         <span class="ex-stat fire"><b>${m.burned ? compact(m.burned) : '—'}</b><small>${tk()} burned</small></span>
         <a class="wbtn small-btn" href="${pumpUrl(esc(m.mint))}" target="_blank" rel="noopener">Trade</a></li>`).join('')}</ol>`
-        : `<p class="muted">No coin launched from this wallet yet.</p>${mine ? '<button class="cta wide" id="fl-strike">Strike your first match</button>' : ''}`}
+        : `<p class="muted">No coin launched from this wallet yet.</p>${mine ? '<button class="cta wide" id="fl-strike">Launch your first coin</button>' : ''}`}
       ${mine ? '<button class="link-btn tiny fl-switch" id="fl-switch">use another wallet</button>' : ''}`, 'm-wide m-flames');
     $('fl-strike')?.addEventListener('click', onStrike);
-    $('fl-switch')?.addEventListener('click', () => { remember(''); flames(null); });
+    $('fl-switch')?.addEventListener('click', async () => { remember(''); await connect.disconnect(); flames(null); });
   }
 
   // ---------------------------------------------------------- tableau de bord
@@ -150,7 +150,7 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
     const lastLaunch = t.lastLaunch || world.matches[world.matches.length - 1];
     const live = Boolean(world.token?.mint) || demo;
     openModal(`
-      <h2>🔥 ${tk()} dashboard</h2>
+      <h2>${tk()} dashboard</h2>
       <p class="muted small">Real data only: WICK's own burns and fee distributions (each with its transaction), the ${tk()}
         supply read on Solana, and DexScreener for volumes.${live ? '' : ` Most of it starts once ${tk()} is live.`}</p>
       <div class="tiles">
@@ -183,7 +183,7 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
 
   function burnTable() {
     const rows = world.burns.slice(0, 80).map((b) => `<tr>
-      <td>${b.kind === 'match' ? `🔥 Ignition <b>$${esc(b.symbol || '?')}</b>` : `💨 Buyback #${esc(b.ref)}`}</td>
+      <td>${b.kind === 'match' ? `Ignition Fee <b>$${esc(b.symbol || '?')}</b>` : `Buyback #${esc(b.ref)}`}</td>
       <td class="num">${sol(b.sol)}</td>
       <td class="num"><b>${compact(b.burned)}</b></td>
       <td class="num">${b.sig ? `<a href="${solscan(esc(b.sig))}" target="_blank" rel="noopener">${ago(b.at)} ↗</a>` : ago(b.at)}</td></tr>`).join('');
@@ -265,11 +265,11 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
           Titles: Spark (1 launch), Firestarter (3), Arsonist (10), Pyromaniac (25).</p>
           <ol class="board">${pyromaniacs.map((r) => `<li${r.holder ? ' class="holder"' : ''}>
             <span class="rank">${r.rank}</span>
-            <span class="who"><button class="link-btn plain" data-wallet="${esc(r.creator)}"><b>${esc(short(r.creator))}${r.holder ? ' 👑' : ''}</b></button><em>${esc(r.title)}</em></span>
+            <span class="who"><button class="link-btn plain" data-wallet="${esc(r.creator)}"><b>${esc(short(r.creator))} ${r.holder ? holderTag(r) : ''}</b></button><em>${esc(r.title)}</em></span>
             <span class="stat">${fmt(r.launches)} <small>launch${r.launches === 1 ? '' : 'es'}</small></span>
             <span class="stat">${compact(r.burned)} <small>${tk()}</small></span>
             <span class="stat best">${r.best ? `<a href="${pumpUrl(esc(r.best.mint))}" target="_blank" rel="noopener">$${esc(r.best.symbol)}</a>${r.best.mcap ? ` <small>$${compact(r.best.mcap)}</small>` : ''}` : ''}</span>
-          </li>`).join('')}</ol>` : '<p class="muted">No creator yet. Strike the first match and take the top spot.</p>';
+          </li>`).join('')}</ol>` : '<p class="muted">No creator yet. Launch the first coin and take the top spot.</p>';
       } catch {
         body = '<p class="muted">Could not load the leaderboard. Try again in a moment.</p>';
       }
@@ -284,7 +284,7 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
         is gone for good and the candle joins the hall. A new season begins.</p>
         <ol class="hall">${now}${world.hall.map((h) => `<li class="flame">
           <span class="hall-candle" aria-hidden="true"></span>
-          <span class="who"><b>Candle #${pad(h.number)} — fully melted 🔥</b><em>${day(h.completedAt)} · ${fmt(h.launches)} coins launched${h.top ? ` · hottest <a href="${pumpUrl(esc(h.top.mint))}" target="_blank" rel="noopener">$${esc(h.top.symbol)}</a>` : ''}</em></span>
+          <span class="who"><b>Candle #${pad(h.number)} — fully melted</b><em>${day(h.completedAt)} · ${fmt(h.launches)} coins launched${h.top ? ` · hottest <a href="${pumpUrl(esc(h.top.mint))}" target="_blank" rel="noopener">$${esc(h.top.symbol)}</a>` : ''}</em></span>
           <span class="stat">${compact(h.burned)} <small>${tk()}</small></span>
           <span class="stat">${h.sol != null ? sol(h.sol) : '—'} <small>spent</small></span>
           <span class="stat best">${h.burns != null ? `${fmt(h.burns)} burns` : ''} ${txLink(h.sig, 'last TX ↗')}</span>
@@ -304,13 +304,13 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
       <p class="muted"><b class="gold">WICK is the launchpad that burns itself.</b> Every coin launched here is a match.
         Every match feeds the flame. The flame burns ${tk()}.</p>
       <ol class="loop big">
-        <li><i>🚀</i><b>Launch a coin</b><small>on pump.fun, from your wallet</small></li>
-        <li><i>🔥</i><b>Generate fees</b><small>Ignition Fee + shared creator fees</small></li>
-        <li><i>💱</i><b>Buy ${tk()}</b><small>within a minute</small></li>
-        <li><i>🕯️</i><b>Burn ${tk()}</b><small>gone from circulation</small></li>
+        <li>${icon('rocket')}<b>Launch a coin</b><small>on pump.fun, from your wallet</small></li>
+        <li>${icon('flame')}<b>Generate fees</b><small>Ignition Fee + shared creator fees</small></li>
+        <li>${icon('swap')}<b>Buy ${tk()}</b><small>within a minute</small></li>
+        <li>${icon('candle')}<b>Burn ${tk()}</b><small>gone from circulation</small></li>
       </ol>
       <ol class="how">
-        <li><b>Strike a match = launch a coin.</b> Name, ticker, image, socials: your coin is created on pump.fun, signed
+        <li><b>Launch a coin.</b> Name, ticker, image, socials: your coin is created on pump.fun, signed
           by your own wallet. You are its creator and you get its pump.fun creator fees.</li>
         <li><b>The Ignition Fee.</b> A ${fee} SOL fee that belongs to WICK (it is not a pump.fun fee), signed together with
           your launch. WICK uses it to buy ${tk()} and burns what it bought, within a minute.</li>
@@ -329,16 +329,17 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
       <p class="muted small">Burning removes ${tk()} from circulation. It is a mechanism of the protocol, not a promise about
         the price. ${tk()} is a meme coin. Coins launched here are made by their creators, not by WICK. Nothing here is
         financial advice.</p>
-      <div class="wallets row"><button class="wbtn primary" id="how-strike">Strike a match</button><button class="wbtn" id="how-token">See ${tk()}</button></div>`, 'm-how m-wide');
+      <div class="wallets row"><button class="wbtn primary" id="how-strike">Launch a coin</button><button class="wbtn" id="how-token">See ${tk()}</button></div>`, 'm-how m-wide');
     $('how-strike').addEventListener('click', onStrike);
     $('how-token').addEventListener('click', onToken);
   }
 
   // Sur téléphone : toutes les pages dans un menu.
   function menu(go) {
-    const items = [['explore', '🧭 Explore'], ['wick', `🕯️ ${tk()}`], ['dashboard', '🔥 Dashboard'], ['leaderboard', '🏆 Leaderboard'],
-      ['hall', '🏛️ Hall of Flames'], ['flames', '✨ Your flames'], ['how', '❓ How it works']];
-    openModal(`<h2>WICK</h2><div class="wallets">${items.map(([k, label]) => `<button class="wbtn" data-menu="${k}">${label}</button>`).join('')}</div>`, 'm-menu');
+    const items = [['explore', icon('compass'), 'Explore'], ['wick', icon('candle'), tk()], ['dashboard', icon('dashboard'), 'Dashboard'],
+      ['leaderboard', icon('trophy'), 'Leaderboard'], ['hall', icon('pillar'), 'Hall of Flames'], ['flames', icon('user'), 'Your flames'],
+      ['how', icon('help'), 'How it works']];
+    openModal(`<h2>WICK</h2><div class="wallets">${items.map(([k, ico, label]) => `<button class="wbtn menu-item" data-menu="${k}">${ico}${label}</button>`).join('')}</div>`, 'm-menu');
     document.querySelectorAll('[data-menu]').forEach((b) => b.addEventListener('click', () => go(b.dataset.menu)));
   }
 

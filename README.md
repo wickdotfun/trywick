@@ -56,8 +56,11 @@ The site never sees a private key and never asks for a seed phrase.
    transaction.
    When the buyback is live, it also builds the **launch fee** transfer (0.02 SOL from the creator to the
    buyback wallet).
-2. **Sign** (in the browser): the wallet (Phantom, Solflare, Backpack…) signs first (the launch and the fee
-   together, one approval), then the mint keypair.
+2. **Sign** (in the browser): the wallet is connected with the Wallet Standard (Phantom, Solflare, Backpack… are
+   detected with their icon, `src/client/connect.js`). One transaction per approval, as Phantom recommends for
+   multi-signer transactions: the wallet signs the launch first, then the mint keypair signs it; then the wallet signs
+   the Ignition Fee (with fee sharing, if chosen). The server checks the fee transaction by its content, so the
+   safety instructions a wallet may add when signing (Phantom's Lighthouse) are accepted.
 3. **Submit** (`POST /api/launch/submit`): the Worker checks that it's a pump.fun transaction, paid and
    signed by that creator, creating that mint, and that the fee is a real transfer of the right amount to
    the buyback wallet. It sends the launch, then the fee.
@@ -184,7 +187,7 @@ Locally, `CYCLE_MINUTES=1` in `.dev.vars` makes the breath (buyback countdown) 1
    |---|---|
    | `IP_SALT` (secret) | random string used to hash IPs |
    | `SOLANA_RPC` (secret, recommended) | a Solana RPC URL (Helius, Triton…). Defaults to the public one, which is rate-limited |
-   | `TOKEN_MINT` | the $WICK mint address: turns the buyback on, and shows a `$WICK` link in the header |
+   | `TOKEN_MINT` | the $WICK mint address. Optional: when the dev wallet launches $WICK, the address is detected and used by itself (this variable, if set, wins) |
    | `BUYBACK_SECRET_KEY` (secret) | the buyback wallet's secret key (Phantom export, base58, or a Solana CLI `[…]` array) |
    | `ADMIN_KEY` (secret) | long random password (16+ characters) for `/admin`. Without it, the admin page is off |
    | `BUYBACK_COLLECT_FEES` | set to `off` to skip collecting creator fees before each buyback |

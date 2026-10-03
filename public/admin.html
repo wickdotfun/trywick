@@ -9,46 +9,81 @@
   <link rel="stylesheet" href="style.css">
   <style>
     body { overflow: auto; }
-    .adm { max-width: 980px; margin: 0 auto; padding: 24px 16px 60px; }
-    .adm-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
+    .adm { max-width: 1180px; margin: 0 auto; padding: 22px 16px 70px; }
+    .adm-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
     .adm-top h1 { display: flex; align-items: center; gap: 10px; font-size: 18px; margin: 0; }
     .adm-top h1 img { width: 30px; height: 30px; border-radius: 8px; }
-    .adm-top .row { display: flex; gap: 8px; }
-    .card { border: 1px solid var(--line); border-radius: 16px; background: #100b08; padding: 18px; margin-bottom: 14px; }
-    .card h2 { font: 500 11px/1 var(--mono); text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 0 0 14px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .live-dot { display: inline-flex; align-items: center; gap: 7px; font: 500 12px var(--mono); color: var(--muted); }
+    .live-dot i { width: 8px; height: 8px; border-radius: 50%; background: #3ddc84; box-shadow: 0 0 10px #3ddc84; animation: pulse 2s infinite; }
+    .live-dot.off i { background: var(--dim); box-shadow: none; animation: none; }
+    .card { border: 1px solid var(--line); border-radius: 16px; background: #100b08; padding: 18px; margin-bottom: 14px; min-width: 0; }
+    .card h2 { display: flex; justify-content: space-between; align-items: center; gap: 10px; font: 500 11px/1 var(--mono); text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 0 0 14px; }
+    .card h2 small { font: 400 11px var(--sans); text-transform: none; letter-spacing: 0; color: var(--dim); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 14px; margin-bottom: 14px; }
     .grid .card { margin: 0; }
-    .hero { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
-    .state { display: flex; align-items: center; gap: 12px; font-size: 22px; font-weight: 650; letter-spacing: -.02em; }
-    .state i { width: 12px; height: 12px; border-radius: 50%; background: var(--dim); }
-    .state.live i { background: #3ddc84; box-shadow: 0 0 12px #3ddc84; }
-    .state.paused i { background: #ffb347; box-shadow: 0 0 12px #ffb347; }
-    .state.off i { background: var(--danger); }
-    .state small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); letter-spacing: 0; margin-top: 2px; }
-    .btn { height: 40px; padding: 0 16px; border-radius: 11px; font-weight: 600; border: 1px solid var(--line-2); background: rgba(255,220,180,.04); }
+    .status-card { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+    .state { display: flex; align-items: center; gap: 14px; }
+    .state i { flex: none; width: 14px; height: 14px; border-radius: 50%; background: var(--dim); }
+    .state.live i { background: #3ddc84; box-shadow: 0 0 14px #3ddc84; }
+    .state.paused i { background: #ffb347; box-shadow: 0 0 14px #ffb347; }
+    .state.off i { background: var(--danger); box-shadow: 0 0 14px var(--danger); }
+    .state b { display: block; font-size: 24px; font-weight: 700; letter-spacing: -.02em; }
+    .state small { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
+    .btn { height: 40px; padding: 0 16px; border-radius: 11px; font-weight: 600; border: 1px solid var(--line-2); background: rgba(255,220,180,.04); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
     .btn:hover { border-color: var(--accent); }
-    .btn:disabled { opacity: .5; cursor: wait; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn.small { height: 30px; padding: 0 11px; font-size: 12.5px; border-radius: 9px; }
     .btn.danger { color: #ffd9d4; background: rgba(255, 90, 70, .14); border-color: rgba(255, 90, 70, .45); }
     .btn.go { color: #c9ffe0; background: rgba(61, 220, 132, .12); border-color: rgba(61, 220, 132, .45); }
     .btn.primary { color: #1a0d03; background: var(--amber); border-color: transparent; }
-    dl.kv { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 0; font-size: 13.5px; }
+    .btn.x { color: #fff; background: #000; border-color: #333; }
+    .kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 14px; }
+    .kpi { border: 1px solid var(--line); border-radius: 14px; background: #100b08; padding: 14px; min-width: 0; }
+    .kpi span { display: block; font: 500 10px/1.2 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--dim); }
+    .kpi b { display: block; margin-top: 7px; font: 650 22px/1.05 var(--sans); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .kpi small { display: block; margin-top: 4px; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .kpi.hot b { color: var(--gold); }
+    dl.kv { display: grid; grid-template-columns: auto 1fr; gap: 9px 16px; margin: 0; font-size: 13.5px; }
     dl.kv dt { color: var(--muted); }
     dl.kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-    .ok { color: #3ddc84; } .bad { color: var(--danger); } .warn { color: #ffb347; }
+    dl.kv dd small { color: var(--dim); }
+    dl.kv .sep { grid-column: 1 / -1; border-top: 1px solid var(--line); margin: 3px 0; }
+    .ok { color: #3ddc84; } .bad { color: var(--danger); } .warn { color: #ffb347; } .gold { color: var(--gold); } .dim { color: var(--dim); }
+    .note-box { margin-top: 12px; padding: 10px 12px; border-radius: 10px; font-size: 12.5px; color: var(--muted); background: rgba(255,220,180,.04); border: 1px solid var(--line); line-height: 1.45; }
+    .note-box b { color: var(--text); }
+    .checklist { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 8px; }
+    .checklist li { display: flex; gap: 12px; align-items: flex-start; padding: 11px 12px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,220,180,.025); }
+    .checklist li.done { border-color: rgba(61,220,132,.3); background: rgba(61,220,132,.05); }
+    .checklist li.todo { border-color: rgba(255,179,71,.35); background: rgba(255,179,71,.05); }
+    .checklist li.bad { border-color: rgba(255,90,70,.4); background: rgba(255,90,70,.06); }
+    .checklist .dot { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: rgba(255,255,255,.06); color: var(--dim); }
+    .checklist li.done .dot { background: #3ddc84; color: #062b16; }
+    .checklist li.todo .dot { background: #ffb347; color: #2b1606; }
+    .checklist li.bad .dot { background: var(--danger); color: #2b0906; }
+    .checklist .txt { flex: 1; min-width: 0; }
+    .checklist .txt b { display: block; font-size: 13.5px; font-weight: 600; }
+    .checklist .txt small { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+    .checklist .act { flex: none; }
+    .bar { height: 8px; border-radius: 99px; overflow: hidden; background: rgba(255,210,160,.1); margin-top: 6px; }
+    .bar i { display: block; height: 100%; background: linear-gradient(90deg, #ffd27a, #ff8a1f 70%, #ff4d2a); }
     table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; white-space: nowrap; }
     th { font: 500 10.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--dim); }
     td a { color: var(--gold); }
-    .tag { display: inline-block; padding: 2px 8px; border-radius: 99px; font: 500 11px/1.4 var(--mono); background: rgba(255,255,255,.06); }
-    .tag.burned { background: rgba(61,220,132,.14); color: #9ff0c2; }
-    .tag.failed { background: rgba(255,90,70,.16); color: #ffb3a8; }
-    .tag.skipped { color: var(--muted); }
-    .tag.work { background: rgba(255,154,46,.16); color: var(--gold); }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 99px; font: 500 11px/1.5 var(--mono); background: rgba(255,255,255,.06); color: var(--muted); }
+    .pill.ok { background: rgba(61,220,132,.14); color: #9ff0c2; }
+    .pill.bad { background: rgba(255,90,70,.16); color: #ffb3a8; }
+    .pill.work { background: rgba(255,154,46,.16); color: var(--gold); }
     .login { max-width: 380px; margin: 14vh auto 0; }
     .login input { width: 100%; height: 44px; padding: 0 12px; margin: 10px 0 12px; border-radius: 11px; color: var(--text);
       border: 1px solid var(--line-2); background: rgba(255,220,180,.04); font: 14px var(--mono); }
-    .msg { margin-top: 10px; font-size: 13px; }
+    .msg { margin: 0 0 14px; padding: 10px 14px; border-radius: 10px; font-size: 13px; background: rgba(255,255,255,.04); }
     .scroll { overflow-x: auto; }
+    .mono { font-family: var(--mono); }
+    a.ext { color: var(--gold); }
+    @media (max-width: 1000px) { .kpis { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 560px) { .kpis { grid-template-columns: repeat(2, 1fr); } .grid { grid-template-columns: 1fr; } .checklist { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -60,45 +95,65 @@
         <input id="key" type="password" autocomplete="current-password" placeholder="Admin key">
         <button class="btn primary" type="submit">Open</button>
       </form>
-      <p class="msg bad" id="login-msg" hidden></p>
+      <p class="bad small" id="login-msg" hidden></p>
     </section>
 
     <section id="dash" hidden>
       <header class="adm-top">
         <h1><img src="brand/icon-192.png" alt="">WICK admin</h1>
         <div class="row">
-          <button class="btn" id="refresh">Refresh</button>
-          <button class="btn" id="logout">Log out</button>
+          <span class="live-dot" id="live-dot"><i></i><span id="updated">…</span></span>
+          <label class="live-dot" style="cursor:pointer"><input type="checkbox" id="auto" checked> auto-refresh 10s</label>
+          <button class="btn small" id="refresh">Refresh</button>
+          <button class="btn small" id="logout">Log out</button>
         </div>
       </header>
 
-      <div class="card hero">
-        <div class="state" id="state"><i></i><div><span id="state-text">…</span><small id="state-sub"></small></div></div>
-        <div class="row" style="display:flex;gap:8px;flex-wrap:wrap">
+      <div class="card status-card">
+        <div class="state" id="state"><i></i><div><b id="state-text">…</b><small id="state-sub"></small></div></div>
+        <div class="row">
           <button class="btn" id="run">Run buyback now</button>
           <button class="btn" id="pause">…</button>
         </div>
       </div>
       <p class="msg" id="action-msg" hidden></p>
 
-      <div class="grid">
-        <div class="card"><h2>Configuration</h2><dl class="kv" id="checks"></dl></div>
-        <div class="card"><h2>Buyback wallet</h2><dl class="kv" id="wallet"></dl></div>
-        <div class="card"><h2>Candle &amp; cron</h2><dl class="kv" id="candle"></dl></div>
+      <div class="card">
+        <h2>Launch day <small id="steps-sum"></small></h2>
+        <ol class="checklist" id="steps"></ol>
       </div>
 
-      <div class="card" style="margin-top:14px">
-        <h2>Burn queue (last 20)</h2>
+      <div class="kpis" id="kpis"></div>
+
+      <div class="grid">
+        <div class="card"><h2>Your wallet &amp; earnings <small>dev wallet</small></h2><dl class="kv" id="earn"></dl><div class="note-box" id="earn-note"></div></div>
+        <div class="card"><h2>Buyback &amp; burns</h2><dl class="kv" id="burnbox"></dl></div>
+        <div class="card"><h2>$WICK market</h2><dl class="kv" id="market"></dl></div>
+        <div class="card"><h2>Launches on WICK</h2><dl class="kv" id="launchbox"></dl></div>
+        <div class="card"><h2>Telegram &amp; health</h2><dl class="kv" id="health"></dl></div>
+        <div class="card"><h2>Settings</h2><dl class="kv" id="checks"></dl></div>
+      </div>
+
+      <div class="card">
+        <h2>Latest launches <small>from the site</small></h2>
         <div class="scroll"><table>
-          <thead><tr><th>#</th><th>Kind</th><th>Status</th><th>SOL</th><th>Burned</th><th>Note</th></tr></thead>
+          <thead><tr><th>Coin</th><th>When</th><th>On-chain</th><th>Ignition Fee</th><th>Fee share</th><th>Telegram</th><th>Mcap</th></tr></thead>
+          <tbody id="launches"></tbody>
+        </table></div>
+      </div>
+
+      <div class="card">
+        <h2>Burn queue <small>every buy &amp; burn, newest first</small></h2>
+        <div class="scroll"><table>
+          <thead><tr><th>#</th><th>What</th><th>Status</th><th>SOL used</th><th>$WICK burned</th><th>When</th></tr></thead>
           <tbody id="burns"></tbody>
         </table></div>
       </div>
 
       <div class="card">
-        <h2>Last 20 candles</h2>
+        <h2>Breaths <small>the 30-minute buyback cycles</small></h2>
         <div class="scroll"><table>
-          <thead><tr><th>#</th><th>Ended</th><th>Matches</th><th>Status</th><th>Bought</th><th>Burned</th><th>Note</th></tr></thead>
+          <thead><tr><th>#</th><th>Ended</th><th>Launches</th><th>Status</th><th>Bought</th><th>Burned</th></tr></thead>
           <tbody id="cycles"></tbody>
         </table></div>
       </div>
@@ -108,12 +163,22 @@
   <script type="module">
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-    const when = (t) => (t ? new Date(t).toLocaleString() : '—');
-    const tx = (sig, label) => (sig ? `<a href="https://solscan.io/tx/${esc(sig)}" target="_blank" rel="noopener">${label}</a>` : '');
     const num = (n, d = 4) => (n == null ? '—' : Number(n).toLocaleString('en-US', { maximumFractionDigits: d }));
+    const compact = (n) => (n == null ? '—' : new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 2 }).format(n));
+    const usd = (n) => (n == null ? '—' : n >= 1000 ? `$${compact(n)}` : `$${Number(n).toLocaleString('en-US', { maximumFractionDigits: n < 1 ? 6 : 2 })}`);
+    const solv = (n) => (n == null ? '—' : `${num(n, n >= 10 ? 2 : 4)} SOL`);
+    const short = (k) => (k ? `${k.slice(0, 4)}…${k.slice(-4)}` : '—');
+    const ago = (t) => {
+      if (!t) return '—';
+      const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+      return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)}m ago` : s < 86400 ? `${Math.round(s / 3600)}h ago` : `${Math.round(s / 86400)}d ago`;
+    };
+    const tx = (sig, label = 'tx ↗') => (sig ? `<a href="https://solscan.io/tx/${esc(sig)}" target="_blank" rel="noopener">${label}</a>` : '');
+    const acct = (a, label) => (a ? `<a class="ext mono" href="https://solscan.io/account/${esc(a)}" target="_blank" rel="noopener">${label ?? short(a)}</a>` : '—');
+    const pill = (text, cls = '') => `<span class="pill ${cls}">${esc(text)}</span>`;
     let key = '';
     try { key = sessionStorage.getItem('wick.admin') || ''; } catch {}
-    let data = null;
+    let data = null, loadedAt = 0, clock = 0;
 
     async function call(path, body) {
       const res = await fetch(path, {
@@ -132,7 +197,6 @@
       $('login-msg').hidden = !msg;
       $('login-msg').textContent = msg || '';
     }
-
     function flash(text, cls = '') {
       const el = $('action-msg');
       el.className = `msg ${cls}`;
@@ -140,78 +204,224 @@
       el.hidden = false;
     }
 
-    const yes = (ok, good, bad, cls = 'bad') => `<span class="${ok ? 'ok' : cls}">${ok ? good : bad}</span>`;
+    // ------------------------------------------------------------ helpers on the data
+    const mintOf = (d) => d.checks.tokenMint || d.checks.detected?.mint || null;
+    const live = (d) => Boolean(mintOf(d) && d.wallet.key === 'ok');
+    const cronAge = (d) => (d.heartbeat ? d.now - d.heartbeat : null);
+    function tweet(d) {
+      const t = d.checks.ticker, mint = mintOf(d);
+      return `$${t} is live. the only CA:\n\n${mint}\n\nevery coin launched on ${t} lights the same flame.\nlaunch a coin → generate ignition fees → buy $${t} → burn $${t}\n\nthe more ${t} is used, the more of its own supply disappears.\n\nthe launchpad that burns itself.\n${d.checks.site.replace(/\/?$/, '/')}`;
+    }
 
+    // ------------------------------------------------------------ launch day checklist
+    function steps(d) {
+      const c = d.checks, w = d.wallet, dev = d.dev, mint = mintOf(d), age = cronAge(d);
+      const S = [];
+      const add = (state, title, detail, action = '') => S.push({ state, title, detail, action });
+      add(age != null && age < 3 * 60_000 ? 'done' : 'bad', 'Site & cron running',
+        age == null ? 'The cron has not run since this update yet. Wait a minute.' : `Last cron run ${ago(d.heartbeat)}.`);
+      add(c.telegram ? 'done' : 'todo', 'Telegram bot connected',
+        c.telegram ? 'Make sure the bot can post and pin messages in the channel.' : 'Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in Cloudflare.');
+      add(w.key === 'ok' ? (dev && !dev.isBuyback ? 'todo' : 'done') : w.key === 'invalid' ? 'bad' : 'todo', 'Buyback wallet key',
+        w.key === 'ok'
+          ? (dev && !dev.isBuyback ? `Set, but it is ${short(w.address)}, not the dev wallet ${short(dev.address)}: $WICK creator fees will not reach the buyback.` : `Set: ${short(w.address)}, the dev wallet. Nothing runs until $WICK exists.`)
+          : w.key === 'invalid' ? `Invalid key: ${esc(w.error)}` : 'Add BUYBACK_SECRET_KEY (type Secret) in Cloudflare now: the dev wallet\'s private key. Nothing runs before $WICK exists.');
+      add(dev?.sol >= 0.05 ? 'done' : 'todo', 'Dev wallet funded',
+        dev ? `${acct(dev.address)} holds ${solv(dev.sol)}. Keep only what the launch needs (about 0.02 SOL + your dev buy + a small margin): once live, SOL above ${c.reserveSol} goes to buybacks.` : 'No dev wallet set.');
+      add(mint ? 'done' : c.deployer ? 'todo' : 'bad', mint ? `$${esc(c.ticker)} is live` : `Launch $${esc(c.ticker)} on pump.fun`,
+        mint ? `CA <span class="mono">${esc(mint)}</span>${c.detected && !c.tokenMint ? '. Detected on the dev wallet: the site went live by itself.' : '.'}`
+          : `From the dev wallet ${short(c.deployer)}, ticker ${esc(c.ticker)}. Within a minute, everything else switches on by itself.`,
+        mint ? `<button class="btn small" data-copy="${esc(mint)}">Copy CA</button>` : '');
+      add(c.announced ? 'done' : mint ? 'todo' : '', 'Telegram announcement',
+        c.announced ? `Posted and pinned ${ago(c.announced.at)}.` : 'Posted and pinned by itself within a minute of the launch.');
+      add(mint ? 'todo' : '', 'Post on X',
+        mint ? 'Your post, with the CA filled in. One click, then Post.' : 'Once $WICK is live, this button opens X with your post and the CA filled in.',
+        `<button class="btn small x" id="tweet"${mint ? '' : ' disabled'}>Post on X</button>`);
+      add(live(d) ? (d.paused ? 'todo' : 'done') : '', 'Buyback running',
+        !live(d) ? 'Starts by itself once $WICK is live and the wallet key is set.' : d.paused ? 'Paused: press Resume to start buying back.' : 'Every breath buys back and burns $WICK.');
+      add(d.market ? 'done' : mint ? 'todo' : '', 'Chart live (DexScreener)',
+        d.market ? `Price ${usd(d.market.priceUsd)} · mcap ${usd(d.market.mcap)}.` : 'DexScreener picks the coin up a few minutes after the first trades.');
+      add(d.totals.matchBurns > 0 ? 'done' : '', 'First Ignition Fee burned', d.totals.matchBurns > 0 ? `${d.totals.matchBurns} launch burns so far.` : 'After the first coin launched from the site.');
+      add(d.totals.buybacks > 0 ? 'done' : '', 'First buyback burned', d.totals.buybacks > 0 ? `${d.totals.buybacks} buybacks so far.` : 'At the end of the first breath (30 min at most), or press Run buyback now.');
+      return S;
+    }
+
+    // ------------------------------------------------------------ render
     function render() {
-      const d = data, w = d.wallet, c = d.checks;
-      const configured = c.tokenMint && w.key === 'ok';
+      const d = data, w = d.wallet, c = d.checks, t = d.totals, m = d.market, dev = d.dev, mint = mintOf(d);
+      const T = esc(c.ticker);
+      const configured = live(d);
       const st = $('state');
       st.className = `state ${!configured ? 'off' : d.paused ? 'paused' : 'live'}`;
-      $('state-text').textContent = !configured ? 'Buyback not configured' : d.paused ? 'Buyback PAUSED' : 'Buyback LIVE';
+      $('state-text').textContent = !configured ? (mint ? 'Wallet key missing' : `Waiting for the $${c.ticker} launch`) : d.paused ? 'Buyback PAUSED' : 'WICK is LIVE';
       $('state-sub').textContent = !configured
-        ? 'Set TOKEN_MINT and BUYBACK_SECRET_KEY to turn it on.'
-        : d.paused ? 'No new buy will start. Candles keep burning, the pot waits.' : 'Every burned-out candle triggers a buy and a burn.';
+        ? (mint ? 'Add BUYBACK_SECRET_KEY in Cloudflare to start the buybacks.' : `Watching the dev wallet ${short(c.deployer)}: the site goes live by itself when $${c.ticker} launches.`)
+        : d.paused ? 'No new buy starts. Launches still work, the pot waits.' : 'Launches burn $WICK, every breath buys back and burns.';
       const p = $('pause');
-      p.textContent = d.paused ? '▶ Resume buyback' : '⏸ Pause buyback';
+      p.textContent = d.paused ? 'Resume buyback' : 'Pause buyback';
       p.className = `btn ${d.paused ? 'go' : 'danger'}`;
       $('run').disabled = !configured;
 
+      // Launch day
+      const S = steps(d);
+      const done = S.filter((s) => s.state === 'done').length;
+      $('steps-sum').textContent = `${done}/${S.length} done`;
+      $('steps').innerHTML = S.map((s, i) => `<li class="${s.state}"><span class="dot">${s.state === 'done' ? '✓' : s.state === 'bad' ? '!' : i + 1}</span>
+        <span class="txt"><b>${s.title}</b><small>${s.detail}</small></span>${s.action ? `<span class="act">${s.action}</span>` : ''}</li>`).join('');
+      $('tweet')?.addEventListener('click', () => window.open(`https://x.com/intent/post?text=${encodeURIComponent(tweet(d))}`, '_blank', 'noopener'));
+      document.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = 'Copied'; } catch { b.textContent = 'Select it'; }
+      }));
+
+      // KPIs
+      const supply = d.supply;
+      const kpi = (label, value, sub = '', cls = '', id = '') => `<div class="kpi ${cls}"><span>${label}</span><b${id ? ` id="${id}"` : ''}>${value}</b><small>${sub}</small></div>`;
+      $('kpis').innerHTML = [
+        kpi(`$${T} price`, m ? usd(m.priceUsd) : '—', m?.change?.h24 != null ? `<span class="${m.change.h24 >= 0 ? 'ok' : 'bad'}">${m.change.h24 >= 0 ? '+' : ''}${num(m.change.h24, 1)}% 24h</span>` : 'not trading yet'),
+        kpi('Market cap', m ? usd(m.mcap) : '—', m ? `vol 24h ${usd(m.volume24h)}` : ''),
+        kpi(`$${T} burned`, compact(t.burned || 0), supply ? `${num(supply.pct, 3)}% of supply` : 'starts at launch', 'hot'),
+        kpi('SOL spent on burns', solv(t.sol || 0), `${solv(d.day.sol)} in 24h`),
+        kpi('Coins launched', num(t.launches ?? 0, 0), `${num(d.day.launches, 0)} in 24h`),
+        kpi('Next buyback', '—', `breath #${d.candle.number} · ${d.candle.matches} launches`, '', 'k-next'),
+      ].join('');
+      tick();
+
+      // Your wallet & earnings
+      const price = m?.priceUsd ?? null, sol$ = d.solUsd;
+      const inUsd = (s) => (s != null && sol$ ? ` <small>${usd(s * sol$)}</small>` : '');
+      $('earn').innerHTML = dev ? `
+        <dt>Dev wallet</dt><dd>${acct(dev.address)}${dev.isBuyback ? ' <small>(also the buyback wallet)</small>' : ''}</dd>
+        <dt>SOL balance</dt><dd>${solv(dev.sol)}${inUsd(dev.sol)}</dd>
+        <dt>$${T} held</dt><dd>${dev.wick == null ? '<span class="dim">after launch</span>' : `<b>${num(dev.wick, 0)}</b>${price ? ` <small>${usd(dev.wick * price)}</small>` : ''}${supply?.original ? ` <small>· ${num((dev.wick / (supply.original - supply.burned)) * 100, 2)}% of supply</small>` : ''}`}</dd>
+        <dt>$${T} creator fees waiting</dt><dd>${dev.feesPending == null ? '—' : `<b class="gold">${solv(dev.feesPending)}</b>${inUsd(dev.feesPending)}`}</dd>
+        <dd class="sep"></dd>
+        <dt>Ignition Fees received</dt><dd>${solv(t.ignitionSol || 0)}${inUsd(t.ignitionSol || 0)}</dd>
+        <dt>Shared creator fees received</dt><dd>${solv(t.sharedSol || 0)} <small>from ${t.sharingCoins || 0} coins</small></dd>
+        <dt>Total SOL turned into burns</dt><dd>${solv(t.sol || 0)}${inUsd(t.sol || 0)}</dd>` : '<dt>Dev wallet</dt><dd class="dim">not set</dd>';
+      $('earn-note').innerHTML = dev?.isBuyback
+        ? `<b>Where the money goes:</b> $${T}'s creator fees, the Ignition Fees and the shared fees all land in this wallet and are spent on buying back and burning $${T} (above a ${c.reserveSol} SOL reserve). What stays yours is the $${T} you hold.`
+        : `<b>Where the money goes:</b> $${T}'s creator fees wait on pump.fun for the dev wallet (claimable there). Ignition Fees and shared fees go to the buyback wallet and are burned.`;
+
+      // Buyback & burns
+      const cd = supply?.candle;
+      $('burnbox').innerHTML = `
+        <dt>Buyback wallet</dt><dd>${w.address ? acct(w.address) : `<span class="${w.key === 'invalid' ? 'bad' : 'dim'}">${w.key === 'invalid' ? 'invalid key' : 'not set'}</span>`}</dd>
+        <dt>SOL in it</dt><dd>${solv(w.sol)}</dd>
+        <dt>Next buyback pot</dt><dd><b class="gold">${solv(d.potSol)}</b>${inUsd(d.potSol)}</dd>
+        <dt>$${T} in it <small>(never burned)</small></dt><dd>${num(w.token, 0)}</dd>
+        <dd class="sep"></dd>
+        <dt>Total burned</dt><dd><b>${num(t.burned || 0, 0)}</b> ${supply ? `<small>${num(supply.pct, 3)}%</small>` : ''}</dd>
+        <dt>Supply left</dt><dd>${supply ? compact(supply.original - supply.burned) : '—'}</dd>
+        <dt>Burns</dt><dd>${t.buybacks || 0} buybacks · ${t.matchBurns || 0} launch burns</dd>
+        <dt>Last 24h</dt><dd>${compact(d.day.burned)} burned · ${solv(d.day.sol)}</dd>
+        <dt>Candle</dt><dd>${cd ? `#${String(cd.number).padStart(3, '0')} · ${Math.floor(cd.melted * 100)}% melted<div class="bar"><i style="width:${(cd.melted * 100).toFixed(1)}%"></i></div>` : '—'}</dd>`;
+
+      // Market
+      $('market').innerHTML = m ? `
+        <dt>Price</dt><dd><b>${usd(m.priceUsd)}</b> ${m.change?.h24 != null ? `<small class="${m.change.h24 >= 0 ? 'ok' : 'bad'}">${m.change.h24 >= 0 ? '+' : ''}${num(m.change.h24, 1)}%</small>` : ''}</dd>
+        <dt>Market cap</dt><dd>${usd(m.mcap)}</dd>
+        <dt>Volume 24h</dt><dd>${usd(m.volume24h)}</dd>
+        <dt>Buys / sells 24h</dt><dd><span class="ok">${num(m.buys24h, 0)}</span> / <span class="bad">${num(m.sells24h, 0)}</span></dd>
+        <dt>Where it trades</dt><dd>${esc(m.dex || '—')}${m.dex !== 'pumpfun' && m.liquidity ? ` · liq ${usd(m.liquidity)}` : ''}</dd>
+        <dt>Bonding curve</dt><dd>${m.curve ? (m.curve.complete ? 'graduated' : `${num(m.curve.progress * 100, 1)}%<div class="bar"><i style="width:${(m.curve.progress * 100).toFixed(1)}%"></i></div>`) : '—'}</dd>
+        <dt>Top holder</dt><dd>${m.holders?.[0] ? `${num(m.holders[0].pct, 2)}% ${m.holders[0].label ? `<small>${esc(m.holders[0].label)}</small>` : acct(m.holders[0].owner)}` : '—'}</dd>
+        <dt>Links</dt><dd><a class="ext" href="https://pump.fun/coin/${esc(mint)}" target="_blank" rel="noopener">pump.fun ↗</a> · <a class="ext" href="https://dexscreener.com/solana/${esc(mint)}" target="_blank" rel="noopener">DexScreener ↗</a> · <a class="ext" href="https://solscan.io/token/${esc(mint)}" target="_blank" rel="noopener">Solscan ↗</a></dd>`
+        : `<dt>Status</dt><dd class="dim">${mint ? 'waiting for DexScreener (a few minutes after the first trades)' : `before the $${T} launch`}</dd>`;
+
+      // Launches
+      $('launchbox').innerHTML = `
+        <dt>Coins launched</dt><dd><b>${num(t.launches ?? 0, 0)}</b> <small>${num(d.day.launches, 0)} in 24h</small></dd>
+        <dt>Sharing creator fees</dt><dd>${num(t.sharingCoins || 0, 0)} coins</dd>
+        <dt>Awaiting confirmation</dt><dd>${d.pendingLaunches}</dd>
+        <dt>Volume of WICK coins, 24h</dt><dd>${usd(t.volume24h)}</dd>
+        <dt>Last launch</dt><dd>${t.lastLaunch ? `$${esc(t.lastLaunch.symbol)} · ${ago(t.lastLaunch.at)} ${tx(t.lastLaunch.sig)}` : '—'}</dd>
+        <dt>Ignition Fee</dt><dd>${c.launchFeeSol ? `${num(c.launchFeeSol)} SOL · ${num(c.sharedFeeSol)} SOL with ${num(c.shareBps / 100)}% sharing` : '<span class="dim">free until the buyback is live</span>'}</dd>`;
+
+      // Telegram & health
+      const age = cronAge(d);
+      $('health').innerHTML = `
+        <dt>Cron</dt><dd class="${age != null && age < 180_000 ? 'ok' : 'bad'}">${age == null ? 'no run yet' : `ran ${ago(d.heartbeat)}`}</dd>
+        <dt>Last buyback step</dt><dd>${d.lastRun ? `${esc(d.lastRun.step)} <small>${ago(d.lastRun.at)}</small>` : '—'}</dd>
+        <dt>Last error</dt><dd class="${d.lastError ? 'bad' : 'ok'}">${d.lastError ? `${esc(d.lastError.message)} <small>${ago(d.lastError.at)}</small>` : 'none'}</dd>
+        <dt>RPC</dt><dd class="${w.rpcError ? 'bad' : c.customRpc ? 'ok' : 'warn'}">${w.rpcError ? esc(w.rpcError) : c.customRpc ? 'custom RPC' : 'public RPC (slow)'}</dd>
+        <dd class="sep"></dd>
+        <dt>Telegram bot</dt><dd class="${c.telegram ? 'ok' : 'warn'}">${c.telegram ? 'on' : 'off'}</dd>
+        <dt>Launch announcement</dt><dd>${c.announced ? `<span class="ok">posted</span> <small>${ago(c.announced.at)}</small>` : c.telegram ? `watching ${short(c.deployer)}` : '—'}</dd>
+        <dt>Daily report</dt><dd>${c.dailyHour === 'off' ? 'off' : `every day at ${esc(c.dailyHour)}:00 UTC`}</dd>`;
+
+      // Settings
       $('checks').innerHTML = `
-        <dt>TOKEN_MINT</dt><dd>${c.tokenMint ? `<span class="ok">${esc(c.tokenMint)}</span>` : '<span class="bad">missing</span>'}</dd>
-        <dt>BUYBACK_SECRET_KEY</dt><dd>${yes(w.key === 'ok', 'valid', w.key === 'invalid' ? 'invalid key' : 'missing')}</dd>
-        <dt>SOLANA_RPC</dt><dd>${yes(c.customRpc, 'set', 'public RPC (rate-limited)', 'warn')}</dd>
-        <dt>IP_SALT</dt><dd>${yes(c.ipSalt, 'set', 'missing', 'warn')}</dd>
+        <dt>TOKEN_MINT</dt><dd>${c.tokenMint ? `<span class="ok mono">${short(c.tokenMint)}</span>` : c.detected ? `<span class="ok mono">${short(c.detected.mint)}</span> <small>auto (detected)</small>` : '<span class="dim">set by itself at launch</span>'}</dd>
+        <dt>BUYBACK_SECRET_KEY</dt><dd class="${w.key === 'ok' ? 'ok' : w.key === 'invalid' ? 'bad' : 'warn'}">${w.key === 'ok' ? 'valid' : w.key === 'invalid' ? 'invalid' : 'missing'}</dd>
+        <dt>Dev wallet</dt><dd class="mono">${short(c.deployer)}</dd>
+        <dt>SOLANA_RPC</dt><dd class="${c.customRpc ? 'ok' : 'warn'}">${c.customRpc ? 'set' : 'public'}</dd>
+        <dt>IP_SALT</dt><dd class="${c.ipSalt ? 'ok' : 'warn'}">${c.ipSalt ? 'set' : 'missing'}</dd>
         <dt>Collect creator fees</dt><dd>${c.collectFees ? 'on' : 'off'}</dd>
-        <dt>Ignition Fee (burned)</dt><dd>${c.launchFeeSol ? `${num(c.launchFeeSol)} SOL` : '<span class="muted">off (buyback not live)</span>'}</dd>
-        <dt>Creator fee sharing</dt><dd>${c.shareBps ? `${num(c.shareBps / 100)}% to WICK · Ignition Fee ${num(c.sharedFeeSol)} SOL with sharing · ${num(d.shares?.sharedSol ?? 0)} SOL received from ${d.shares?.sharingCoins ?? 0} coins` : '<span class="muted">off (buyback not live)</span>'}</dd>
-        <dt>Launch announcement</dt><dd>${c.announced ? `posted · <span class="mono">${esc(c.announced.mint)}</span>` : c.telegram && c.deployer ? `watching the dev wallet <span class="mono">${esc(c.deployer.slice(0, 4))}…${esc(c.deployer.slice(-4))}</span>: posts in the channel within a minute of the $WICK launch` : '<span class="muted">off (needs the Telegram bot)</span>'}</dd>
-        <dt>Telegram bot</dt><dd>${yes(c.telegram, 'on', 'off (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID)', 'warn')}</dd>
-        <dt>Candle</dt><dd>${num(c.cycleMinutes)} min · −${num(c.matchMinutes)} min per match</dd>`;
+        <dt>Breath</dt><dd>${num(c.cycleMinutes)} min · −${num(c.matchMinutes)} min per launch</dd>
+        <dt>Fee sharing</dt><dd>${c.shareBps ? `${num(c.shareBps / 100)}% to WICK` : '<span class="dim">once live</span>'}</dd>`;
 
-      $('wallet').innerHTML = w.address ? `
-        <dt>Address</dt><dd><a href="https://solscan.io/account/${esc(w.address)}" target="_blank" rel="noopener">${esc(w.address)}</a></dd>
-        <dt>SOL</dt><dd>${num(w.sol)}</dd>
-        <dt>Pot (above 0.02 reserve)</dt><dd><b>${num(w.pot)} SOL</b></dd>
-        <dt>$WICK held</dt><dd>${num(w.token, 2)}</dd>
-        ${w.rpcError ? `<dt>RPC</dt><dd class="bad">${esc(w.rpcError)}</dd>` : ''}`
-        : `<dt>Wallet</dt><dd class="${w.key === 'invalid' ? 'bad' : 'muted'}">${w.key === 'invalid' ? esc(w.error) : 'not set'}</dd>`;
-
-      const left = Math.max(0, d.candle.endsAt - d.now);
-      $('candle').innerHTML = `
-        <dt>Candle</dt><dd>#${d.candle.number} · ${d.candle.matches} matches</dd>
-        <dt>Burns out in</dt><dd>${Math.floor(left / 60000)}m ${Math.round((left % 60000) / 1000)}s</dd>
-        <dt>Launches awaiting confirmation</dt><dd>${d.pendingLaunches}</dd>
-        <dt>Last buyback step</dt><dd>${d.lastRun ? `${esc(d.lastRun.step)} · ${when(d.lastRun.at)}` : '—'}</dd>
-        <dt>Last error</dt><dd class="${d.lastError ? 'bad' : ''}">${d.lastError ? `${esc(d.lastError.message)} · ${when(d.lastError.at)}` : 'none'}</dd>`;
-
-      const tag = (s) => {
-        const cls = s === 'burned' ? 'burned' : s === 'failed' ? 'failed' : s === 'skipped' ? 'skipped' : s === 'burning' ? '' : 'work';
-        return `<span class="tag ${cls}">${esc(s)}</span>`;
+      // Tables
+      const feeCell = (r) => {
+        if (!(r.fee_lamports > 0)) return '<span class="dim">—</span>';
+        const amt = `${num(r.fee_lamports / 1e9)} SOL`;
+        if (r.burn_status === 'burned') return `${pill(`burned ${compact(r.burned)}`, 'ok')} ${tx(r.burn_sig)}`;
+        if (r.fee_state === 'paid') return `${pill(`${amt} paid`, 'work')} <small class="dim">burn queued</small>`;
+        if (r.fee_state === 'held' || r.fee_state === 'sending') return pill(`${amt} waiting for the coin`, 'work');
+        if (r.fee_state === 'sent') return `${pill(`${amt} sent`, 'work')} ${tx(r.fee_sig)}`;
+        if (r.fee_state === 'failed') return pill('failed', 'bad');
+        return pill(amt);
       };
+      const shareCell = (r) => {
+        if (!(r.share_bps > 0)) return '<span class="dim">—</span>';
+        const p = `${r.share_bps / 100}%`;
+        return r.share_state === 'shared' ? pill(`${p} active`, 'ok') : ['failed', 'expired'].includes(r.share_state) ? pill(r.share_state, 'bad') : pill(`${p} pending`, 'work');
+      };
+      $('launches').innerHTML = d.launches.length ? d.launches.map((r) => `<tr>
+        <td><a href="https://pump.fun/coin/${esc(r.mint)}" target="_blank" rel="noopener"><b>$${esc(r.symbol)}</b></a>${r.holder ? ' <small class="gold">holder</small>' : ''} <small class="dim">${esc(short(r.creator))}</small></td>
+        <td>${ago(r.lit_at || r.created_at)}</td>
+        <td>${r.seq != null ? `${pill(`#${r.seq} live`, 'ok')} ${tx(r.signature)}` : pill('confirming…', 'work')}</td>
+        <td>${feeCell(r)}</td><td>${shareCell(r)}</td>
+        <td>${r.tg_state === 'photo' || r.tg_state === 'text' ? pill('posted', 'ok') : r.tg_state === 'posting' ? pill('posting', 'work') : '<span class="dim">—</span>'}</td>
+        <td>${r.mcap ? usd(r.mcap) : '—'}</td></tr>`).join('') : '<tr><td colspan="7" class="dim">No launch yet.</td></tr>';
+
+      const NOTES = { not_live: 'WICK not live yet', paused: 'buyback paused', empty_pot: 'pot too small, carried over', nothing_bought: 'nothing bought', burn_failed: 'burn failed' };
+      const STATUS = { queued: ['queued', 'work'], buying: ['buying…', 'work'], bought: ['bought, burning next', 'work'], burning_tx: ['burning…', 'work'], burned: ['burned', 'ok'], skipped: ['skipped', ''], failed: ['failed', 'bad'], ended: ['waiting', 'work'], burning: ['now', 'ok'] };
+      const status = (s, note) => `${pill(...(STATUS[s] || [s]))}${note ? ` <small class="dim">${esc(NOTES[note] || note)}</small>` : ''}`;
       $('burns').innerHTML = d.burns.length ? d.burns.map((b) => `<tr>
-        <td>${b.id}</td><td>${b.kind === 'candle' ? `candle #${esc(b.ref)}` : `launch $${esc(b.symbol || '?')}`}</td>
-        <td>${tag(b.status)}</td>
+        <td>${b.id}</td><td>${b.kind === 'candle' ? `Buyback · breath #${esc(b.ref)}` : `Ignition Fee · $${esc(b.symbol || '?')}`}</td>
+        <td>${status(b.status, b.note)}</td>
         <td>${b.sol != null ? `${num(b.sol)} ${tx(b.buy_sig, '↗')}` : ''}</td>
-        <td>${b.burned_ui != null ? `${num(b.burned_ui, 0)} ${tx(b.burn_sig, '↗')}` : tx(b.burn_sig, 'pending ↗')}</td>
-        <td class="muted">${esc(b.note || '')}</td></tr>`).join('') : '<tr><td colspan="6" class="muted">No burn yet.</td></tr>';
+        <td>${b.burned_ui != null ? `<b>${num(b.burned_ui, 0)}</b> ${tx(b.burn_sig, '↗')}` : tx(b.burn_sig, 'pending ↗')}</td>
+        <td>${ago(b.created_at)}</td></tr>`).join('') : '<tr><td colspan="6" class="dim">No burn yet.</td></tr>';
       $('cycles').innerHTML = d.cycles.map((r) => `<tr>
-        <td>${r.id}</td><td>${r.ended_at ? when(r.ended_at) : '<span class="ok">burning</span>'}</td><td>${r.matches}</td>
-        <td>${tag(r.status)}</td>
+        <td>${r.id}</td><td>${r.ended_at ? ago(r.ended_at) : '<span class="ok">now</span>'}</td><td>${r.matches}</td>
+        <td>${status(r.status, r.note)}</td>
         <td>${r.buy_sol != null ? `${num(r.buy_sol)} SOL ${tx(r.buy_sig, '↗')}` : ''}</td>
-        <td>${r.burned_ui != null ? `${num(r.burned_ui, 0)} ${tx(r.burn_sig, '↗')}` : tx(r.burn_sig, 'pending ↗')}</td>
-        <td class="muted">${esc(r.note || '')}</td></tr>`).join('');
+        <td>${r.burned_ui != null ? `${num(r.burned_ui, 0)} ${tx(r.burn_sig, '↗')}` : ''}</td></tr>`).join('');
+    }
+
+    // Every second: the countdown and "updated Xs ago".
+    function tick() {
+      if (!data) return;
+      const left = Math.max(0, data.candle.endsAt - (Date.now() + clock));
+      const el = $('k-next');
+      if (el) el.textContent = `${String(Math.floor(left / 60000)).padStart(2, '0')}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}`;
+      $('updated').textContent = `updated ${Math.round((Date.now() - loadedAt) / 1000)}s ago`;
     }
 
     async function load() {
       try {
         data = await call('/api/admin/status');
+        loadedAt = Date.now();
+        clock = data.now - Date.now();
         $('login').hidden = true;
         $('dash').hidden = false;
+        $('live-dot').classList.remove('off');
         render();
       } catch (err) {
         if (err.status === 401) { try { sessionStorage.removeItem('wick.admin'); } catch {} key = ''; showLogin('Wrong key.'); }
         else if (err.status === 404) showLogin('Admin is off: set an ADMIN_KEY (16+ characters) in Cloudflare.');
-        else flash(`Could not load: ${err.message}`, 'bad');
+        else { $('live-dot').classList.add('off'); flash(`Could not load: ${err.message}`, 'bad'); }
       }
     }
 
@@ -237,18 +447,19 @@
     });
 
     $('run').addEventListener('click', async () => {
-      if (!confirm('Run the next buyback step now? If a burned-out candle is waiting, this spends the pot on $WICK.')) return;
+      if (!confirm('Run the next buyback step now? If a breath has ended, this spends the pot on $WICK and burns it.')) return;
       $('run').disabled = true;
       flash('Running… (up to a minute)', 'warn');
       try {
         const { step } = await call('/api/admin/run', {});
-        flash(step ? `Done: ${step}` : 'Nothing to do: no burned-out candle is waiting.', step?.startsWith('error') ? 'bad' : 'ok');
+        flash(step ? `Done: ${step}` : 'Nothing to do: no breath has ended yet.', step?.startsWith('error') ? 'bad' : 'ok');
       } catch (err) { flash(err.message, 'bad'); }
       load();
     });
 
     if (key) load(); else showLogin();
-    setInterval(() => { if (key && !document.hidden) load(); }, 10_000);
+    setInterval(() => { if (key && $('auto').checked && !document.hidden) load(); }, 10_000);
+    setInterval(tick, 1000);
   </script>
 </body>
 </html>

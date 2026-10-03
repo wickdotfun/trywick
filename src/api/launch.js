@@ -116,7 +116,7 @@ export async function submit({ request, env }) {
   if (row.fee_lamports > 0 || row.share_bps > 0) {
     try { feeBytes = body.feeTx ? bytesFromBase64(body.feeTx) : null; } catch { feeBytes = null; }
     let feeProblem = 'no_fee_tx';
-    if (feeBytes && row.share_bps > 0) feeProblem = row.share_msg ? checkSignedShareTx(feeBytes, bytesFromBase64(row.share_msg)) : 'bad_share_tx';
+    if (feeBytes && row.share_bps > 0) feeProblem = checkSignedShareTx(feeBytes, { creator: row.creator, mint: row.mint, wick: row.fee_to, wickBps: row.share_bps, feeLamports: row.fee_lamports });
     else if (feeBytes) feeProblem = checkFeeTx(feeBytes, { from: row.creator, to: row.fee_to, lamports: row.fee_lamports });
     if (feeProblem) return json({ error: feeProblem }, 400);
   }

@@ -2,20 +2,26 @@
 
 **[trywick.fun](https://trywick.fun)** · [@trywickdotfun](https://x.com/trywickdotfun)
 
-One giant candle, burning live. Everyone sees the same one.
+**The candle is $WICK.** It melts as $WICK is burned, and it never comes back.
 
-- **A candle lasts 30 minutes.** The countdown is on screen: it's the countdown to the next buyback.
+- **One candle = 0.5% of the $WICK supply.** When it's fully consumed, that slice of $WICK is gone forever:
+  the candle joins the **candle hall** (with its story: launches, hottest coin) and the next one is lit.
 - **Strike a match = launch a coin.** Pick a name, a ticker and an image: the coin is created on
-  [pump.fun](https://pump.fun), signed by your own wallet. You are its creator (and you get its
-  creator fees).
-- **Every coin is a match that burns 1 minute off the candle.** It flies in and joins the orbit. The more
-  launches, the more often the candle burns out.
-- **When the flame dies, $WICK is bought back and burned** with the $WICK creator fees, automatically.
-  Every buyback and every burn is on-chain, linked on the site. Then a new candle rises from the wax.
-- **The more coins, the bigger the flame.** Launches from the last 10 minutes make it burn harder.
+  [pump.fun](https://pump.fun), signed by your own wallet. You are its creator (and you get its creator fees).
+- **Every launch burns $WICK.** A 0.02 SOL launch fee, signed together with the launch, buys back $WICK and
+  burns it within a minute.
+- **The breath: a buyback every 30 minutes at most.** The $WICK creator fees buy back and burn $WICK. Every
+  launch brings the next buyback 1 minute closer. The countdown is on screen.
+- **Living matches.** Each coin orbits the candle; coins that pump (DexScreener market cap) grow and move closer
+  to the flame, dead ones fade. Coins launched by a $WICK holder burn in gold.
+- **Burn tracker**: % of the supply burned, the cumulative burn chart and every burn with its Solscan link.
+- **Leaderboard**: the Pyromaniacs (creators ranked by the $WICK their launches burned), the hottest coins, the
+  candle hall.
+- **Telegram bot**: every new coin is posted in the channel with its picture, then updated once its launch fee
+  is burned; every buyback and every consumed candle is announced.
 
-**Demo mode**: add `?demo` to the address for a simulated, sped-up world (2-minute candles, fake
-buybacks, a fake launch with no wallet), running entirely in your browser, with a permanent "Demo" banner.
+**Demo mode**: add `?demo` to the address for a simulated, sped-up world (90-second breaths, tiny candles, fake
+burns, a fake launch with no wallet), running entirely in your browser, with a permanent "Demo" banner.
 
 ---
 
@@ -28,37 +34,47 @@ The site never sees a private key and never asks for a seed phrase.
    wallet address. The Worker uploads the image and metadata to pump.fun's IPFS, then asks
    [PumpPortal](https://pumpportal.fun/local-trading-api/trading-api) to build the unsigned `create`
    transaction.
-2. **Sign** (in the browser): the wallet (Phantom, Solflare, Backpack…) signs first, then the mint keypair.
+   When the buyback is live, it also builds the **launch fee** transfer (0.02 SOL from the creator to the
+   buyback wallet).
+2. **Sign** (in the browser): the wallet (Phantom, Solflare, Backpack…) signs first (the launch and the fee
+   together, one approval), then the mint keypair.
 3. **Submit** (`POST /api/launch/submit`): the Worker checks that it's a pump.fun transaction, paid and
-   signed by that creator, creating that mint, and sends it to Solana.
+   signed by that creator, creating that mint, and that the fee is a real transfer of the right amount to
+   the buyback wallet. It sends the launch, then the fee.
 4. **Confirm** (`GET /api/launch/status`): once the transaction is confirmed on-chain (success, right
    creator, right mint, pump.fun program called, tokens minted), the match is lit and gets its number.
-   A cron re-checks every 2 minutes, in case the browser was closed before confirmation.
+   The creator's $WICK balance is checked then (gold flame for holders). Once the fee is confirmed, its
+   burn joins the queue. The cron re-checks every minute, in case the browser was closed before confirmation.
 
 Only matches confirmed on-chain count. A coin launched elsewhere (directly on pump.fun) is not a match.
 
-## The buyback
+## The burns
 
-When a candle burns out, the cron (every minute) runs its buyback, one step at a time
-(`lib/buyback.js`):
+Every burn goes through one queue (`burns` table), run by the cron every minute, one step at a time
+(`lib/buyback.js`): **buy** $WICK, then **burn** exactly the $WICK that buy brought (SPL `Burn`). Any other
+$WICK in the wallet (a dev buy, for example) is never touched. Two kinds:
 
-1. **Collect** the $WICK creator fees into the buyback wallet (PumpPortal `collectCreatorFee`).
-2. **Buy** $WICK with everything in the wallet above a 0.02 SOL reserve (kept for fees). Below
-   0.005 SOL, no buyback this time: the pot carries over.
-3. **Burn** exactly the $WICK this buyback just bought (SPL `Burn`). Any other $WICK in the wallet
-   (a dev buy, for example) is never touched.
+- **Buyback** (end of each breath): first **collect** the $WICK creator fees (PumpPortal `collectCreatorFee`),
+  then buy with everything above a 0.02 SOL reserve, minus the launch fees still waiting for their own burn.
+  Below 0.005 SOL, no buyback this time: the pot carries over.
+- **Launch burn**: the 0.02 SOL launch fee (minus 0.0005 SOL kept for network fees), bought back and burned
+  within a minute, with a smaller priority fee.
 
-Each step is claimed by an atomic database write, so two overlapping crons never buy twice. A failed
-buy leaves the SOL in the wallet for the next candle. Without `TOKEN_MINT` and `BUYBACK_SECRET_KEY`,
-candles still burn out on time, but no buyback runs ("no buyback yet").
+Each step is claimed by an atomic database write, so two overlapping crons never buy twice. A failed buy
+leaves the SOL in the wallet. Without `TOKEN_MINT` and `BUYBACK_SECRET_KEY`, the breath still runs, nothing is
+bought ("no buyback yet"), and launching costs nothing extra.
 
-**The admin page** (`/admin`, needs `ADMIN_KEY`) shows the configuration checklist, the buyback wallet
-(SOL, pot, $WICK held), the current candle, the last 20 candles with their buy and burn transactions, and
-the last cron step and error. It has two buttons:
+**The candle** is computed from the burns: % burned = $WICK burned by WICK ÷ the original supply (current
+supply read on-chain + what WICK burned). Each 0.5% crossed is a consumed candle, recorded once in the `hall`
+table.
 
-- **Pause buyback**: the emergency switch. No new buy starts (burned-out candles are marked "paused", the pot
-  waits); candles keep burning, and a buy already sent still goes on to its burn. The site shows "Buybacks are
-  paused".
+**The admin page** (`/admin`, needs `ADMIN_KEY`) shows the configuration checklist (including the launch fee and
+the Telegram bot), the buyback wallet (SOL, pot, $WICK held), the burn queue, the last 20 breaths with their
+buy and burn transactions, and the last cron step and error. It has two buttons:
+
+- **Pause buyback**: the emergency switch. No new buy starts (queued burns are marked "paused", the SOL
+  waits in the wallet), launching costs nothing extra while paused, and a buy already sent still goes on to
+  its burn. The site shows "Buybacks are paused".
 - **Run buyback now**: moves the buyback forward right away instead of waiting for the next cron.
 
 **The buyback wallet** is a dedicated Solana wallet whose secret key is stored as the
@@ -85,12 +101,16 @@ small JSON API, backed by a [D1](https://developers.cloudflare.com/d1/) database
 | Form checks | `lib/launch.js` |
 | Solana without a library (base58, transaction reading, RPC) | `lib/solana.js` |
 | pump.fun / PumpPortal calls | `lib/pump.js` |
-| Matches in the database, cron sweep | `lib/matches.js`, `lib/schema.js` |
-| Candles (30-minute cycles) | `lib/candle.js`, `lib/cycles.js` |
-| Buyback and burn | `lib/buyback.js` |
+| Matches in the database, cron sweep, world state | `lib/matches.js`, `lib/schema.js` |
+| The candle (% of supply) and the candle hall | `lib/candle.js`, `lib/supply.js`, `lib/hall.js` |
+| The breath (30-minute buyback countdown) | `lib/cycles.js` |
+| Burn queue: buybacks and launch burns | `lib/buyback.js` |
+| Living matches (DexScreener market caps) | `lib/markets.js` |
+| Pyromaniacs leaderboard | `lib/leaderboard.js`, `src/api/leaderboard.js` |
+| Telegram bot | `lib/telegram.js` |
 | Admin page (status, pause, run) | `public/admin.html`, `src/api/admin.js`, `lib/settings.js` |
 
-The database tables (`matches`, `cycles`) are created on the first request. Tables from the previous version of
+The database tables (`matches`, `cycles`, `burns`, `hall`, `settings`) are created on the first request. Tables from the previous version of
 the site are left untouched (they can be dropped by hand).
 
 **Fair play**: at most 12 launches prepared per IP per hour. IPs are never stored, only salted hashes.
@@ -106,7 +126,7 @@ npm run dev      # http://localhost:8787  (and /?demo for the demo)
 npm test
 ```
 
-Locally, `CYCLE_MINUTES=1` in `.dev.vars` lets you see a candle burn out quickly.
+Locally, `CYCLE_MINUTES=1` in `.dev.vars` makes the breath (buyback countdown) 1 minute long.
 `npx wrangler dev --test-scheduled` then `curl "localhost:8787/__scheduled?cron=*+*+*+*+*"` runs the cron by hand.
 
 ## Deploy (Cloudflare)
@@ -114,7 +134,7 @@ Locally, `CYCLE_MINUTES=1` in `.dev.vars` lets you see a candle burn out quickly
 1. The D1 database id is in `wrangler.toml`. The table is created on the first request.
 2. Workers & Pages → Import a repository. Build command: empty. Deploy command: `npx wrangler deploy`.
    Every push to `main` then redeploys the site.
-3. Variables (Worker → Settings → Variables and Secrets):
+3. Variables (Worker → Settings → **Runtime variables and secrets**, not the Build ones):
 
    | Variable | Purpose |
    |---|---|
@@ -124,7 +144,12 @@ Locally, `CYCLE_MINUTES=1` in `.dev.vars` lets you see a candle burn out quickly
    | `BUYBACK_SECRET_KEY` (secret) | the buyback wallet's secret key (Phantom export, base58, or a Solana CLI `[…]` array) |
    | `ADMIN_KEY` (secret) | long random password (16+ characters) for `/admin`. Without it, the admin page is off |
    | `BUYBACK_COLLECT_FEES` | set to `off` to skip collecting creator fees before each buyback |
-   | `CYCLE_MINUTES`, `MATCH_MINUTES` | candle length (default `30`) and time burned per match (default `1`) |
+   | `CYCLE_MINUTES`, `MATCH_MINUTES` | breath length (default `30`) and how much closer each launch brings the buyback (default `1`) |
+   | `CANDLE_PCT` | share of the $WICK supply per candle, in % (default `0.5`) |
+   | `LAUNCH_FEE_SOL` | launch fee burned as $WICK (default `0.02`, `0` to turn it off). Only charged while the buyback is live |
+   | `HOLDER_MIN` | minimum $WICK held for a golden flame (default: any amount) |
+   | `TELEGRAM_BOT_TOKEN` (secret), `TELEGRAM_CHAT_ID` | the bot (from @BotFather) and the channel (`@yourchannel` or its numeric id); the bot must be an admin of the channel |
+   | `SITE_URL` | the link in Telegram posts (default `https://trywick.fun`) |
    | `TOKEN_TICKER` | defaults to `WICK` |
    | `X_URL` | the X link in the header |
 

@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>WICK — strike a match</title>
-  <meta name="description" content="One giant candle, 30 minutes of wax. Every coin launched here is a match that melts it faster. When the flame dies, $WICK is bought back and burned.">
+  <meta name="description" content="The candle is $WICK. Every coin launched here burns $WICK, and the candle melts forever. Strike a match.">
   <meta property="og:title" content="WICK — strike a match">
-  <meta property="og:description" content="Every coin launched melts the candle. When it dies, $WICK is bought back and burned.">
+  <meta property="og:description" content="The candle is $WICK. Every coin launched here burns $WICK, and the candle melts forever.">
   <meta property="og:image" content="/brand/og.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="/brand/og.png">
@@ -34,7 +34,9 @@
     </a>
     <nav class="top-right">
       <span class="status" id="status" title="Live"><i></i>live</span>
-      <button class="ghost" id="how-btn">How it works</button>
+      <button class="ghost" id="burns-btn">🔥 Burns</button>
+      <button class="ghost" id="board-btn">Leaderboard</button>
+      <button class="ghost hide-sm" id="how-btn">How it works</button>
       <a class="ghost tick" id="wick-btn" target="_blank" rel="noopener" hidden>$WICK</a>
       <a class="icon-btn" id="x-link" href="https://x.com/trywickdotfun" target="_blank" rel="noopener" aria-label="WICK on X">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.8 3h3.1l-6.8 7.8L22 21h-6.2l-4.9-6.4L5.3 21H2.2l7.3-8.3L2 3h6.4l4.4 5.8L17.8 3zm-1.1 16.2h1.7L7.4 4.7H5.6l11.1 14.5z"/></svg>
@@ -45,28 +47,29 @@
     </nav>
   </header>
 
-  <!-- Où en est la bougie : le compte à rebours du buyback -->
+  <!-- La bougie (= la supply de $WICK) et le souffle (le compte à rebours du buyback) -->
   <section class="meter">
-    <p class="eyebrow">Candle <b id="candle-no">#1</b> · <span id="meter-matches">0 matches</span></p>
+    <p class="eyebrow">Candle <b id="candle-no">#1</b> · <span id="candle-melt">0% melted</span></p>
+    <div class="bar" title="This candle = 0.5% of the $WICK supply"><i id="bar"></i></div>
+    <p class="supply"><strong id="supply-pct">0%</strong> <span id="supply-label">of $WICK burned forever</span></p>
     <p class="count-label" id="count-label">Next buyback in</p>
     <p class="count"><strong id="countdown">30:00</strong></p>
-    <div class="bar"><i id="bar"></i></div>
-    <p class="meter-sub" id="meter-sub">Every coin launched here burns <b>1 minute</b> off.</p>
+    <p class="meter-sub" id="meter-sub">&nbsp;</p>
     <dl class="stats" id="stats">
-      <div><dt>$WICK burned</dt><dd id="st-burned">0</dd></div>
+      <div><dt id="st-burned-label">$WICK burned</dt><dd id="st-burned">0</dd></div>
       <div><dt>In the wax</dt><dd id="st-pot">—</dd></div>
-      <div><dt>Buybacks</dt><dd id="st-buybacks">0</dd></div>
+      <div><dt>Candles gone</dt><dd id="st-candles">0</dd></div>
     </dl>
   </section>
 
   <!-- À la première visite : ce qu'est le site, en trois lignes -->
   <section class="intro" id="intro" hidden>
     <p class="eyebrow">What is WICK?</p>
-    <h1>One candle.<br><span class="grad">Every coin melts it.</span></h1>
+    <h1>The candle is $WICK.<br><span class="grad">Every coin melts it.</span></h1>
     <ol class="intro-steps">
-      <li><i>1</i><span><b>Launch a coin from here.</b> It's a real pump.fun coin, yours, and it becomes a match orbiting the candle.</span></li>
-      <li><i>2</i><span><b>Every match burns <span data-t="match">1 minute</span></b> off the candle. Left alone, it lasts <span data-t="total">30 minutes</span>.</span></li>
-      <li><i>3</i><span><b>When the flame dies, $WICK is bought back and burned</b> with the creator fees. Then a new candle is lit.</span></li>
+      <li><i>1</i><span><b>Launch a coin from here.</b> A real pump.fun coin, yours. It becomes a match orbiting the candle.</span></li>
+      <li><i>2</i><span><b>Every launch burns $WICK.</b> <span data-t="fee-line">Its launch fee buys back $WICK and burns it within a minute</span>, and the next buyback comes <span data-t="match">1 minute</span> sooner.</span></li>
+      <li><i>3</i><span><b>The candle never comes back.</b> It melts as $WICK burns: one candle = <span data-t="step">0.5%</span> of the supply. Consumed candles go to the hall.</span></li>
     </ol>
     <div class="intro-actions">
       <button class="cta" id="intro-strike">Strike a match</button>
@@ -82,7 +85,7 @@
     </header>
     <ol class="feed-list" id="feed"></ol>
     <section class="finals" id="finals" hidden>
-      <h3>Buybacks</h3>
+      <h3>Buybacks <button class="link-btn tiny" id="finals-more">all burns →</button></h3>
       <ol id="finals-list"></ol>
     </section>
   </aside>
@@ -96,7 +99,7 @@
       <svg class="match-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19 15.5 8.5"/><circle cx="17" cy="7" r="2.6"/></svg>
       Strike a match
     </button>
-    <p class="cta-sub">Launch your coin on pump.fun · it melts the candle <span data-t="match">1 minute</span> faster</p>
+    <p class="cta-sub" id="cta-sub">Launch your coin on pump.fun · it burns $WICK</p>
   </div>
 
   <div class="tip" id="tip" hidden></div>

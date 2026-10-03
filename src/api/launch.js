@@ -2,6 +2,7 @@
 //   POST /api/launch/prepare  (formulaire + image)  → la transaction à signer
 //   POST /api/launch/submit   (transaction signée)  → envoyée sur Solana
 //   GET  /api/launch/status?mint=…                  → allumée ou pas encore
+import { launchFee } from '../../lib/buyback.js';
 import { CONFIG } from '../../lib/config.js';
 import { ipHash, json } from '../../lib/http.js';
 import { isPubkey, validateImage, validateLaunch } from '../../lib/launch.js';
@@ -9,7 +10,8 @@ import { getMatch, publicMatch, settle } from '../../lib/matches.js';
 import { buildCreateTx, uploadMetadata } from '../../lib/pump.js';
 import { ensureSchema } from '../../lib/schema.js';
 import {
-  base64FromBytes, bytesFromBase64, checkSignedLaunch, sendTransaction, signatureOf,
+  base64FromBytes, buildTransferTx, bytesFromBase64, checkFeeTx, checkSignedLaunch, getLatestBlockhash,
+  sendTransaction, signatureOf,
 } from '../../lib/solana.js';
 
 export async function prepare({ request, env }) {
@@ -53,6 +55,11 @@ export async function prepare({ request, env }) {
     await env.DB.prepare('UPDATE matches SET dev_buy = ? WHERE mint = ?').bind(launch.devBuy, launch.mint).run();
   }
 
+  // Le frais de lancement (quand le buyback tourne) : un virement à signer avec le lancement.
+  const fee = await launchFee(env);
+  await env.DB.prepare('UPDATE matches SET fee_lamports = ?, fee_to = ? WHERE mint = ?')
+    .bind(fee?.lamports ?? 0, fee?.to ?? null, launch.mint).run();
+
   // Le nom et le ticker de la transaction sont ceux enregistrés avec les métadonnées.
   const row = existing || launch;
   let tx;
@@ -62,13 +69,25 @@ export async function prepare({ request, env }) {
     console.error('pumpportal', err.detail || err.message);
     return json({ error: 'build_failed' }, 502);
   }
-  return json({ tx: base64FromBytes(tx), image: meta.image });
+  let feeTx = null;
+  if (fee) {
+    try {
+      feeTx = base64FromBytes(buildTransferTx({
+        from: launch.creator, to: fee.to, lamports: fee.lamports, blockhash: await getLatestBlockhash(env),
+      }));
+    } catch (err) {
+      console.error('fee tx', err.message);
+      return json({ error: 'build_failed' }, 502);
+    }
+  }
+  return json({ tx: base64FromBytes(tx), feeTx, feeSol: fee ? fee.lamports / 1e9 : 0, image: meta.image });
 }
 
 export async function submit({ request, env }) {
   await ensureSchema(env.DB);
   const body = await request.json().catch(() => null);
-  if (!isPubkey(body?.mint) || typeof body.tx !== 'string' || body.tx.length > 4000) {
+  if (!isPubkey(body?.mint) || typeof body.tx !== 'string' || body.tx.length > 4000
+    || (body.feeTx != null && (typeof body.feeTx !== 'string' || body.feeTx.length > 2000))) {
     return json({ error: 'bad_request' }, 400);
   }
   const row = await getMatch(env.DB, body.mint);
@@ -80,6 +99,14 @@ export async function submit({ request, env }) {
   // On ne relaie que la création de CE coin, payée et signée par SON créateur.
   const problem = checkSignedLaunch(bytes, row);
   if (problem) return json({ error: problem }, 400);
+
+  // Le frais de lancement, s'il y en a un : un virement signé du créateur vers le wallet de buyback.
+  let feeBytes = null;
+  if (row.fee_lamports > 0) {
+    try { feeBytes = body.feeTx ? bytesFromBase64(body.feeTx) : null; } catch { feeBytes = null; }
+    const feeProblem = feeBytes ? checkFeeTx(feeBytes, { from: row.creator, to: row.fee_to, lamports: row.fee_lamports }) : 'no_fee_tx';
+    if (feeProblem) return json({ error: feeProblem }, 400);
+  }
 
   const signature = signatureOf(bytes);
   try {
@@ -93,6 +120,20 @@ export async function submit({ request, env }) {
   }
   await env.DB.prepare('UPDATE matches SET signature = ?, sent_at = ? WHERE mint = ? AND seq IS NULL')
     .bind(signature, Date.now(), row.mint).run();
+
+  // Le lancement est parti : le frais part juste après. (S'il échoue, le coin est lancé quand
+  // même, sans burn de lancement.)
+  if (feeBytes) {
+    let state = 'sent';
+    try {
+      await sendTransaction(env, feeBytes);
+    } catch (err) {
+      console.error('fee send', row.mint, err.message);
+      state = 'failed';
+    }
+    await env.DB.prepare('UPDATE matches SET fee_sig = ?, fee_state = ? WHERE mint = ?')
+      .bind(signatureOf(feeBytes), state, row.mint).run();
+  }
   return json({ status: 'pending', signature });
 }
 

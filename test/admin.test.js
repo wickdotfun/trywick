@@ -60,7 +60,7 @@ test('pause stops new buybacks, resume lets them run again', async () => {
   await tickCycle(env, 0);
   await tickCycle(env, 30 * 60_000);
   assert.equal(await runBuyback(env, 30 * 60_000), 'skipped:paused');
-  const row = await env.DB.prepare('SELECT status, note FROM cycles WHERE id = 1').first();
+  const row = await env.DB.prepare('SELECT status, note FROM burns WHERE id = 1').first();
   assert.deepEqual({ ...row }, { status: 'skipped', note: 'paused' });
 
   await adminPause({ request: req('/api/admin/pause', { body: { paused: false } }), env });

@@ -5,6 +5,9 @@
 //   setCandle({ melted, heat })  la bougie fond (0 → 1) et la flamme chauffe (0 → 1)
 //   setMatches(liste)            les allumettes déjà là (sans animation)
 //   addMatch(m)                  une nouvelle allumette arrive, lancée depuis l'écran
+//   updateMarkets(list)          le market cap des coins : les allumettes vivantes grossissent,
+//                                se rapprochent de la flamme, ou pâlissent ; les holders brûlent en or
+//   flare()                      un buyback part : la flamme s'emballe
 //   burnout()                    la bougie a fondu : les allumettes plongent dans la flamme,
 //                                elle s'éteint, une nouvelle bougie sort de la flaque
 //   screenOf(mint)               où est une allumette à l'écran (pour les étiquettes)
@@ -35,9 +38,18 @@ export function hash(s, salt = 0) {
 
 // La couleur de la tête d'une allumette vient de son mint : toujours la même.
 const HEADS = ['#e8402a', '#ff6b2b', '#d92b4b', '#ffb02e', '#3fb5ff', '#7a5cff', '#2fd38a', '#ff4fa3', '#f2f2f2'];
-export function headColor(mint) {
-  return HEADS[Math.floor(hash(mint, 7) * HEADS.length)];
+export const GOLD = '#ffc94a';
+export function headColor(mint, holder = false) {
+  return holder ? GOLD : HEADS[Math.floor(hash(mint, 7) * HEADS.length)];
 }
+
+// La force d'un coin selon son market cap : 0 à 5 k$, 1 à 1 M$ (échelle logarithmique).
+export function marketPower(mcap) {
+  if (!(mcap > 0)) return 0;
+  return clamp(Math.log10(mcap / 5000) / Math.log10(200));
+}
+
+const FLAME = { normal: [1, 0.5, 0.15], hot: [1, 0.36, 0.08], gold: [1, 0.8, 0.22], dead: [0.5, 0.33, 0.25] };
 
 function softDot() {
   const c = document.createElement('canvas');
@@ -126,15 +138,21 @@ function glowPoints(count, { size = 1, color = [1, 0.5, 0.15], core = [1, 0.95, 
   const seeds = new Float32Array(count);
   for (let i = 0; i < count; i++) seeds[i] = Math.random();
   geo.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1));
+  // La couleur de chaque point (par défaut celle de tout le système).
+  const tints = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) tints.set(color, i * 3);
+  geo.setAttribute('aTint', new THREE.BufferAttribute(tints, 3).setUsage(THREE.DynamicDrawUsage));
   const mat = new THREE.ShaderMaterial({
     uniforms: {
       uTime: { value: 0 }, uPixel: { value: 1 }, uSize: { value: size },
       uColor: { value: new THREE.Vector3(...color) }, uCore: { value: new THREE.Vector3(...core) },
     },
     vertexShader: `
-      attribute float aSeed; attribute float aSize;
+      attribute float aSeed; attribute float aSize; attribute vec3 aTint;
       uniform float uTime; uniform float uPixel; uniform float uSize;
+      varying vec3 vTint;
       void main() {
+        vTint = aTint;
         vec4 mv = modelViewMatrix * vec4(position, 1.0);
         float f = 0.85 + 0.15 * sin(uTime * 19.0 + aSeed * 40.0) + 0.1 * sin(uTime * 31.0 + aSeed * 13.0);
         gl_PointSize = aSize * uSize * f * uPixel * (70.0 / max(0.1, -mv.z));
@@ -142,10 +160,11 @@ function glowPoints(count, { size = 1, color = [1, 0.5, 0.15], core = [1, 0.95, 
       }`,
     fragmentShader: `
       uniform vec3 uColor; uniform vec3 uCore;
+      varying vec3 vTint;
       void main() {
         float d = length(gl_PointCoord - 0.5) * 2.0;
         float a = smoothstep(1.0, 0.0, d);
-        vec3 col = mix(uColor, uCore, pow(1.0 - d, 3.0));
+        vec3 col = mix(vTint, uCore, pow(1.0 - d, 3.0));
         gl_FragColor = vec4(col * a * 1.7, a);
       }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -364,11 +383,27 @@ export function createScene(container, { onFrame } = {}) {
     if (byMint.has(m.mint) || list.length >= CAP) return;
     const spawn = camera.position.clone()
       .add(new THREE.Vector3((Math.random() - 0.5) * 6, -1.5 - Math.random() * 2, 0).applyQuaternion(camera.quaternion));
-    const e = { m, o: orbitOf(m), born: fresh ? now : -1e9, spawn, struck: !fresh, pos: new THREE.Vector3(), headPos: new THREE.Vector3() };
-    heads.setColorAt(list.length, new THREE.Color(headColor(m.mint)));
+    const e = {
+      m, o: orbitOf(m), born: fresh ? now : -1e9, spawn, struck: !fresh, pos: new THREE.Vector3(), headPos: new THREE.Vector3(),
+      power: marketPower(m.mcap), powerTarget: marketPower(m.mcap),
+    };
+    heads.setColorAt(list.length, new THREE.Color(headColor(m.mint, m.holder)));
+    tintFor(e, list.length);
     heads.instanceColor.needsUpdate = true;
     list.push(e);
     byMint.set(m.mint, e);
+  }
+
+  // La couleur de la flamme d'une allumette : or pour un holder de $WICK, vive pour un coin qui
+  // monte, éteinte pour un coin mort.
+  function tintFor(e, i) {
+    const m = e.m;
+    const kind = m.holder ? 'gold'
+      : m.mcap > 0 && m.mcap < 4500 && (m.change ?? 0) < -40 ? 'dead'
+        : (m.change ?? 0) > 50 || e.powerTarget > 0.6 ? 'hot' : 'normal';
+    e.dead = kind === 'dead';
+    matchFlames.geometry.attributes.aTint.array.set(FLAME[kind], i * 3);
+    matchFlames.geometry.attributes.aTint.needsUpdate = true;
   }
 
   // ------------------------------------------------------------ état animé
@@ -479,7 +514,7 @@ export function createScene(container, { onFrame } = {}) {
     body.scale.y = h;
     top.position.y = h;
     uniforms.uTop.value = h;
-    uniforms.uGlow.value = (0.45 + st.heat * 0.4 + st.pulse * 0.5) * (st.flameOn > 0 ? 1 : 0.2);
+    uniforms.uGlow.value = (0.42 + st.heat * 0.22 + st.pulse * 0.28) * (st.flameOn > 0 ? 1 : 0.2);
     const pr = R * 1.08 + st.melted * 2.0 + st.puddleBase;
     puddle.scale.set(pr, 1 + st.melted * 1.5, pr);
     for (const d of drips) {
@@ -492,16 +527,16 @@ export function createScene(container, { onFrame } = {}) {
       d.mesh.position.set(Math.cos(d.a) * (R + d.r * 0.15), h + 0.01, Math.sin(d.a) * (R + d.r * 0.15));
     }
 
-    const power = (1 + st.heat * 0.75 + st.pulse * 0.4) * st.flameOn;
+    const power = (1 + st.heat * 0.45 + st.pulse * 0.3) * st.flameOn;
     flame.visible = power > 0.01;
     flame.scale.setScalar(1.3 * power);
     outerMat.uniforms.uTime.value = innerMat.uniforms.uTime.value = t;
-    halo.scale.setScalar(3.4 + st.heat * 1.6 + st.pulse * 1.5);
-    halo.material.opacity = 0.45 * Math.min(1, power);
+    halo.scale.setScalar(3.2 + st.heat * 0.9 + st.pulse * 0.8);
+    halo.material.opacity = 0.36 * Math.min(1, power);
     flame.getWorldPosition(flameWorld);
     const flick = 1 + 0.08 * Math.sin(t * 23) + 0.06 * Math.sin(t * 37 + 1) + 0.05 * Math.sin(t * 11);
     flameLight.position.set(flameWorld.x, flameWorld.y + 0.6, flameWorld.z);
-    flameLight.intensity = (26 + st.heat * 22 + st.pulse * 25) * flick * Math.min(1, power) + 1.5;
+    flameLight.intensity = (24 + st.heat * 12 + st.pulse * 14) * flick * Math.min(1, power) + 1.5;
 
     // -- les allumettes
     const cy = h * 0.55 + 1.0;
@@ -511,8 +546,10 @@ export function createScene(container, { onFrame } = {}) {
       const e = list[i], o = e.o;
       const th = o.phase + o.speed * t;
       const ci = Math.cos(o.incl), si = Math.sin(o.incl), cn = Math.cos(o.node), sn = Math.sin(o.node);
-      let r = o.r;
-      if (suck) r = o.r * (1 - ease(suck)) + 0.05;
+      // Les coins forts se rapprochent de la flamme.
+      e.power += (e.powerTarget - e.power) * Math.min(1, dt * 0.8);
+      let r = o.r * (1 - 0.32 * e.power);
+      if (suck) r = r * (1 - ease(suck)) + 0.05;
       // Un cercle, incliné autour de x puis tourné autour de y.
       const x0 = r * Math.cos(th), z0 = r * Math.sin(th);
       const y1 = -z0 * si, z1 = z0 * ci;
@@ -524,7 +561,7 @@ export function createScene(container, { onFrame } = {}) {
       // Debout, penchée vers l'avant et un peu vers la bougie.
       dir.set(-tmpV.x, 0, -tmpV.z).normalize().multiplyScalar(0.2).add(up).addScaledVector(tan, o.lean).normalize();
 
-      let scale = MS * (1 - ease(suck) * 0.9);
+      let scale = MS * (0.85 + 0.8 * e.power) * (1 - ease(suck) * 0.9);
       const age = t - e.born;
       if (age < INTRO) {
         const k = ease(age / INTRO);
@@ -546,7 +583,7 @@ export function createScene(container, { onFrame } = {}) {
       heads.setMatrixAt(i, mat4);
       tmpV.copy(e.headPos).addScaledVector(dir, 0.13 * scale);
       fpos.setXYZ(i, tmpV.x, tmpV.y, tmpV.z);
-      fsize.setX(i, (age < INTRO ? 1.6 : 1) * (scale / MS) * (0.9 + st.heat * 0.3));
+      fsize.setX(i, (age < INTRO ? 1.6 : 1) * (scale / MS) * (0.9 + st.heat * 0.3) * (e.dead ? 0.45 : 1 + 0.4 * e.power));
     }
     sticks.count = heads.count = list.length;
     matchFlames.geometry.setDrawRange(0, list.length);
@@ -643,6 +680,20 @@ export function createScene(container, { onFrame } = {}) {
       for (const m of ms) insert(m, false, clock.elapsedTime);
     },
     addMatch(m) { insert(m, true, clock.elapsedTime); },
+    updateMarkets(markets) {
+      for (const k of markets) {
+        const e = byMint.get(k.mint);
+        if (!e) continue;
+        e.m.mcap = k.mcap;
+        e.m.change = k.change;
+        e.powerTarget = marketPower(k.mcap);
+        tintFor(e, list.indexOf(e));
+      }
+    },
+    flare() {
+      st.pulse = 1.2;
+      burst(flameWorld, 70, 1.3);
+    },
     burnout() {
       return new Promise((done) => {
         if (st.burn) { done(); return; }

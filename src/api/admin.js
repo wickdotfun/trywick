@@ -2,13 +2,14 @@
 //   GET  /api/admin/status  → tout l'état du buyback
 //   POST /api/admin/pause   { paused: true | false } → l'interrupteur d'urgence
 //   POST /api/admin/run     → fait avancer le buyback tout de suite
-import { buybackWallet, runBuyback } from '../../lib/buyback.js';
+import { buybackWallet, launchFee, runBuyback } from '../../lib/buyback.js';
 import { CONFIG, cycleTiming } from '../../lib/config.js';
 import { publicCycle, tickCycle } from '../../lib/cycles.js';
 import { json } from '../../lib/http.js';
 import { ensureSchema } from '../../lib/schema.js';
 import { buybackPaused, getSetting, setSetting } from '../../lib/settings.js';
 import { getBalance, tokenHolding } from '../../lib/solana.js';
+import { telegramReady } from '../../lib/telegram.js';
 
 async function digest(text) {
   return new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
@@ -63,14 +64,21 @@ export const adminStatus = guarded(async ({ env }) => {
   const now = Date.now();
   const timing = cycleTiming(env);
   const open = await tickCycle(env, now);
-  const [wallet, paused, lastRun, lastError, { results: cycles }, pending] = await Promise.all([
+  const [wallet, paused, lastRun, lastError, { results: cycles }, pending, { results: burns }, fee] = await Promise.all([
     walletInfo(env),
     buybackPaused(db),
     getSetting(db, 'cron.lastRun'),
     getSetting(db, 'cron.lastError'),
-    db.prepare(`SELECT id, started_at, ended_at, matches, status, note, step_at, buy_sol, buy_sig, burn_sig,
-      burn_tries, burned_ui FROM cycles ORDER BY id DESC LIMIT 20`).all(),
+    db.prepare(`SELECT c.id, c.started_at, c.ended_at, c.matches,
+      CASE WHEN c.ended_at IS NULL THEN 'burning' ELSE COALESCE(b.status, c.status) END AS status,
+      COALESCE(b.note, c.note) AS note, COALESCE(b.sol, c.buy_sol) AS buy_sol, b.buy_sig, b.burn_sig,
+      COALESCE(b.burned_ui, c.burned_ui) AS burned_ui
+      FROM cycles c LEFT JOIN burns b ON b.kind = 'candle' AND b.ref = CAST(c.id AS TEXT)
+      ORDER BY c.id DESC LIMIT 20`).all(),
     db.prepare('SELECT COUNT(*) AS n FROM matches WHERE seq IS NULL AND signature IS NOT NULL').first(),
+    db.prepare(`SELECT b.id, b.kind, b.ref, b.created_at, b.status, b.note, b.sol, b.buy_sig, b.burn_sig, b.burned_ui, m.symbol
+      FROM burns b LEFT JOIN matches m ON b.kind = 'match' AND m.mint = b.ref ORDER BY b.id DESC LIMIT 20`).all(),
+    launchFee(env),
   ]);
   return json({
     now,
@@ -83,10 +91,13 @@ export const adminStatus = guarded(async ({ env }) => {
       collectFees: env.BUYBACK_COLLECT_FEES !== 'off',
       cycleMinutes: timing.durationMs / 60_000,
       matchMinutes: timing.matchMs / 60_000,
+      launchFeeSol: fee ? fee.lamports / 1e9 : 0,
+      telegram: telegramReady(env),
     },
     wallet,
     candle: publicCycle(open, env, now),
     cycles,
+    burns,
     pendingLaunches: pending.n,
     lastRun,
     lastError,

@@ -2,7 +2,7 @@
 //   POST /api/launch/prepare  (formulaire + image)  → la transaction à signer
 //   POST /api/launch/submit   (transaction signée)  → envoyée sur Solana
 //   GET  /api/launch/status?mint=…                  → allumée ou pas encore
-import { launchFee } from '../../lib/buyback.js';
+import { expectedFee, feeTransfers, launchFee } from '../../lib/buyback.js';
 import { CONFIG } from '../../lib/config.js';
 import { ipHash, json } from '../../lib/http.js';
 import { isPubkey, validateImage, validateLaunch } from '../../lib/launch.js';
@@ -11,7 +11,7 @@ import { buildCreateTx, uploadMetadata } from '../../lib/pump.js';
 import { ensureSchema } from '../../lib/schema.js';
 import { buildShareTx, checkSignedShareTx } from '../../lib/sharing.js';
 import {
-  base64FromBytes, buildTransferTx, bytesFromBase64, checkFeeTx, checkSignedLaunch, getLatestBlockhash,
+  base64FromBytes, buildFeeTx, bytesFromBase64, checkFeeTx, checkSignedLaunch, getLatestBlockhash,
   sendTransaction, signatureOf,
 } from '../../lib/solana.js';
 
@@ -39,14 +39,17 @@ export async function prepare({ request, env }) {
         .bind(ip, now - 3600_000).first();
       if (n >= CONFIG.preparesPerIpPerHour) return json({ error: 'too_many' }, 429);
     }
+    // Une limite pour tout le site : chaque préparation envoie l'image sur Pinata.
+    const { n: all } = await env.DB.prepare('SELECT COUNT(*) AS n FROM matches WHERE created_at > ?').bind(now - 3600_000).first();
+    if (all >= Number(env.UPLOADS_PER_HOUR || CONFIG.uploadsPerHour)) return json({ error: 'busy' }, 429);
     const image = form.get('image');
     const imageError = validateImage(image);
     if (imageError) return json({ error: imageError }, 400);
     try {
-      meta = await uploadMetadata(launch, image);
+      meta = await uploadMetadata(env, launch, image);
     } catch (err) {
       console.error('ipfs', err.detail || err.message);
-      return json({ error: 'ipfs_failed' }, 502);
+      return json({ error: err.message === 'ipfs_not_configured' ? 'ipfs_not_configured' : 'ipfs_failed' }, 502);
     }
     await env.DB.prepare(
       `INSERT INTO matches (mint, creator, name, symbol, image, uri, dev_buy, ip, created_at, twitter, telegram, website)
@@ -57,9 +60,10 @@ export async function prepare({ request, env }) {
     await env.DB.prepare('UPDATE matches SET dev_buy = ? WHERE mint = ?').bind(launch.devBuy, launch.mint).run();
   }
 
-  // L'Ignition Fee (quand le buyback tourne) : à signer avec le lancement. Avec le partage des
-  // creator fees (au choix du créateur), elle est réduite et part dans la même transaction que
-  // le partage (lib/sharing.js).
+  // L'Ignition Fee (quand le buyback tourne) : une seconde transaction à signer, avec deux
+  // virements (la part brûlée vers le wallet burn, la part de l'équipe vers son wallet). Avec le
+  // partage des creator fees (au choix du créateur), elle est réduite et part dans la même
+  // transaction que le partage (lib/sharing.js).
   const shared = fields.share === '1';
   const fee = (shared && (await launchFee(env, { shared: true }))) || (await launchFee(env));
 
@@ -72,24 +76,36 @@ export async function prepare({ request, env }) {
     console.error('pumpportal', err.detail || err.message);
     return json({ error: 'build_failed' }, 502);
   }
-  let feeTx = null, shareMsg = null;
+  let feeTx = null;
+  const holders = fee?.holders || [];
+  const shareBps = holders.reduce((n, h) => n + h.bps, 0);
+  const shareTeamBps = holders.find((h) => h.address === fee?.teamWallet)?.bps ?? 0;
   if (fee) {
     try {
       const blockhash = await getLatestBlockhash(env);
-      const bytes = fee.bps
-        ? await buildShareTx({ creator: launch.creator, mint: launch.mint, wick: fee.to, wickBps: fee.bps, feeLamports: fee.lamports, blockhash })
-        : buildTransferTx({ from: launch.creator, to: fee.to, lamports: fee.lamports, blockhash });
+      const transfers = feeTransfers(fee);
+      const bytes = holders.length
+        ? await buildShareTx({ creator: launch.creator, mint: launch.mint, transfers, holders, blockhash })
+        : buildFeeTx({ from: launch.creator, transfers, blockhash });
       feeTx = base64FromBytes(bytes);
-      if (fee.bps) shareMsg = base64FromBytes(bytes.subarray(1 + 64));
     } catch (err) {
       console.error('fee tx', err.message);
       return json({ error: 'build_failed' }, 502);
     }
   }
-  await env.DB.prepare('UPDATE matches SET fee_lamports = ?, fee_to = ?, share_bps = ?, share_msg = ? WHERE mint = ?')
-    .bind(fee?.lamports ?? 0, fee?.to ?? null, fee?.bps ?? 0, shareMsg, launch.mint).run();
+  // Un nouvel essai repart de zéro : une ancienne transaction de fee gardée ne partira jamais.
+  await env.DB.prepare(`UPDATE matches SET fee_lamports = ?, fee_to = ?, team_to = ?, team_lamports = ?, share_bps = ?,
+      share_team_bps = ?, share_msg = NULL, share_tx = NULL, fee_sig = NULL, fee_state = NULL, share_state = NULL
+      WHERE mint = ? AND seq IS NULL`)
+    .bind(fee?.lamports ?? 0, fee?.to ?? null, fee?.teamWallet ?? null, fee?.team?.lamports ?? 0, shareBps, shareTeamBps, launch.mint).run();
   return json({
-    tx: base64FromBytes(tx), feeTx, feeSol: fee ? fee.lamports / 1e9 : 0, shareBps: fee?.bps ?? 0, image: meta.image,
+    tx: base64FromBytes(tx),
+    feeTx,
+    feeSol: fee ? fee.lamports / 1e9 : 0,
+    burnSol: fee ? fee.burn / 1e9 : 0,
+    teamSol: fee?.team ? fee.team.lamports / 1e9 : 0,
+    shareBps,
+    image: meta.image,
   });
 }
 
@@ -116,8 +132,9 @@ export async function submit({ request, env }) {
   if (row.fee_lamports > 0 || row.share_bps > 0) {
     try { feeBytes = body.feeTx ? bytesFromBase64(body.feeTx) : null; } catch { feeBytes = null; }
     let feeProblem = 'no_fee_tx';
-    if (feeBytes && row.share_bps > 0) feeProblem = checkSignedShareTx(feeBytes, { creator: row.creator, mint: row.mint, wick: row.fee_to, wickBps: row.share_bps, feeLamports: row.fee_lamports });
-    else if (feeBytes) feeProblem = checkFeeTx(feeBytes, { from: row.creator, to: row.fee_to, lamports: row.fee_lamports });
+    const { transfers, holders } = expectedFee(row);
+    if (feeBytes && row.share_bps > 0) feeProblem = checkSignedShareTx(feeBytes, { creator: row.creator, mint: row.mint, transfers, holders });
+    else if (feeBytes) feeProblem = checkFeeTx(feeBytes, { from: row.creator, transfers });
     if (feeProblem) return json({ error: feeProblem }, 400);
   }
 
@@ -134,26 +151,13 @@ export async function submit({ request, env }) {
   await env.DB.prepare('UPDATE matches SET signature = ?, sent_at = ? WHERE mint = ? AND seq IS NULL')
     .bind(signature, Date.now(), row.mint).run();
 
-  // Avec le partage : la transaction attend que le coin existe (elle part à la confirmation du
-  // lancement, voir releaseHeld dans lib/matches.js).
-  if (feeBytes && row.share_bps > 0) {
-    await env.DB.prepare("UPDATE matches SET share_tx = ?, fee_sig = ?, fee_state = 'held', share_state = 'held' WHERE mint = ?")
-      .bind(body.feeTx, signatureOf(feeBytes), row.mint).run();
-    return json({ status: 'pending', signature });
-  }
-
-  // Le lancement est parti : l'Ignition Fee part juste après. (Si elle échoue, le coin est lancé
-  // quand même, sans burn de lancement.)
+  // L'Ignition Fee (et le partage) attend que le lancement soit confirmé : elle part à la
+  // confirmation (releaseHeld dans lib/matches.js). Un lancement raté ne coûte donc pas de fee.
+  // (Le partage a besoin, en plus, que le coin existe.)
   if (feeBytes) {
-    let state = 'sent';
-    try {
-      await sendTransaction(env, feeBytes);
-    } catch (err) {
-      console.error('fee send', row.mint, err.message);
-      state = 'failed';
-    }
-    await env.DB.prepare('UPDATE matches SET fee_sig = ?, fee_state = ? WHERE mint = ?')
-      .bind(signatureOf(feeBytes), state, row.mint).run();
+    await env.DB.prepare(`UPDATE matches SET share_tx = ?, fee_sig = ?, fee_state = 'held',
+        share_state = CASE WHEN share_bps > 0 THEN 'held' ELSE share_state END WHERE mint = ?`)
+      .bind(body.feeTx, signatureOf(feeBytes), row.mint).run();
   }
   return json({ status: 'pending', signature });
 }

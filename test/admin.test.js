@@ -52,7 +52,7 @@ test('status shows the configuration and the candles', async () => {
 
 test('pause stops new buybacks, resume lets them run again', async () => {
   const kp = Keypair.generate();
-  const env = await makeEnv({ TOKEN_MINT: Keypair.generate().publicKey.toBase58(), BUYBACK_SECRET_KEY: base58(kp.secretKey) });
+  const env = await makeEnv({ TOKEN_MINT: Keypair.generate().publicKey.toBase58(), BUYBACK_SECRET_KEY: base58(kp.secretKey), BURN_WALLET: kp.publicKey.toBase58() });
   assert.equal((await adminPause({ request: req('/api/admin/pause', { body: { paused: 'yes' } }), env })).status, 400);
   assert.equal((await adminPause({ request: req('/api/admin/pause', { body: { paused: true } }), env })).status, 200);
   assert.equal(await buybackPaused(env.DB), true);

@@ -2,11 +2,12 @@
 //   GET  /api/admin/status  → tout l'état du buyback
 //   POST /api/admin/pause   { paused: true | false } → l'interrupteur d'urgence
 //   POST /api/admin/run     → fait avancer le buyback tout de suite
-import { buybackWallet, launchFee, potSol, runBuyback } from '../../lib/buyback.js';
+import { buybackWallet, feeSummary, potSol, runBuyback } from '../../lib/buyback.js';
 import { supplyCandle } from '../../lib/candle.js';
 import { CONFIG, candlePct, cycleTiming } from '../../lib/config.js';
 import { burnTotals, launchTotals, publicCycle, tickCycle } from '../../lib/cycles.js';
 import { json } from '../../lib/http.js';
+import { pinataStatus } from '../../lib/pump.js';
 import { ensureSchema } from '../../lib/schema.js';
 import { deployer } from '../../lib/announce.js';
 import { PUMP, PUMP_AMM, shareTotals } from '../../lib/sharing.js';
@@ -95,7 +96,7 @@ export const adminStatus = guarded(async ({ env }) => {
   const now = Date.now();
   const timing = cycleTiming(env);
   const open = await tickCycle(env, now);
-  const [wallet, paused, lastRun, lastError, { results: cycles }, pending, { results: burns }, fee, sharedFee, shares, announced, detected] = await Promise.all([
+  const [wallet, paused, lastRun, lastError, { results: cycles }, pending, { results: burns }, fees, shares, announced, detected] = await Promise.all([
     walletInfo(env),
     buybackPaused(db),
     getSetting(db, 'cron.lastRun'),
@@ -109,13 +110,12 @@ export const adminStatus = guarded(async ({ env }) => {
     db.prepare('SELECT COUNT(*) AS n FROM matches WHERE seq IS NULL AND signature IS NOT NULL').first(),
     db.prepare(`SELECT b.id, b.kind, b.ref, b.created_at, b.status, b.note, b.sol, b.buy_sig, b.burn_sig, b.burned_ui, m.symbol
       FROM burns b LEFT JOIN matches m ON b.kind = 'match' AND m.mint = b.ref ORDER BY b.id DESC LIMIT 20`).all(),
-    launchFee(env),
-    launchFee(env, { shared: true }),
+    feeSummary(env),
     shareTotals(db),
     getSetting(db, 'launch.announced'),
     getSetting(db, 'launch.detected'),
   ]);
-  const [heartbeat, burned, launched, supply, day, market, usd, pot, dev, { results: launches }] = await Promise.all([
+  const [heartbeat, burned, launched, supply, day, market, usd, pot, dev, { results: launches }, pinata] = await Promise.all([
     getSetting(db, 'cron.heartbeat'),
     burnTotals(db),
     launchTotals(db, now),
@@ -130,6 +130,7 @@ export const adminStatus = guarded(async ({ env }) => {
         b.status AS burn_status, b.burned_ui AS burned, b.burn_sig
       FROM matches m LEFT JOIN burns b ON b.kind = 'match' AND b.ref = m.mint
       WHERE m.seq IS NOT NULL OR m.signature IS NOT NULL ORDER BY m.created_at DESC LIMIT 15`).all(),
+    pinataStatus(env),
   ]);
   return json({
     now,
@@ -137,14 +138,17 @@ export const adminStatus = guarded(async ({ env }) => {
     checks: {
       tokenMint: env.TOKEN_MINT || null,
       buybackKey: wallet.key,
+      pinata,
       customRpc: Boolean(env.SOLANA_RPC),
       ipSalt: Boolean(env.IP_SALT),
-      collectFees: env.BUYBACK_COLLECT_FEES !== 'off',
+      collectFees: env.BUYBACK_COLLECT_FEES === 'on',
       cycleMinutes: timing.durationMs / 60_000,
       matchMinutes: timing.matchMs / 60_000,
-      launchFeeSol: fee ? fee.lamports / 1e9 : 0,
-      sharedFeeSol: sharedFee ? sharedFee.lamports / 1e9 : null,
-      shareBps: sharedFee?.bps ?? 0,
+      launchFeeSol: fees.feeSol,
+      sharedFeeSol: fees.sharedFeeSol,
+      shareBps: fees.shareBps,
+      fees,
+      burnWalletExpected: env.BURN_WALLET ?? CONFIG.buyback.wallet ?? null,
       telegram: telegramReady(env),
       deployer: deployer(env),
       announced,

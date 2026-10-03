@@ -69,6 +69,6 @@ test('Your flames: launches, burns, rank and achievements', async () => {
 test('Dashboard: launches, ignition fees paid and 24h volume', async () => {
   const db = await seeded();
   assert.deepEqual(await launchTotals(db, NOW), {
-    launches: 3, ignitionSol: 0.04, volume24h: 130_010, lastLaunch: { mint: 'new', symbol: 'NEW', at: NOW - 1000, sig: 'sig-new' },
+    launches: 3, ignitionSol: 0.04, ignitionTeamSol: 0, ignitionBurnSol: 0.04, volume24h: 130_010, lastLaunch: { mint: 'new', symbol: 'NEW', at: NOW - 1000, sig: 'sig-new' },
   });
 });

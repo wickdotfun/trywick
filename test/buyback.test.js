@@ -26,7 +26,7 @@ test('reads Phantom (base58) and CLI ([…]) secret keys', () => {
 
 test('the wallet signs exactly like Solana does', async () => {
   const kp = Keypair.generate();
-  const wallet = await buybackWallet({ BUYBACK_SECRET_KEY: base58(kp.secretKey) });
+  const wallet = await buybackWallet({ BUYBACK_SECRET_KEY: base58(kp.secretKey), BURN_WALLET: kp.publicKey.toBase58() });
   assert.equal(wallet.publicKey, kp.publicKey.toBase58());
 
   const other = Keypair.generate();
@@ -54,7 +54,7 @@ test('the burn transaction is a valid SPL Burn, signed by the owner', async () =
     owner: owner.publicKey.toBase58(), tokenAccount: account, mint, tokenProgram: TOKEN_PROGRAM,
     amount: 123456789012345n, blockhash: BLOCKHASH,
   });
-  const wallet = await buybackWallet({ BUYBACK_SECRET_KEY: base58(owner.secretKey) });
+  const wallet = await buybackWallet({ BUYBACK_SECRET_KEY: base58(owner.secretKey), BURN_WALLET: owner.publicKey.toBase58() });
   const signed = await signTransaction(bytes, wallet);
   const tx = Transaction.from(signed);
   assert.equal(tx.feePayer.toBase58(), owner.publicKey.toBase58());
@@ -127,7 +127,7 @@ async function world(lamports, opts = {}) {
   const kp = Keypair.generate();
   const env = {
     DB: fakeD1(), TOKEN_MINT: Keypair.generate().publicKey.toBase58(),
-    BUYBACK_SECRET_KEY: base58(kp.secretKey), SOLANA_RPC: 'https://rpc.test',
+    BUYBACK_SECRET_KEY: base58(kp.secretKey), BURN_WALLET: kp.publicKey.toBase58(), SOLANA_RPC: 'https://rpc.test',
   };
   await ensureSchema(env.DB);
   await tickCycle(env, 0);
@@ -136,7 +136,7 @@ async function world(lamports, opts = {}) {
   return { env, chain: fakeChain(wallet, { lamports, ...opts }) };
 }
 
-test('a burned-out candle: fees collected, $WICK bought, only the bought tokens burned', async () => {
+test('a burned-out candle: $WICK bought with the pot, only the bought tokens burned, creator fees untouched', async () => {
   const { env, chain } = await world(1.5e9);
   const step = await runBuyback(env, 30 * MIN);
   assert.equal(step, 'burned');
@@ -147,8 +147,16 @@ test('a burned-out candle: fees collected, $WICK bought, only the bought tokens 
   assert.equal(row.bought_raw, '1000000');        // le dev bag (5 M) n'est pas touché
   assert.equal(row.burned_ui, 1);
   assert.ok(row.buy_sig && row.burn_sig);
-  assert.deepEqual(chain.calls.filter((c) => c.startsWith('portal')), ['portal:collectCreatorFee', 'portal:buy']);
+  // Les creator fees de $WICK restent au dev wallet : le burn ne les collecte pas.
+  assert.deepEqual(chain.calls.filter((c) => c.startsWith('portal')), ['portal:buy']);
   assert.equal(await runBuyback(env, 31 * MIN), null);   // rien d'autre à faire
+});
+
+test('creator fees are only collected when BUYBACK_COLLECT_FEES=on', async () => {
+  const { env, chain } = await world(1.5e9);
+  env.BUYBACK_COLLECT_FEES = 'on';
+  assert.equal(await runBuyback(env, 30 * MIN), 'burned');
+  assert.deepEqual(chain.calls.filter((c) => c.startsWith('portal')), ['portal:collectCreatorFee', 'portal:buy']);
 });
 
 test('an empty pot skips the buyback', async () => {
@@ -196,5 +204,5 @@ test('a launch fee is bought back and burned on its own, outside the candle pot'
   const buy = chain.buys.at(-1);
   assert.equal(buy.amount, 0.0195);
   assert.equal(buy.priorityFee, 0.0001);
-  assert.equal(chain.calls.filter((c) => c === 'portal:collectCreatorFee').length, 1);  // pas de collecte pour un lancement
+  assert.equal(chain.calls.filter((c) => c === 'portal:collectCreatorFee').length, 0);
 });

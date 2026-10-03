@@ -56,7 +56,7 @@ export function createDemo() {
       devBuy: Math.random() < 0.5 ? 0 : Math.round(Math.random() * 20) / 10, at,
       holder: Math.random() < 0.18, mcap, change: mcap ? Math.round((Math.random() - 0.35) * 160) : null, burned: null,
       volume: mcap ? Math.round(mcap * (0.2 + Math.random() * 1.5)) : null, sig: null, fee: null,
-      share: Math.random() < 0.65 ? { bps: 1000, live: true } : null,
+      share: Math.random() < 0.65 ? { bps: 1000, teamBps: 500, live: true } : null,
       ...extra,
     };
     all.push(m);
@@ -64,7 +64,8 @@ export function createDemo() {
     pot += 0.01 + Math.random() * 0.02;     // les creator fees qui coulent
     // Son frais de lancement est brûlé quelques secondes plus tard.
     m.fee = m.share ? SHARED_FEE : FEE;
-    setTimeout(() => { m.burned = burn('match', m.mint, m.fee - 0.0005, m.symbol).burned; }, 2500 + Math.random() * 3000);
+    m.burnFee = m.fee / 2;   // 50 % burn, 50 % équipe
+    setTimeout(() => { m.burned = burn('match', m.mint, m.burnFee - 0.0005, m.symbol).burned; }, 2500 + Math.random() * 3000);
     return m;
   }
 
@@ -77,7 +78,7 @@ export function createDemo() {
   }
   for (let i = 0; i < 14; i++) {
     const m = make(Date.now() - (14 - i) * 25_000);
-    m.burned = burn('match', m.mint, FEE - 0.0005, m.symbol).burned;
+    m.burned = burn('match', m.mint, m.burnFee - 0.0005, m.symbol).burned;
     burns[0].at = m.at + 3000;
   }
   burns.sort((a, b) => b.at - a.at);
@@ -137,6 +138,8 @@ export function createDemo() {
           burned, supplyPct: (burned / SUPPLY) * 100,
           buybacks: burns.filter((b) => b.kind === 'candle').length, matchBurns: burns.filter((b) => b.kind === 'match').length,
           sol: burns.reduce((n, b) => n + b.sol, 0), launches: seq, ignitionSol: all.reduce((n, m) => n + (m.fee || 0), 0),
+          ignitionBurnSol: all.reduce((n, m) => n + (m.fee || 0) / 2, 0), ignitionTeamSol: all.reduce((n, m) => n + (m.fee || 0) / 2, 0),
+          teamSharedSol: all.filter((m) => m.share).reduce((n, m) => n + (m.volume || 0) / 180 * 0.0005, 0),
           sharedSol: all.filter((m) => m.share).reduce((n, m) => n + (m.volume || 0) / 180 * 0.0005, 0), sharingCoins: all.filter((m) => m.share).length,
           volume24h: all.reduce((n, m) => n + (m.volume || 0), 0), supply: { original: SUPPLY, current: SUPPLY - burned },
           lastLaunch: all.length ? { mint: all.at(-1).mint, symbol: all.at(-1).symbol, at: all.at(-1).at, sig: null } : null,
@@ -148,7 +151,11 @@ export function createDemo() {
         markets: full || markets ? inOrbit.filter((m) => m.mcap).map((m) => ({ mint: m.mint, mcap: m.mcap, change: m.change })) : null,
         buyback: { live: true, paused: false, potSol: pot, wallet: null },
         token: { mint: null, ticker: 'WICK', x: null, telegram: null },
-        launch: { maxDevBuy: 5, feeSol: FEE, sharedFeeSol: SHARED_FEE, shareBps: 1000 },
+        launch: {
+          maxDevBuy: 5, feeSol: FEE, burnSol: FEE / 2, teamSol: FEE / 2,
+          sharedFeeSol: SHARED_FEE, sharedBurnSol: SHARED_FEE / 2, sharedTeamSol: SHARED_FEE / 2,
+          shareBps: 1000, split: { creatorBps: 9000, burnBps: 500, teamBps: 500 },
+        },
       };
     },
     async leaderboard() {
@@ -236,7 +243,7 @@ export function createDemo() {
       const m = make(Date.now(), {
         name: fields.name, symbol: fields.symbol, creator: 'YouDemo1111111111111111111111111111111111111',
         image: image ? URL.createObjectURL(image) : null, devBuy: Number(fields.devBuy) || 0, mcap: null, change: null, holder: false,
-        share: fields.share === '1' ? { bps: 1000, live: true } : null,
+        share: fields.share === '1' ? { bps: 1000, teamBps: 500, live: true } : null,
       });
       return { match: pub(m), signature: null };
     },

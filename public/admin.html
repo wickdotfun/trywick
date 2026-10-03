@@ -222,12 +222,25 @@
         age == null ? 'The cron has not run since this update yet. Wait a minute.' : `Last cron run ${ago(d.heartbeat)}.`);
       add(c.telegram ? 'done' : 'todo', 'Telegram bot connected',
         c.telegram ? 'Make sure the bot can post and pin messages in the channel.' : 'Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in Cloudflare.');
-      add(w.key === 'ok' ? (dev && !dev.isBuyback ? 'todo' : 'done') : w.key === 'invalid' ? 'bad' : 'todo', 'Buyback wallet key',
+      const burnW = c.burnWalletExpected;
+      const keyErr = {
+        dev_wallet_key: `This is the <b>dev wallet's</b> key. Replace it with the burn wallet's key${burnW ? ` (${short(burnW)})` : ''}: the dev wallet must stay yours, nothing runs with it.`,
+        wrong_burn_wallet: `This key is not the burn wallet${burnW ? ` ${short(burnW)}` : ''}. Paste the private key of ${burnW ? short(burnW) : 'the burn wallet'} instead.`,
+      };
+      add(w.key === 'ok' ? 'done' : w.key === 'invalid' ? 'bad' : 'todo', 'Burn wallet key',
         w.key === 'ok'
-          ? (dev && !dev.isBuyback ? `Set, but it is ${short(w.address)}, not the dev wallet ${short(dev.address)}: $WICK creator fees will not reach the buyback.` : `Set: ${short(w.address)}, the dev wallet. Nothing runs until $WICK exists.`)
-          : w.key === 'invalid' ? `Invalid key: ${esc(w.error)}` : 'Add BUYBACK_SECRET_KEY (type Secret) in Cloudflare now: the dev wallet\'s private key. Nothing runs before $WICK exists.');
+          ? `Set: ${acct(w.address)}, the burn wallet. It only buys and burns $${esc(c.ticker)}. Nothing runs until $${esc(c.ticker)} exists.`
+          : w.key === 'invalid' ? (keyErr[w.error] || `Invalid key: ${esc(w.error)}`)
+            : `Add BUYBACK_SECRET_KEY (type Secret) in Cloudflare: the private key (not the recovery phrase) of the burn wallet${burnW ? ` ${short(burnW)}` : ''}. Never the dev wallet's.`);
+      const pin = {
+        ok: 'Set and working: coin images and metadata go to IPFS through Pinata.',
+        missing: 'Add PINATA_JWT (type Secret) in Cloudflare: the JWT of a free Pinata API key. Without it, nobody can launch a coin from the site.',
+        invalid: 'PINATA_JWT is set but Pinata refuses it. Create a new API key (Admin) and paste its JWT again.',
+        unreachable: 'PINATA_JWT is set, but Pinata could not be reached just now. It is checked again every 10 minutes.',
+      };
+      add(c.pinata === 'ok' ? 'done' : c.pinata === 'invalid' ? 'bad' : 'todo', 'Coin uploads (Pinata)', pin[c.pinata] || pin.missing);
       add(dev?.sol >= 0.05 ? 'done' : 'todo', 'Dev wallet funded',
-        dev ? `${acct(dev.address)} holds ${solv(dev.sol)}. Keep only what the launch needs (about 0.02 SOL + your dev buy + a small margin): once live, SOL above ${c.reserveSol} goes to buybacks.` : 'No dev wallet set.');
+        dev ? `${acct(dev.address)} holds ${solv(dev.sol)}: enough for the launch (about 0.02 SOL + your dev buy + a small margin). The site never spends from it.` : 'No dev wallet set.');
       add(mint ? 'done' : c.deployer ? 'todo' : 'bad', mint ? `$${esc(c.ticker)} is live` : `Launch $${esc(c.ticker)} on pump.fun`,
         mint ? `CA <span class="mono">${esc(mint)}</span>${c.detected && !c.tokenMint ? '. Detected on the dev wallet: the site went live by itself.' : '.'}`
           : `From the dev wallet ${short(c.deployer)}, ticker ${esc(c.ticker)}. Within a minute, everything else switches on by itself.`,
@@ -290,22 +303,28 @@
       const price = m?.priceUsd ?? null, sol$ = d.solUsd;
       const inUsd = (s) => (s != null && sol$ ? ` <small>${usd(s * sol$)}</small>` : '');
       $('earn').innerHTML = dev ? `
-        <dt>Dev wallet</dt><dd>${acct(dev.address)}${dev.isBuyback ? ' <small>(also the buyback wallet)</small>' : ''}</dd>
+        <dt>Dev wallet</dt><dd>${acct(dev.address)}${dev.isBuyback ? ' <small class="bad">(also the burn wallet: use a separate one)</small>' : ''}</dd>
         <dt>SOL balance</dt><dd>${solv(dev.sol)}${inUsd(dev.sol)}</dd>
         <dt>$${T} held</dt><dd>${dev.wick == null ? '<span class="dim">after launch</span>' : `<b>${num(dev.wick, 0)}</b>${price ? ` <small>${usd(dev.wick * price)}</small>` : ''}${supply?.original ? ` <small>· ${num((dev.wick / (supply.original - supply.burned)) * 100, 2)}% of supply</small>` : ''}`}</dd>
-        <dt>$${T} creator fees waiting</dt><dd>${dev.feesPending == null ? '—' : `<b class="gold">${solv(dev.feesPending)}</b>${inUsd(dev.feesPending)}`}</dd>
+        <dt>$${T} creator fees waiting <small>100% yours</small></dt><dd>${dev.feesPending == null ? '—' : `<b class="gold">${solv(dev.feesPending)}</b>${inUsd(dev.feesPending)} <small>claim on pump.fun</small>`}</dd>
         <dd class="sep"></dd>
-        <dt>Ignition Fees received</dt><dd>${solv(t.ignitionSol || 0)}${inUsd(t.ignitionSol || 0)}</dd>
-        <dt>Shared creator fees received</dt><dd>${solv(t.sharedSol || 0)} <small>from ${t.sharingCoins || 0} coins</small></dd>
+        <dt>Your half of the Ignition Fees</dt><dd><b class="gold">${solv(t.ignitionTeamSol || 0)}</b>${inUsd(t.ignitionTeamSol || 0)}</dd>
+        <dt>Your ${num((c.fees?.split?.teamBps ?? 500) / 100)}% of shared creator fees</dt><dd><b class="gold">${solv(t.teamSharedSol || 0)}</b>${inUsd(t.teamSharedSol || 0)} <small>from ${t.sharingCoins || 0} coins</small></dd>
+        <dt>Total earned through WICK</dt><dd><b>${solv((t.ignitionTeamSol || 0) + (t.teamSharedSol || 0))}</b>${inUsd((t.ignitionTeamSol || 0) + (t.teamSharedSol || 0))} <small>+ $${T} creator fees</small></dd>
+        <dd class="sep"></dd>
+        <dt>Ignition Fees to the burn</dt><dd>${solv(t.ignitionBurnSol ?? t.ignitionSol ?? 0)}</dd>
+        <dt>Shared fees to the burn</dt><dd>${solv(t.sharedSol || 0)}</dd>
         <dt>Total SOL turned into burns</dt><dd>${solv(t.sol || 0)}${inUsd(t.sol || 0)}</dd>` : '<dt>Dev wallet</dt><dd class="dim">not set</dd>';
-      $('earn-note').innerHTML = dev?.isBuyback
-        ? `<b>Where the money goes:</b> $${T}'s creator fees, the Ignition Fees and the shared fees all land in this wallet and are spent on buying back and burning $${T} (above a ${c.reserveSol} SOL reserve). What stays yours is the $${T} you hold.`
-        : `<b>Where the money goes:</b> $${T}'s creator fees wait on pump.fun for the dev wallet (claimable there). Ignition Fees and shared fees go to the buyback wallet and are burned.`;
+      const sp = c.fees?.split;
+      $('earn-note').innerHTML = `<b>Where the money goes:</b> $${T}'s own creator fees are <b>100% yours</b>: they wait on pump.fun for the dev wallet, the site never touches them.
+        Ignition Fees: <b>50% to the dev wallet, 50% to the burn wallet</b>, in the launch transaction itself.
+        Shared creator fees of WICK coins: <b>${sp ? `${num(sp.creatorBps / 100)}% creator · ${num(sp.burnBps / 100)}% burn · ${num(sp.teamBps / 100)}% you` : '90% creator · 5% burn · 5% you'}</b>, locked on pump.fun.
+        The burn wallet only buys and burns $${T}.`;
 
       // Buyback & burns
       const cd = supply?.candle;
       $('burnbox').innerHTML = `
-        <dt>Buyback wallet</dt><dd>${w.address ? acct(w.address) : `<span class="${w.key === 'invalid' ? 'bad' : 'dim'}">${w.key === 'invalid' ? 'invalid key' : 'not set'}</span>`}</dd>
+        <dt>Burn wallet</dt><dd>${w.address ? acct(w.address) : `<span class="${w.key === 'invalid' ? 'bad' : 'dim'}">${w.key === 'invalid' ? 'invalid key' : 'not set'}</span>`}</dd>
         <dt>SOL in it</dt><dd>${solv(w.sol)}</dd>
         <dt>Next buyback pot</dt><dd><b class="gold">${solv(d.potSol)}</b>${inUsd(d.potSol)}</dd>
         <dt>$${T} in it <small>(never burned)</small></dt><dd>${num(w.token, 0)}</dd>
@@ -352,13 +371,16 @@
       // Settings
       $('checks').innerHTML = `
         <dt>TOKEN_MINT</dt><dd>${c.tokenMint ? `<span class="ok mono">${short(c.tokenMint)}</span>` : c.detected ? `<span class="ok mono">${short(c.detected.mint)}</span> <small>auto (detected)</small>` : '<span class="dim">set by itself at launch</span>'}</dd>
-        <dt>BUYBACK_SECRET_KEY</dt><dd class="${w.key === 'ok' ? 'ok' : w.key === 'invalid' ? 'bad' : 'warn'}">${w.key === 'ok' ? 'valid' : w.key === 'invalid' ? 'invalid' : 'missing'}</dd>
-        <dt>Dev wallet</dt><dd class="mono">${short(c.deployer)}</dd>
+        <dt>BUYBACK_SECRET_KEY</dt><dd class="${w.key === 'ok' ? 'ok' : w.key === 'invalid' ? 'bad' : 'warn'}">${w.key === 'ok' ? 'valid' : w.key === 'invalid' ? `invalid <small>${esc(w.error)}</small>` : 'missing'}</dd>
+        <dt>Burn wallet</dt><dd class="mono">${c.burnWalletExpected ? short(c.burnWalletExpected) : '<span class="dim">any</span>'}</dd>
+        <dt>Dev wallet <small>team share</small></dt><dd class="mono">${short(c.fees?.teamWallet || c.deployer)}</dd>
+        <dt>Ignition Fee</dt><dd>${c.fees?.feeSol ? `${num(c.fees.feeSol, 3)} SOL · ${num(c.fees.burnSol, 3)} burn / ${num(c.fees.teamSol, 3)} team` : '<span class="dim">once live</span>'}</dd>
+        <dt>PINATA_JWT</dt><dd class="${c.pinata === 'ok' ? 'ok' : c.pinata === 'invalid' ? 'bad' : 'warn'}">${esc(c.pinata || 'missing')}</dd>
         <dt>SOLANA_RPC</dt><dd class="${c.customRpc ? 'ok' : 'warn'}">${c.customRpc ? 'set' : 'public'}</dd>
         <dt>IP_SALT</dt><dd class="${c.ipSalt ? 'ok' : 'warn'}">${c.ipSalt ? 'set' : 'missing'}</dd>
-        <dt>Collect creator fees</dt><dd>${c.collectFees ? 'on' : 'off'}</dd>
+        <dt>Collect $${esc(c.ticker)} creator fees</dt><dd class="${c.collectFees ? 'warn' : 'ok'}">${c.collectFees ? 'on: the burn wallet claims them' : 'off: they stay yours'}</dd>
         <dt>Breath</dt><dd>${num(c.cycleMinutes)} min · −${num(c.matchMinutes)} min per launch</dd>
-        <dt>Fee sharing</dt><dd>${c.shareBps ? `${num(c.shareBps / 100)}% to WICK` : '<span class="dim">once live</span>'}</dd>`;
+        <dt>Fee sharing</dt><dd>${c.fees?.split ? `${num(c.fees.split.creatorBps / 100)}% creator · ${num(c.fees.split.burnBps / 100)}% burn · ${num(c.fees.split.teamBps / 100)}% team · ${num(c.fees.sharedFeeSol, 3)} SOL fee` : '<span class="dim">once live</span>'}</dd>`;
 
       // Tables
       const feeCell = (r) => {

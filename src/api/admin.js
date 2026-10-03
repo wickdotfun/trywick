@@ -7,6 +7,7 @@ import { CONFIG, cycleTiming } from '../../lib/config.js';
 import { publicCycle, tickCycle } from '../../lib/cycles.js';
 import { json } from '../../lib/http.js';
 import { ensureSchema } from '../../lib/schema.js';
+import { deployer } from '../../lib/announce.js';
 import { shareTotals } from '../../lib/sharing.js';
 import { buybackPaused, getSetting, setSetting } from '../../lib/settings.js';
 import { getBalance, tokenHolding } from '../../lib/solana.js';
@@ -65,7 +66,7 @@ export const adminStatus = guarded(async ({ env }) => {
   const now = Date.now();
   const timing = cycleTiming(env);
   const open = await tickCycle(env, now);
-  const [wallet, paused, lastRun, lastError, { results: cycles }, pending, { results: burns }, fee, sharedFee, shares] = await Promise.all([
+  const [wallet, paused, lastRun, lastError, { results: cycles }, pending, { results: burns }, fee, sharedFee, shares, announced] = await Promise.all([
     walletInfo(env),
     buybackPaused(db),
     getSetting(db, 'cron.lastRun'),
@@ -82,6 +83,7 @@ export const adminStatus = guarded(async ({ env }) => {
     launchFee(env),
     launchFee(env, { shared: true }),
     shareTotals(db),
+    getSetting(db, 'launch.announced'),
   ]);
   return json({
     now,
@@ -98,6 +100,8 @@ export const adminStatus = guarded(async ({ env }) => {
       sharedFeeSol: sharedFee ? sharedFee.lamports / 1e9 : null,
       shareBps: sharedFee?.bps ?? 0,
       telegram: telegramReady(env),
+      deployer: deployer(env),
+      announced,
     },
     wallet,
     shares,

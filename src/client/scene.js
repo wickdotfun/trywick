@@ -80,7 +80,9 @@ function waxMaterial(uniforms, color = 0xf1e3cf) {
       .replace('#include <common>', '#include <common>\nvarying float vWorldY;\nuniform float uTop;\nuniform float uGlow;')
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
         float warm = pow(smoothstep(uTop - 2.4, uTop + 0.05, vWorldY), 2.2) * smoothstep(0.05, 0.9, vWorldY);
-        totalEmissiveRadiance += vec3(1.0, 0.42, 0.1) * uGlow * warm;`);
+        totalEmissiveRadiance += vec3(1.0, 0.42, 0.1) * uGlow * warm;
+        // La cire est un peu translucide : la lumière de la flamme la traverse, partout pareil.
+        totalEmissiveRadiance += diffuseColor.rgb * vec3(1.0, 0.72, 0.48) * 0.07;`);
   };
   return mat;
 }
@@ -202,9 +204,9 @@ export function createScene(container, { onFrame } = {}) {
 
   // ------------------------------------------------------------ lumières, sol
   scene.add(new THREE.HemisphereLight(0xffd9b0, 0x0b0705, 0.22));
-  const rim = new THREE.DirectionalLight(0x5f6bff, 0.35);
-  rim.position.set(-6, 8, -10);
-  scene.add(rim);
+  // Une lumière douce tout autour (et non d'un seul côté) : la cire garde la même couleur sous
+  // tous les angles quand la bougie tourne.
+  scene.add(new THREE.AmbientLight(0xffe2c4, 0.12));
   const flameLight = new THREE.PointLight(0xffa050, 30, 30, 1.5);
   scene.add(flameLight);
 

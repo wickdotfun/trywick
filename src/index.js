@@ -8,10 +8,10 @@ import { state } from './api/state.js';
 import { token, tradePrepare, tradeSend, tradeStatus } from './api/token.js';
 import { json } from '../lib/http.js';
 import { runBuyback } from '../lib/buyback.js';
-import { cycleTiming } from '../lib/config.js';
 import { tickCycle } from '../lib/cycles.js';
 import { checkMilestones } from '../lib/hall.js';
 import { refreshMarkets } from '../lib/markets.js';
+import { runAnnounce } from '../lib/announce.js';
 import { runShares } from '../lib/sharing.js';
 import { runTelegram } from '../lib/telegram.js';
 import { sweep } from '../lib/matches.js';
@@ -67,6 +67,13 @@ export default {
   async scheduled(event, env) {
     await ensureSchema(env.DB);
     const now = Date.now();
+    // En premier : l'annonce du lancement officiel de $WICK (une seule fois), le plus vite possible.
+    try {
+      const mint = await runAnnounce(env, now);
+      if (mint) console.log('launch announced', mint);
+    } catch (err) {
+      console.error('announce', err?.message ?? err);
+    }
     await sweep(env, now);
     const open = await tickCycle(env, now);
     const step = await recordRun(env, () => runBuyback(env, Date.now()));
@@ -75,7 +82,7 @@ export default {
       checkMilestones(env, Date.now()),
       refreshMarkets(env, Date.now(), open?.id),
       runShares(env, Date.now()),
-      runTelegram(env, Date.now(), { ticker: env.TOKEN_TICKER || 'WICK', matchMinutes: cycleTiming(env).matchMs / 60_000 }),
+      runTelegram(env, Date.now()),
     ];
     for (const r of await Promise.allSettled(steps)) {
       if (r.status === 'rejected') console.error('cron', r.reason?.message ?? r.reason);

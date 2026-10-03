@@ -12,11 +12,16 @@ const STORE = 'wick.wallet.name';
 const SOLANA = 'solana:mainnet';
 
 // Les wallets proposés à l'installation quand aucun n'est trouvé (ou pour en ajouter un).
+// Leurs logos officiels (public/brand/wallets, ceux des paquets @solana/wallet-adapter).
 const SUGGESTED = [
-  { name: 'Phantom', url: 'https://phantom.com/download', deep: (u) => `https://phantom.app/ul/browse/${encodeURIComponent(u)}?ref=${encodeURIComponent(location.origin)}` },
-  { name: 'Solflare', url: 'https://solflare.com/download', deep: (u) => `https://solflare.com/ul/v1/browse/${encodeURIComponent(u)}?ref=${encodeURIComponent(location.origin)}` },
-  { name: 'Backpack', url: 'https://backpack.app/download' },
+  { name: 'Phantom', icon: '/brand/wallets/phantom.svg', url: 'https://phantom.com/download', deep: (u) => `https://phantom.app/ul/browse/${encodeURIComponent(u)}?ref=${encodeURIComponent(location.origin)}` },
+  { name: 'Solflare', icon: '/brand/wallets/solflare.svg', url: 'https://solflare.com/download', deep: (u) => `https://solflare.com/ul/v1/browse/${encodeURIComponent(u)}?ref=${encodeURIComponent(location.origin)}` },
+  { name: 'Backpack', icon: '/brand/wallets/backpack.png', url: 'https://backpack.app/download' },
 ];
+const logoOf = (w) => w.icon || SUGGESTED.find((s) => s.name === w.name)?.icon || null;
+const logo = (w, size) => (logoOf(w)
+  ? `<img src="${esc(logoOf(w))}" alt="" width="${size}" height="${size}">`
+  : `<span class="wm-ico">${esc((w.name || '?')[0])}</span>`);
 
 // ------------------------------------------------------------ découverte (Wallet Standard)
 const found = new Set();
@@ -62,7 +67,7 @@ function remembered() { try { return localStorage.getItem(STORE); } catch { retu
 let unwatch = null;
 function bind(wallet, account) {
   unwatch?.();
-  session = { wallet, account, address: account.address, name: wallet.name, icon: wallet.icon };
+  session = { wallet, account, address: account.address, name: wallet.name, icon: logoOf(wallet) };
   try {
     localStorage.setItem('wick.wallet', account.address);   // pour « Your flames »
   } catch { /* */ }
@@ -134,7 +139,7 @@ function ensureDialog() {
 
 function walletRow(w, i) {
   return `<button class="wm-row" data-i="${i}">
-    ${w.icon ? `<img src="${esc(w.icon)}" alt="" width="32" height="32">` : '<span class="wm-ico"></span>'}
+    ${logo(w, 32)}
     <span class="wm-name">${esc(w.name)}</span><span class="wm-tag">Detected</span></button>`;
 }
 
@@ -155,7 +160,7 @@ export function choose() {
         ${list.length ? `<div class="wm-list">${list.map(walletRow).join('')}</div>` : ''}
         ${others.length ? `<p class="wm-sub">${list.length ? 'More wallets' : mobile ? 'Open WICK in your wallet app' : 'No Solana wallet found. Get one:'}</p>
           <div class="wm-list">${others.map((s) => `<a class="wm-row" href="${esc(mobile && s.deep ? s.deep(location.href) : s.url)}" target="_blank" rel="noopener">
-            <span class="wm-ico">${esc(s.name[0])}</span><span class="wm-name">${esc(s.name)}</span><span class="wm-tag dim">${mobile && s.deep ? 'Open' : 'Install'}</span></a>`).join('')}</div>` : ''}
+            ${logo(s, 32)}<span class="wm-name">${esc(s.name)}</span><span class="wm-tag dim">${mobile && s.deep ? 'Open' : 'Install'}</span></a>`).join('')}</div>` : ''}
         <p class="error" ${error ? '' : 'hidden'}>${esc(error)}</p>`;
       d.querySelectorAll('[data-i]').forEach((b) => b.addEventListener('click', async () => {
         const w = list[Number(b.dataset.i)];

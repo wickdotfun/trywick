@@ -17,8 +17,9 @@ const WICK_PER_SOL = 400_000;
 // Les Keepers de la démo : des personnalités, des esprits, et ce qu'ils disent.
 const KEEPER_STYLES = [['stoic', 'Stoic', 'Calm, patient, few words'], ['degen', 'Degen', 'Loud, fast, all conviction'],
   ['poet', 'Poet', 'Every burn is a verse'], ['pyro', 'Pyromaniac', 'Loves the fire a bit too much']];
-const KEEPER_MODELS = [['llama', 'Llama 3.3 70B', 'Meta'], ['gpt-oss', 'gpt-oss 120B', 'OpenAI'], ['qwen', 'Qwen3 30B', 'Qwen'],
-  ['mistral', 'Mistral Small 3.1', 'Mistral'], ['gemma', 'Gemma 3 12B', 'Google'], ['deepseek', 'DeepSeek R1 32B', 'DeepSeek']];
+const KEEPER_MODELS = [['llama', 'Llama 3.3 70B', 'Meta', 'meta'], ['gpt-oss', 'gpt-oss 120B', 'OpenAI', 'openai'], ['qwen', 'Qwen3 30B', 'Qwen', 'qwen'],
+  ['mistral', 'Mistral Small 3.1', 'Mistral', 'mistral'], ['gemma', 'Gemma 3 12B', 'Google', 'gemma'], ['deepseek', 'DeepSeek R1 32B', 'DeepSeek', 'deepseek']];
+const logoOf = (f) => `/brand/ai/${f}.svg`;
 const VOICES = {
   stoic: ['It dipped 14%. A fair price for the flame.', 'Quiet hours. The wax waits for no one.', 'Volume is up. I take my share of the fire.'],
   degen: ['dip spotted. fed the candle, we eat', 'paper hands sold, I bought it and BURNED it', 'supply goes down, conviction goes up. lfg'],
@@ -66,7 +67,7 @@ export function createDemo() {
   function makeKeeper(m, style = pick(KEEPER_STYLES)[0], model = pick(KEEPER_MODELS)[0]) {
     const s = KEEPER_STYLES.find((x) => x[0] === style) || KEEPER_STYLES[0];
     const mm = KEEPER_MODELS.find((x) => x[0] === model) || KEEPER_MODELS[0];
-    return { style: s[0], label: s[1], model: mm[1], by: mm[2], intro: `I keep the candle of $${m.symbol}. Every burn, I will tell you why.`, thought: null, thoughtAt: null };
+    return { style: s[0], label: s[1], model: mm[1], by: mm[2], logo: logoOf(mm[3]), intro: `I keep the candle of $${m.symbol}. Every burn, I will tell you why.`, thought: null, thoughtAt: null };
   }
 
   function make(at, extra = {}) {
@@ -218,7 +219,7 @@ export function createDemo() {
           shareBps: 1000, split: { creatorBps: 9000, burnBps: 500, teamBps: 500 }, selfOptions: [1000, 2000, 3000, 5000],
           keepers: {
             styles: KEEPER_STYLES.map(([id, label, hint]) => ({ id, label, hint })),
-            models: KEEPER_MODELS.map(([id, name, by]) => ({ id, name, by })),
+            models: KEEPER_MODELS.map(([id, name, by, f]) => ({ id, name, by, logo: logoOf(f) })),
           },
         },
       };

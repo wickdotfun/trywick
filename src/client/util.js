@@ -42,6 +42,13 @@ const ICONS = {
   keeper: '<rect x="5" y="9.5" width="14" height="10" rx="3"/><path d="M9.5 14.5h.01M14.5 14.5h.01M12 9.5V7M12 2.8c.8.9 1.2 1.6 1.2 2.2a1.2 1.2 0 0 1-2.4 0c0-.6.4-1.3 1.2-2.2z"/>',
   lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
 };
+// Le logo d'un modèle d'IA (Meta, OpenAI…), servi depuis /brand/ai/.
+export const aiLogo = (m, size = 16) => (m?.logo
+  ? `<img class="ai-logo" src="${esc(m.logo)}" alt="${esc(m.by)}" width="${size}" height="${size}" loading="lazy" decoding="async">`
+  : `<span class="ai-logo mono">${esc(String(m?.by || '?').slice(0, 2))}</span>`);
+// La rangée des six modèles qui font tourner les Keepers.
+export const aiLogos = (models = [], size = 18) => `<span class="ai-logos">${models.map((m) => `<span class="ai-chip" title="${esc(`${m.name} by ${m.by}`)}">${aiLogo(m, size)}</span>`).join('')}</span>`;
+
 export function icon(name, cls = '') {
   return `<svg class="ico${cls ? ` ${cls}` : ''}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ICONS.flame}</svg>`;
 }

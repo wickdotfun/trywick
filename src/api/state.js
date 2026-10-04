@@ -17,6 +17,6 @@ export async function state({ request, env }) {
     token: tokenInfo(env),
     // L'Ignition Fee (50 % burn, 50 % équipe), et celle réduite avec le partage des creator fees
     // (split : créateur / burn / équipe).
-    launch: { maxDevBuy: CONFIG.maxDevBuySol, ...fees, keepers: fees.selfOptions.length ? keeperChoices() : null },
+    launch: { maxDevBuy: CONFIG.maxDevBuySol, ...fees, keepers: keeperChoices() },
   });
 }

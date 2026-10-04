@@ -4,7 +4,7 @@
 // leur transaction), la chaîne (supply) et DexScreener (market cap, volume).
 import * as connect from './connect.js';
 import { remember, remembered } from './token.js';
-import { ago, compact, esc, fmt, icon, pumpUrl, short, sol, solscan, span } from './util.js';
+import { ago, aiLogos, compact, esc, fmt, icon, pumpUrl, short, sol, solscan, span } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 const usd = (n) => (n ? `$${compact(n)}` : '—');
@@ -335,7 +335,8 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
           Mistral, Gemma or DeepSeek, run free by Cloudflare). When your coin's fees fill its candle, the Keeper reads the
           market and picks the moment to buy your coin back and burn it, then tells your holders why, on its page, in the
           fire and on Telegram. It only decides <i>when</i>, never how much: the SOL can only burn your coin, at least once
-          every 24 hours. If the AI is ever down, the candle burns anyway.</li>
+          every 24 hours. If the AI is ever down, the candle burns anyway.
+          ${world.launch?.keepers ? `<span class="how-ai">${aiLogos(world.launch.keepers.models, 18)}</span>` : ''}</li>
         <li><b>The breath.</b> On top of the burn of each launch, a buyback every ${span(b?.durationMs ?? 1_800_000)} at most:
           everything waiting in the WICK burn wallet (the burn share of shared creator fees, and any leftovers) buys
           ${tk()} back and burns it. Every launch brings the next one ${span(b?.matchMs ?? 60_000)} closer: the countdown is

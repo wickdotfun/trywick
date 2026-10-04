@@ -5,7 +5,7 @@ import { createPages } from './pages.js';
 import { createScene, headColor } from './scene.js';
 import * as connect from './connect.js';
 import { createTokenPage, remember } from './token.js';
-import { ago, compact, esc, fmt, icon, pumpUrl, short, sol, solscan, span } from './util.js';
+import { ago, aiLogo, aiLogos, compact, esc, fmt, icon, pumpUrl, short, sol, solscan, span } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 const DEMO = new URLSearchParams(location.search).has('demo');
@@ -588,7 +588,16 @@ function costLine(burnPct) {
 function keeperBlock() {
   const k = world.launch?.keepers;
   if (!k) return '';
-  const mono = (by) => esc(by.slice(0, 2));
+  // Avant $WICK, « Make it burn » n'est pas ouvert : on montre ce qui arrive, sans pouvoir le choisir.
+  if (!burnOptions().length) {
+    return `<div class="keeper-opt soon" id="lf-keeper">
+      <div class="burn-head"><b>${icon('keeper')} Make it <span class="grad">burn</span>, with an AI <span class="grad">Keeper</span>
+        <span class="tag soon">${icon('lock')} unlocks with $${ticker()}</span></b>
+        <small>Once $${ticker()} is live, your coin can burn itself with a share of its creator fees. An AI agent tends its candle:
+        it picks the moments to buy it back and burn it, and tells your holders why.</small></div>
+      <div class="k-soon">${aiLogos(k.models, 18)}<small>${k.models.length} minds · ${k.styles.length} personalities · free on Cloudflare</small></div>
+    </div>`;
+  }
   return `<div class="keeper-opt" id="lf-keeper"${burning() ? '' : ' hidden'}>
     <div class="burn-head"><b>${icon('keeper')} Your <span class="grad">Keeper</span></b>
       <small>An AI agent tends your candle. It picks the moments to buy your coin back and burn it, and tells your holders why.
@@ -596,7 +605,7 @@ function keeperBlock() {
     <span class="k-label">Personality</span>
     <div class="k-styles" role="group" aria-label="Personality">${k.styles.map((s) => `<button type="button" class="k-style${draft.keeper.style === s.id ? ' on' : ''}" data-kstyle="${esc(s.id)}" aria-pressed="${draft.keeper.style === s.id}"><b>${esc(s.label)}</b><small>${esc(s.hint)}</small></button>`).join('')}</div>
     <span class="k-label">The mind <em>· runs free on Cloudflare</em></span>
-    <div class="k-minds" role="group" aria-label="The mind">${k.models.map((m) => `<button type="button" class="k-mind${draft.keeper.model === m.id ? ' on' : ''}" data-kmodel="${esc(m.id)}" aria-pressed="${draft.keeper.model === m.id}"><i>${mono(m.by)}</i><span><b>${esc(m.name)}</b><small>${esc(m.by)}</small></span></button>`).join('')}</div>
+    <div class="k-minds" role="group" aria-label="The mind">${k.models.map((m) => `<button type="button" class="k-mind${draft.keeper.model === m.id ? ' on' : ''}" data-kmodel="${esc(m.id)}" aria-pressed="${draft.keeper.model === m.id}"><i>${aiLogo(m, 18)}</i><span><b>${esc(m.name)}</b><small>${esc(m.by)}</small></span></button>`).join('')}</div>
   </div>`;
 }
 

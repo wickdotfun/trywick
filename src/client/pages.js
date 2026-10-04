@@ -313,7 +313,7 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
         The more WICK is used, the more of its own supply disappears.</p>
       <ol class="loop big">
         <li>${icon('rocket')}<b>Launch a coin</b><small>on pump.fun, from your wallet</small></li>
-        <li>${icon('candle')}<b>It burns itself</b><small>its fees buy it back, forever</small></li>
+        <li>${icon('keeper')}<b>Its Keeper burns it</b><small>an AI picks the moments</small></li>
         <li>${icon('swap')}<b>It feeds ${tk()}</b><small>Ignition Fee + 5% of its fees</small></li>
         <li>${icon('flame')}<b>Burn ${tk()}</b><small>gone from circulation</small></li>
       </ol>
@@ -331,6 +331,11 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
           page, its burns on Solscan, and its place in the forest. ${burnPct}% burns ${tk()} and ${teamPct}% funds the team;
           the rest is yours. Your Ignition Fee drops to ${l.sharedFeeSol ?? 0.01} SOL. The split is set with pump.fun's own
           fee sharing and locked on-chain: nobody can change it, not even WICK. WICK runs the buybacks for every candle.</li>
+        <li><b>The Keepers.</b> Every candle gets an AI agent: you pick its personality and its mind (Llama, gpt-oss, Qwen,
+          Mistral, Gemma or DeepSeek, run free by Cloudflare). When your coin's fees fill its candle, the Keeper reads the
+          market and picks the moment to buy your coin back and burn it, then tells your holders why, on its page, in the
+          fire and on Telegram. It only decides <i>when</i>, never how much: the SOL can only burn your coin, at least once
+          every 24 hours. If the AI is ever down, the candle burns anyway.</li>
         <li><b>The breath.</b> On top of the burn of each launch, a buyback every ${span(b?.durationMs ?? 1_800_000)} at most:
           everything waiting in the WICK burn wallet (the burn share of shared creator fees, and any leftovers) buys
           ${tk()} back and burns it. Every launch brings the next one ${span(b?.matchMs ?? 60_000)} closer: the countdown is

@@ -10,6 +10,7 @@ import { getMatch, publicMatch, settle } from '../../lib/matches.js';
 import { buildCreateTx, uploadMetadata } from '../../lib/pump.js';
 import { ensureSchema } from '../../lib/schema.js';
 import { buildShareTx, checkSignedShareTx } from '../../lib/sharing.js';
+import { keeperModel, keeperStyle } from '../../lib/keepers.js';
 import {
   base64FromBytes, buildFeeTx, bytesFromBase64, checkFeeTx, checkSignedLaunch, getLatestBlockhash,
   sendTransaction, signatureOf,
@@ -102,6 +103,11 @@ export async function prepare({ request, env }) {
       WHERE mint = ? AND seq IS NULL`)
     .bind(fee?.lamports ?? 0, fee?.to ?? null, fee?.teamWallet ?? null, fee?.team?.lamports ?? 0, shareBps, shareTeamBps,
       holders.length ? fee.selfBps || 0 : 0, launch.mint).run();
+  // Le Keeper de la bougie (seulement avec « Make it burn ») : sa personnalité et son esprit.
+  const burns = holders.length && fee.selfBps > 0;
+  const style = burns ? keeperStyle(fields.keeper_style) : null;
+  await env.DB.prepare('UPDATE matches SET keeper_style = ?, keeper_model = ? WHERE mint = ? AND seq IS NULL')
+    .bind(style, style ? keeperModel(fields.keeper_model)?.id || 'llama' : null, launch.mint).run();
   return json({
     tx: base64FromBytes(tx),
     feeTx,

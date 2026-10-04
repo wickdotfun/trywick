@@ -25,6 +25,10 @@ database_name = "wick"
 # D1 database id (Cloudflare → Storage & databases → D1 → wick)
 database_id = "b18af738-eaa4-45f6-811c-55a3ce7a2557"
 
+# Workers AI : l'esprit des Keepers (l'agent IA de chaque bougie). Gratuit dans le quota du jour.
+[ai]
+binding = "AI"
+
 [observability]
 enabled = true
 

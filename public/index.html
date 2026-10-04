@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>WICK — the launchpad that burns itself</title>
-  <meta name="description" content="WICK is the launchpad that burns itself. Launch a coin on pump.fun that burns its own supply, forever: a share of its creator fees buys it back and burns it. Every candle also burns $WICK.">
+  <meta name="description" content="WICK is the launchpad where every coin is a candle with its own AI Keeper. Spark an idea: the Keeper creates the coin, you launch it on pump.fun, and it talks to its holders and burns it. Every candle burns $WICK.">
   <meta property="og:title" content="WICK — the launchpad that burns itself">
-  <meta property="og:description" content="Every coin is a candle. Launch a coin that burns itself, forever. Every candle burns $WICK.">
+  <meta property="og:description" content="Every coin is a candle. Every candle has an AI Keeper. Spark an idea, launch on pump.fun, watch it burn. Every candle burns $WICK.">
   <meta property="og:image" content="/brand/og.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="/brand/og.png">
@@ -62,12 +62,12 @@
     <h1 class="hero-title">Every coin is <br>a <span class="grad">candle</span>.</h1>
     <ol class="loop" aria-label="How WICK works">
       <li><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 15c-1.4 1.2-1.9 4.6-1.9 4.6s3.4-.5 4.6-1.9c.7-.8.6-2-.1-2.7a1.9 1.9 0 0 0-2.6 0z"/><path d="m12 15-3-3a20 20 0 0 1 1.8-3.6A11.6 11.6 0 0 1 20.8 3.2c0 2.5-.7 6.8-5.4 9.9A20 20 0 0 1 12 15z"/><path d="M9 12H5s.5-2.7 1.8-3.6C7.3 7.4 10.4 8 10.4 8M12 15v4s2.7-.5 3.6-1.8c1-1.5 0-4.6 0-4.6"/></svg><span>Launch a coin</span></li>
-      <li><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8c.5 3 4.7 5 4.7 9.9a4.7 4.7 0 1 1-9.4 0c0-2.4 1.2-3.6 1.9-5 .6 1.4 1.5 2.1 2.6 2.4-.4-2.6.2-4.9.2-7.3z"/></svg><span>AI burns it</span></li>
+      <li><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8c.5 3 4.7 5 4.7 9.9a4.7 4.7 0 1 1-9.4 0c0-2.4 1.2-3.6 1.9-5 .6 1.4 1.5 2.1 2.6 2.4-.4-2.6.2-4.9.2-7.3z"/></svg><span>AI runs it</span></li>
       <li><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h14l-3.5-3.5M20 16H6l3.5 3.5"/></svg><span>Feeds <span data-t="ticker">$WICK</span></span></li>
       <li><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9.5" width="6" height="11" rx="1"/><path d="M12 9.5V7.6M12 3.2c.9 1 1.3 1.8 1.3 2.4a1.3 1.3 0 0 1-2.6 0c0-.6.4-1.4 1.3-2.4z"/></svg><span>Burn <span data-t="ticker">$WICK</span></span></li>
     </ol>
     <!-- Les Keepers : l'agent IA de chaque bougie, et les modèles qui le font tourner -->
-    <a class="ai-strip" href="#candles"><span class="ai-pulse" aria-hidden="true"></span><span><b>AI Keepers</b> burn every candle</span><span class="ai-logos"><img src="/brand/ai/meta.svg" alt="Meta" width="16" height="16"><img src="/brand/ai/openai.svg" alt="OpenAI" width="16" height="16"><img src="/brand/ai/qwen.svg" alt="Qwen" width="16" height="16"><img src="/brand/ai/mistral.svg" alt="Mistral" width="16" height="16"><img src="/brand/ai/gemma.svg" alt="Google Gemma" width="16" height="16"><img src="/brand/ai/deepseek.svg" alt="DeepSeek" width="16" height="16"></span><span class="ai-go" aria-hidden="true">→</span></a>
+    <a class="ai-strip" href="#how"><span class="ai-pulse" aria-hidden="true"></span><span>Every coin gets an <b>AI Keeper</b></span><span class="ai-logos"><img src="/brand/ai/meta.svg" alt="Meta" width="16" height="16"><img src="/brand/ai/openai.svg" alt="OpenAI" width="16" height="16"><img src="/brand/ai/qwen.svg" alt="Qwen" width="16" height="16"><img src="/brand/ai/mistral.svg" alt="Mistral" width="16" height="16"><img src="/brand/ai/gemma.svg" alt="Google Gemma" width="16" height="16"><img src="/brand/ai/deepseek.svg" alt="DeepSeek" width="16" height="16"></span><span class="ai-go" aria-hidden="true">→</span></a>
     <div class="candle-card" id="candle-card">
       <p class="eyebrow"><span>Candle <b id="candle-no">#001</b></span><span id="candle-melt">0% melted</span></p>
       <div class="bar" title="One candle = 0.5% of the $WICK supply"><i id="bar"></i></div>
@@ -101,7 +101,7 @@
   <!-- Frapper une allumette -->
   <div class="cta-wrap">
     <button class="cta" id="strike-btn"><svg class="match-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19 15.5 8.5"/><circle cx="17" cy="7" r="2.6"/></svg>Launch a coin</button>
-    <p class="cta-sub" id="cta-sub">Your coin on pump.fun · it feeds the flame</p>
+    <p class="cta-sub" id="cta-sub">One idea → your AI Keeper creates the coin · launch it on pump.fun</p>
   </div>
 
   <div class="tip" id="tip" hidden></div>

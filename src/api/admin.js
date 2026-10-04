@@ -142,8 +142,11 @@ export const adminStatus = guarded(async ({ env }) => {
       buybackKey: wallet.key,
       pinata,
       ai: Boolean(env.AI?.run),
-      aiCalls: await getSetting(db, 'ai.day').then((s) => (s?.day === Math.floor(now / 86_400_000) ? s.count : 0)),
-      aiDaily: CONFIG.keepers.dailyCalls,
+      // L'IA du jour, par usage : décisions et voix des Keepers, Spark, logos, questions, journal.
+      aiUse: await getSetting(db, 'ai.day').then((s) => {
+        const today = s?.day === Math.floor(now / 86_400_000) ? s : {};
+        return Object.fromEntries(Object.entries(CONFIG.keepers.daily).map(([k, max]) => [k, { used: today[k === 'keeper' ? 'count' : k] || 0, max }]));
+      }),
       customRpc: Boolean(env.SOLANA_RPC),
       ipSalt: Boolean(env.IP_SALT),
       collectFees: env.BUYBACK_COLLECT_FEES === 'on',

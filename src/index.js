@@ -5,6 +5,7 @@ import { candles, coin } from './api/candles.js';
 import { launches, profile } from './api/explore.js';
 import { prepare, status, submit } from './api/launch.js';
 import { board } from './api/leaderboard.js';
+import { ask, spark, sparkLogo } from './api/spark.js';
 import { state } from './api/state.js';
 import { token, tradePrepare, tradeSend, tradeStatus } from './api/token.js';
 import { json } from '../lib/http.js';
@@ -13,7 +14,7 @@ import { tickCycle } from '../lib/cycles.js';
 import { checkMilestones } from '../lib/hall.js';
 import { refreshMarkets } from '../lib/markets.js';
 import { runAnnounce, withLaunch } from '../lib/announce.js';
-import { runKeepers, runVoices } from '../lib/keepers.js';
+import { runJournal, runKeepers, runVoices } from '../lib/keepers.js';
 import { queueSelfBurn, runShares } from '../lib/sharing.js';
 import { runTelegram } from '../lib/telegram.js';
 import { sweep } from '../lib/matches.js';
@@ -34,6 +35,9 @@ const ROUTES = {
   'POST /api/launch/prepare': prepare,
   'POST /api/launch/submit': submit,
   'GET /api/launch/status': status,
+  'POST /api/spark': spark,
+  'POST /api/spark/image': sparkLogo,
+  'POST /api/ask': ask,
   'GET /api/admin/status': adminStatus,
   'POST /api/admin/pause': adminPause,
   'POST /api/admin/run': adminRun,
@@ -91,7 +95,8 @@ export default {
       refreshMarkets(env, Date.now(), open?.id),
       runShares(env, Date.now()),
       runKeepers(env, Date.now(), queueSelfBurn),
-      runVoices(env, Date.now()),
+      // Les voix des Keepers, puis la page de journal du jour (une à la fois).
+      runVoices(env, Date.now()).then(() => runJournal(env, Date.now())),
       runTelegram(env, Date.now()),
     ];
     for (const r of await Promise.allSettled(steps)) {

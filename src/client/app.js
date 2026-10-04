@@ -5,7 +5,7 @@ import { createPages } from './pages.js';
 import { createScene, headColor } from './scene.js';
 import * as connect from './connect.js';
 import { createTokenPage, remember } from './token.js';
-import { ago, aiLogo, aiLogos, compact, esc, fmt, icon, pumpUrl, short, sol, solscan, span } from './util.js';
+import { ago, aiLogo, compact, esc, fmt, icon, pumpUrl, short, sol, solscan, span } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 const DEMO = new URLSearchParams(location.search).has('demo');
@@ -17,6 +17,15 @@ async function get(url) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
+// Les appels POST : une erreur du serveur (« too_many »…) devient err.code.
+async function post(url, body, as = 'json') {
+  const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  if (!res.ok || !(res.headers.get('content-type') || '').startsWith(as === 'blob' ? 'image/' : 'application/json')) {
+    const data = await res.json().catch(() => ({}));
+    throw Object.assign(new Error(data.error || `HTTP ${res.status}`), { code: data.error || 'ai_failed' });
+  }
+  return as === 'blob' ? res.blob() : res.json();
+}
 const api = DEMO ? createDemo() : {
   state: (since = 0, markets = false) => get(`/api/state?since=${since}${markets ? '&markets=1' : ''}`),
   leaderboard: () => get('/api/leaderboard'),
@@ -25,6 +34,10 @@ const api = DEMO ? createDemo() : {
   token: () => get('/api/token'),
   candles: () => get('/api/candles'),
   coin: (mint) => get(`/api/coin?mint=${encodeURIComponent(mint)}`),
+  // L'IA : Spark (le coin inventé par le Keeper), son logo, et les questions aux Keepers.
+  spark: (b) => post('/api/spark', b),
+  sparkImage: (b) => post('/api/spark/image', b, 'blob'),
+  ask: (b) => post('/api/ask', b),
 };
 
 function avatar(m, size = 34) {
@@ -68,6 +81,7 @@ const world = {
   history: [],               // les buybacks (un par souffle)
   burns: [],                 // le journal des burns, du plus récent au plus ancien
   coinBurns: [],             // les burns des coins qui se brûlent eux-mêmes (« Make it burn »)
+  thoughts: [],              // ce que disent les Keepers (premiers mots, journal, décisions)
   hall: [],                  // la salle des bougies consumées
   hot: [],                   // les coins WICK les plus chauds
   totals: { burned: 0, supplyPct: null },
@@ -125,8 +139,8 @@ function renderMeter() {
       ? 'Buybacks are paused for now. The candle waits.'
       : `The candle starts melting once ${esc(tk)} is live.`;
   $('cta-sub').innerHTML = fee
-    ? `${world.launch.selfOptions?.length ? 'Launch a coin that burns itself' : 'Launch your coin on pump.fun'} · <b>Ignition Fee ${from < fee ? `from ${from}` : fee} SOL</b>, ${world.launch.teamSol ? 'half of it burns' : 'burns'} ${esc(tk)}`
-    : 'Launch your coin on pump.fun · it feeds the flame';
+    ? `One idea, an AI Keeper, a coin that burns itself · <b>Ignition Fee ${from < fee ? `from ${from}` : fee} SOL</b>, ${world.launch.teamSol ? 'half of it burns' : 'burns'} ${esc(tk)}`
+    : 'One idea → your AI Keeper creates the coin · launch it on pump.fun';
   document.querySelectorAll('[data-t="ticker"]').forEach((el) => { el.textContent = tk; });
   if (!scene?.burning) scene?.setCandle({ melted: c.melted, heat: world.heat / HEAT_FULL });
   if (document.body.classList.contains('no-webgl')) {
@@ -182,6 +196,15 @@ function coinBurnCard(b) {
     </a></li>`;
 }
 
+// Un Keeper parle : ses premiers mots, son journal du jour, ou sa décision d'attendre.
+function thoughtCard(t) {
+  return `<li class="ev thought"><a href="#coin/${esc(t.mint)}" data-coin="${esc(t.mint)}">
+      <span class="ev-keeper">${avatar(t)}${t.keeper?.logo ? `<i class="ev-mind">${aiLogo(t.keeper, 11)}</i>` : ''}</span>
+      <span class="ev-main"><b>Keeper of $${esc(t.symbol || '?')}</b><span class="voice" title="${esc(t.line)}">“${esc(t.line)}”</span></span>
+      <span class="ev-meta"><span class="mono">${icon('keeper')}</span><time data-at="${t.at}">${ago(t.at)}</time></span>
+    </a></li>`;
+}
+
 function pendingCard() {
   const h = world.history[0];
   if (!h || !['ended', 'buying', 'bought', 'burning_tx'].includes(h.status) || !world.buyback.live || world.buyback.paused) return '';
@@ -194,6 +217,9 @@ function renderFeed() {
     ...world.recent.map((m) => ({ at: m.at, html: () => launchCard(m) })),
     ...world.burns.slice(0, 40).map((b) => ({ at: b.at, html: () => burnCard(b) })),
     ...world.coinBurns.slice(0, 12).map((b) => ({ at: b.at, html: () => coinBurnCard(b) })),
+    // Une pensée déjà dite par un burn (sa voix) n'est pas répétée.
+    ...world.thoughts.filter((t) => !world.coinBurns.some((b) => b.mint === t.mint && b.voice === t.line)).slice(0, 4)
+      .map((t) => ({ at: t.at, html: () => thoughtCard(t) })),
   ].sort((a, b) => b.at - a.at).slice(0, 50);
   $('feed').innerHTML = pendingCard() + (events.length
     ? events.map((e) => e.html()).join('')
@@ -292,6 +318,7 @@ function applyState(data, first) {
   if (data.hall) world.hall = data.hall;
   mergeBurns(data, first);
   mergeCoinBurns(data, first);
+  if (data.thoughts) world.thoughts = data.thoughts;
   // Le fil garde les lancements d'une bougie à l'autre.
   const seen = new Set(world.recent.map((m) => m.mint));
   if (data.recent) world.recent = data.recent.slice().reverse();
@@ -551,7 +578,7 @@ const ERRORS = {
 
 let busy = false;
 // burn : « Make it burn », la part (en %) des creator fees qui rachète et brûle le coin lui-même.
-const DRAFT = () => ({ fields: {}, image: null, preview: null, burn: 20, keeper: { style: 'stoic', model: 'llama' } });
+const DRAFT = () => ({ fields: {}, image: null, preview: null, burn: 20, keeper: { style: 'stoic', model: 'llama' }, idea: '', spark: null });
 let draft = DRAFT();
 
 
@@ -566,7 +593,7 @@ function burnSplit(pct) {
   if (!pct) return { bar: '<span style="width:100%">You 100%</span>', legend: 'You keep 100% of your creator fees. Your candle stays unlit.' };
   const you = s.creatorBps / 100 - pct;
   return {
-    bar: `<span style="width:${you}%">You ${you}%</span><span class="self" style="width:${pct}%">${pct >= 15 ? 'Burns it ' : ''}${pct}%</span>`
+    bar: `<span style="width:${you}%">You ${you}%</span><span class="self" style="width:${pct}%">${pct >= 30 ? 'Burns it ' : ''}${pct}%</span>`
       + `<span class="wick" style="width:${s.burnBps / 100}%"></span><span class="team" style="width:${s.teamBps / 100}%"></span>`,
     legend: `You ${you}% · ${pct}% buys your coin back and burns it · ${s.burnBps / 100}% burns $${ticker()} · ${s.teamBps / 100}% WICK team`,
   };
@@ -584,28 +611,53 @@ function costLine(burnPct) {
     : '≈ 0.02 SOL of pump.fun creation and network costs, plus your dev buy.'} Your wallet signs, your coin${withShare ? `, ${(l.split?.creatorBps ?? 10_000 - l.shareBps) / 100 - burnPct}% of your creator fees` : ', your pump.fun creator fees'}.`;
 }
 
-// Le Keeper de la bougie (avec « Make it burn ») : sa personnalité et son esprit (le modèle).
+// Le Keeper du coin : sa personnalité et son esprit (le modèle). Chaque coin en a un ; c'est lui
+// qui invente le coin avec Spark, parle à ses holders, et (avec « Make it burn ») le brûle.
+const mindOf = (id) => world.launch?.keepers?.models.find((m) => m.id === id) || world.launch?.keepers?.models[0];
 function keeperBlock() {
   const k = world.launch?.keepers;
   if (!k) return '';
-  // Avant $WICK, « Make it burn » n'est pas ouvert : on montre ce qui arrive, sans pouvoir le choisir.
-  if (!burnOptions().length) {
-    return `<div class="keeper-opt soon" id="lf-keeper">
-      <div class="burn-head"><b>${icon('keeper')} Make it <span class="grad">burn</span>, with an AI <span class="grad">Keeper</span>
-        <span class="tag soon">${icon('lock')} unlocks with $${ticker()}</span></b>
-        <small>Once $${ticker()} is live, your coin can burn itself with a share of its creator fees. An AI agent tends its candle:
-        it picks the moments to buy it back and burn it, and tells your holders why.</small></div>
-      <div class="k-soon">${aiLogos(k.models, 18)}<small>${k.models.length} minds · ${k.styles.length} personalities · free on Cloudflare</small></div>
-    </div>`;
-  }
-  return `<div class="keeper-opt" id="lf-keeper"${burning() ? '' : ' hidden'}>
-    <div class="burn-head"><b>${icon('keeper')} Your <span class="grad">Keeper</span></b>
-      <small>An AI agent tends your candle. It picks the moments to buy your coin back and burn it, and tells your holders why.
-      It decides when, never how much: the SOL can only burn your coin.</small></div>
+  return `<section class="lf-step keeper-opt" id="lf-keeper">
+    <div class="lf-step-head"><span class="lf-num">1</span><b>Summon its <span class="grad">Keeper</span></b>
+      <small>The AI agent of your coin. It creates it with you, talks to its holders, and burns it.</small></div>
     <span class="k-label">Personality</span>
     <div class="k-styles" role="group" aria-label="Personality">${k.styles.map((s) => `<button type="button" class="k-style${draft.keeper.style === s.id ? ' on' : ''}" data-kstyle="${esc(s.id)}" aria-pressed="${draft.keeper.style === s.id}"><b>${esc(s.label)}</b><small>${esc(s.hint)}</small></button>`).join('')}</div>
-    <span class="k-label">The mind <em>· runs free on Cloudflare</em></span>
+    <span class="k-label">The mind <em>· open models, run free by Cloudflare</em></span>
     <div class="k-minds" role="group" aria-label="The mind">${k.models.map((m) => `<button type="button" class="k-mind${draft.keeper.model === m.id ? ' on' : ''}" data-kmodel="${esc(m.id)}" aria-pressed="${draft.keeper.model === m.id}"><i>${aiLogo(m, 18)}</i><span><b>${esc(m.name)}</b><small>${esc(m.by)}</small></span></button>`).join('')}</div>
+  </section>`;
+}
+
+// Spark : une idée, et le Keeper invente le coin (nom, ticker, description, logo).
+function sparkBlock() {
+  if (!world.launch?.keepers) return '';
+  const sp = draft.spark;
+  return `<section class="lf-step spark" id="lf-spark">
+    <div class="lf-step-head"><span class="lf-num">2</span><b>Spark <span class="grad">an idea</span></b>
+      <small>One sentence. Your Keeper writes the name, the ticker, the story and paints the logo. You can change everything.</small></div>
+    <div class="spark-box">
+      <textarea id="sp-idea" maxlength="200" rows="2" placeholder="${esc(pick(IDEAS))}">${esc(draft.idea || '')}</textarea>
+      <button type="button" class="cta spark-go" id="sp-go">${icon('sparkle')} <span>${sp ? 'Spark again' : 'Spark it'}</span></button>
+    </div>
+    <div class="spark-status" id="sp-status"${sp ? '' : ' hidden'}>${sp ? sparkDone(sp) : ''}</div>
+  </section>`;
+}
+const IDEAS = ['A cat that is terrified of fire but lives in a candle shop', 'A tiny dragon who only breathes birthday candles',
+  'A moth that finally caught the flame', 'A frog who runs a candle factory on Solana', 'The last ember of a burned-down casino'];
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+function sparkDone(sp) {
+  return `<div class="sp-done">
+      <span class="sp-who">${aiLogo(sp.mind, 16)} <b>${esc(sp.mind?.name || 'Your Keeper')}</b> wrote it${draft.image ? ' and painted the logo' : ''}.</span>
+      ${sp.intro ? `<blockquote>“${esc(sp.intro)}”</blockquote>` : ''}
+      <span class="sp-actions"><button type="button" class="linkish" id="sp-logo">${icon('sparkle')} New logo</button></span>
+    </div>`;
+}
+
+// « Make it burn » avant $WICK : ce qui arrive, sans pouvoir le choisir.
+function burnTeaser() {
+  if (burnOptions().length) return '';
+  return `<div class="burn-opt soon">
+    <div class="burn-head"><b>Make it <span class="grad">burn</span> <span class="tag soon">${icon('lock')} unlocks with $${ticker()}</span></b>
+      <small>Once $${ticker()} is live, a share of your creator fees can buy your coin back and burn it, forever. Your Keeper picks the moments.</small></div>
   </div>`;
 }
 
@@ -613,9 +665,14 @@ function launchForm(error = '') {
   const f = draft.fields;
   const max = world.launch?.maxDevBuy ?? 5;
   openModal(`
-    <h2>Launch a coin</h2>
-    <p class="muted">Launch a real coin on pump.fun. It becomes a match orbiting the $${ticker()} candle${world.launch?.feeSol ? `, and ${world.launch.teamSol ? 'half of its Ignition Fee burns' : 'its Ignition Fee burns'} $${ticker()} within a minute` : ''}.</p>
+    <h2>Launch a coin <span class="grad">with its Keeper</span></h2>
+    <p class="muted">A real coin on pump.fun, with an AI agent of its own. It becomes a match orbiting the $${ticker()} candle${world.launch?.feeSol ? `, and ${world.launch.teamSol ? 'half of its Ignition Fee burns' : 'its Ignition Fee burns'} $${ticker()} within a minute` : ''}.</p>
     <form id="launch-form" novalidate>
+      ${keeperBlock()}
+      ${sparkBlock()}
+      <section class="lf-step lf-coin">
+      <div class="lf-step-head"><span class="lf-num">${world.launch?.keepers ? 3 : 1}</span><b>Your <span class="grad">coin</span></b>
+        <small>Check it, change it, make it yours.</small></div>
       <div class="lf-top">
         <label class="drop">
           <input type="file" id="lf-image" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
@@ -626,7 +683,7 @@ function launchForm(error = '') {
           <label>Ticker<input name="symbol" maxlength="11" autocomplete="off" placeholder="WCAT" value="${esc(f.symbol)}" class="mono up-case"></label>
         </div>
       </div>
-      <label><span>Description <em>· optional</em></span><textarea name="description" maxlength="500" rows="2">${esc(f.description)}</textarea></label>
+      <label><span>Description <em>· optional</em></span><textarea name="description" maxlength="500" rows="3">${esc(f.description)}</textarea></label>
       <details${f.twitter || f.telegram || f.website ? ' open' : ''}><summary>Links <em>· optional</em></summary>
         <label>X<input name="twitter" type="url" placeholder="https://x.com/…" value="${esc(f.twitter)}"></label>
         <label>Telegram<input name="telegram" type="url" placeholder="https://t.me/…" value="${esc(f.telegram)}"></label>
@@ -645,7 +702,8 @@ function launchForm(error = '') {
         <small class="muted" id="lf-legend">${burnSplit(burning()).legend}</small>
         <small class="lock">${icon('lock')} Locked on pump.fun. Nobody can change it, not even WICK.</small>
       </div>` : ''}
-      ${keeperBlock()}
+      ${burnTeaser()}
+      </section>
       <input type="hidden" name="burn" value="${burning()}"><input type="hidden" name="share" value="${burning() ? '1' : ''}">
       <input type="hidden" name="keeper_style" value="${esc(draft.keeper.style)}"><input type="hidden" name="keeper_model" value="${esc(draft.keeper.model)}">
       <p class="cost" id="lf-cost">${costLine(burning())}</p>
@@ -688,14 +746,98 @@ function launchForm(error = '') {
     });
     form.burn.value = String(pct);
     form.share.value = pct ? '1' : '';
-    const kb = $('lf-keeper');
-    if (kb) kb.hidden = !pct;
     const split = burnSplit(pct);
     $('lf-split').innerHTML = split.bar;
     $('lf-legend').textContent = split.legend;
     $('lf-cost').innerHTML = costLine(pct);
   }));
+  $('sp-go')?.addEventListener('click', () => runSpark(form));
+  $('sp-idea')?.addEventListener('input', (e) => { draft.idea = e.target.value; });
+  $('sp-idea')?.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runSpark(form); } });
+  bindLogoAgain(form);
   form.addEventListener('submit', (e) => { e.preventDefault(); submitLaunch(form); });
+}
+
+// ------------------------------------------------------------ Spark
+const SPARK_ERRORS = {
+  bad_idea: 'Give your Keeper an idea first: a few words are enough.',
+  blocked_idea: "Your Keeper won't make that one. Try another idea.",
+  too_many: 'Lots of sparks from here. Try again in a little while.',
+  ai_busy: 'The Keepers have created a lot today. Come back tomorrow, or fill in your coin yourself.',
+  ai_off: 'Spark is resting right now. Fill in your coin yourself, or try again later.',
+  ai_failed: "Your Keeper couldn't find the words. Try again, or try another mind.",
+};
+let sparking = false;
+function sparkStatus(html, cls = '') {
+  const el = $('sp-status');
+  if (!el) return;
+  el.hidden = false;
+  el.className = `spark-status ${cls}`.trim();
+  el.innerHTML = html;
+}
+const thinking = (mind, what) => `<span class="sp-think">${aiLogo(mind, 16)} <b>${esc(mind?.name || 'Your Keeper')}</b> ${what}<i></i><i></i><i></i></span>`;
+
+async function runSpark(form) {
+  if (sparking) return;
+  const idea = ($('sp-idea')?.value || '').trim();
+  draft.idea = idea;
+  if (idea.length < 3) { sparkStatus(SPARK_ERRORS.bad_idea, 'err'); return; }
+  const mind = mindOf(draft.keeper.model);
+  const btn = $('sp-go');
+  sparking = true;
+  btn.disabled = true;
+  btn.classList.add('busy');
+  sparkStatus(thinking(mind, 'is thinking'));
+  try {
+    const sp = await api.spark({ idea, style: draft.keeper.style, model: draft.keeper.model });
+    draft.spark = sp;
+    form.name.value = sp.name;
+    form.symbol.value = sp.symbol;
+    form.description.value = sp.description;
+    for (const el of [form.name, form.symbol, form.description]) { el.classList.remove('filled'); void el.offsetWidth; el.classList.add('filled'); }
+    draft.fields = Object.fromEntries(new FormData(form));
+    sparkStatus(thinking(sp.mind || mind, 'is painting the logo'));
+    await paintLogo(sp);
+    sparkStatus(sparkDone(sp), 'done');
+    bindLogoAgain(form);
+  } catch (err) {
+    sparkStatus(SPARK_ERRORS[err.code] || SPARK_ERRORS.ai_failed, 'err');
+  } finally {
+    sparking = false;
+    if ($('sp-go')) {
+      btn.disabled = false;
+      btn.classList.remove('busy');
+      btn.querySelector('span').textContent = draft.spark ? 'Spark again' : 'Spark it';
+    }
+  }
+}
+
+// Le logo peint par l'IA devient l'image du coin (recadré comme une image envoyée à la main).
+async function paintLogo(sp) {
+  const view = $('drop-view');
+  view?.classList.add('painting');
+  try {
+    const blob = await api.sparkImage({ visual: sp.visual, name: sp.name });
+    draft.image = await prepareImage(new File([blob], 'logo.png', { type: blob.type || 'image/png' }));
+    draft.preview = URL.createObjectURL(draft.image);
+    if ($('drop-view')) $('drop-view').innerHTML = `<img src="${draft.preview}" alt="">`;
+  } catch {
+    // Pas de logo cette fois : le reste est là, on peut en envoyer un.
+  } finally {
+    $('drop-view')?.classList.remove('painting');
+  }
+}
+
+function bindLogoAgain(form) {
+  $('sp-logo')?.addEventListener('click', async () => {
+    if (sparking || !draft.spark) return;
+    sparking = true;
+    sparkStatus(thinking(draft.spark.mind || mindOf(draft.keeper.model), 'is painting a new logo'));
+    await paintLogo(draft.spark);
+    sparking = false;
+    sparkStatus(sparkDone(draft.spark), 'done');
+    bindLogoAgain(form);
+  });
 }
 
 function showFormError(msg) {

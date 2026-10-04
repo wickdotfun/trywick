@@ -376,6 +376,7 @@
         <dt>Burn wallet</dt><dd class="mono">${c.burnWalletExpected ? short(c.burnWalletExpected) : '<span class="dim">any</span>'}</dd>
         <dt>Dev wallet <small>team share</small></dt><dd class="mono">${short(c.fees?.teamWallet || c.deployer)}</dd>
         <dt>Ignition Fee</dt><dd>${c.fees?.feeSol ? `${num(c.fees.feeSol, 3)} SOL · ${num(c.fees.burnSol, 3)} burn / ${num(c.fees.teamSol, 3)} team` : '<span class="dim">once live</span>'}</dd>
+        <dt>Keepers (AI)</dt><dd class="${c.ai ? 'ok' : 'warn'}">${c.ai ? `on · ${num(c.aiCalls || 0, 0)}/${num(c.aiDaily, 0)} calls today` : 'off (no AI binding): Keepers use ready-made lines'}</dd>
         <dt>PINATA_JWT</dt><dd class="${c.pinata === 'ok' ? 'ok' : c.pinata === 'invalid' ? 'bad' : 'warn'}">${esc(c.pinata || 'missing')}</dd>
         <dt>SOLANA_RPC</dt><dd class="${c.customRpc ? 'ok' : 'warn'}">${c.customRpc ? 'set' : 'public'}</dd>
         <dt>IP_SALT</dt><dd class="${c.ipSalt ? 'ok' : 'warn'}">${c.ipSalt ? 'set' : 'missing'}</dd>

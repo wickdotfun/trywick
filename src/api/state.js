@@ -1,6 +1,7 @@
 // GET /api/state?since=… : la bougie, ses allumettes (les nouvelles seulement si since est donné).
 import { CONFIG } from '../../lib/config.js';
 import { feeSummary } from '../../lib/buyback.js';
+import { keeperChoices } from '../../lib/keepers.js';
 import { json, tokenInfo } from '../../lib/http.js';
 import { worldState } from '../../lib/matches.js';
 import { ensureSchema } from '../../lib/schema.js';
@@ -16,6 +17,6 @@ export async function state({ request, env }) {
     token: tokenInfo(env),
     // L'Ignition Fee (50 % burn, 50 % équipe), et celle réduite avec le partage des creator fees
     // (split : créateur / burn / équipe).
-    launch: { maxDevBuy: CONFIG.maxDevBuySol, ...fees },
+    launch: { maxDevBuy: CONFIG.maxDevBuySol, ...fees, keepers: fees.selfOptions.length ? keeperChoices() : null },
   });
 }

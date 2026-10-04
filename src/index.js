@@ -13,7 +13,8 @@ import { tickCycle } from '../lib/cycles.js';
 import { checkMilestones } from '../lib/hall.js';
 import { refreshMarkets } from '../lib/markets.js';
 import { runAnnounce, withLaunch } from '../lib/announce.js';
-import { runShares } from '../lib/sharing.js';
+import { runKeepers, runVoices } from '../lib/keepers.js';
+import { queueSelfBurn, runShares } from '../lib/sharing.js';
 import { runTelegram } from '../lib/telegram.js';
 import { sweep } from '../lib/matches.js';
 import { ensureSchema } from '../lib/schema.js';
@@ -89,6 +90,8 @@ export default {
       checkMilestones(env, Date.now()),
       refreshMarkets(env, Date.now(), open?.id),
       runShares(env, Date.now()),
+      runKeepers(env, Date.now(), queueSelfBurn),
+      runVoices(env, Date.now()),
       runTelegram(env, Date.now()),
     ];
     for (const r of await Promise.allSettled(steps)) {

@@ -80,7 +80,7 @@ test('a coin burn buys the coin itself, burns it, and melts its own candle, not 
   const m = await db.prepare('SELECT * FROM matches WHERE mint = ?').bind(mint).first();
   assert.deepEqual([m.self_burned, m.self_sol, m.self_burns], [1, 0.05, 1]);
   const candle = publicMatch(m).candle;
-  assert.deepEqual({ ...candle, pct: Number(candle.pct.toPrecision(3)) }, { bps: 2000, burned: 1, pct: 1e-7, sol: 0.05, burns: 1, live: true });
+  assert.deepEqual({ ...candle, pct: Number(candle.pct.toPrecision(3)) }, { bps: 2000, burned: 1, pct: 1e-7, sol: 0.05, burns: 1, live: true, keeper: null });
   // … mais pas celle de $WICK.
   assert.equal((await burnTotals(db)).burned, 0);
   // La forêt, le fil et la page du coin le montrent.

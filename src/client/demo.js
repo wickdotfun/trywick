@@ -14,6 +14,19 @@ const STEP = 0.05;
 const FEE = 0.02;
 const SHARED_FEE = 0.01;
 const WICK_PER_SOL = 400_000;
+// Les Keepers de la démo : des personnalités, des esprits, et ce qu'ils disent.
+const KEEPER_STYLES = [['stoic', 'Stoic', 'Calm, patient, few words'], ['degen', 'Degen', 'Loud, fast, all conviction'],
+  ['poet', 'Poet', 'Every burn is a verse'], ['pyro', 'Pyromaniac', 'Loves the fire a bit too much']];
+const KEEPER_MODELS = [['llama', 'Llama 3.3 70B', 'Meta'], ['gpt-oss', 'gpt-oss 120B', 'OpenAI'], ['qwen', 'Qwen3 30B', 'Qwen'],
+  ['mistral', 'Mistral Small 3.1', 'Mistral'], ['gemma', 'Gemma 3 12B', 'Google'], ['deepseek', 'DeepSeek R1 32B', 'DeepSeek']];
+const VOICES = {
+  stoic: ['It dipped 14%. A fair price for the flame.', 'Quiet hours. The wax waits for no one.', 'Volume is up. I take my share of the fire.'],
+  degen: ['dip spotted. fed the candle, we eat', 'paper hands sold, I bought it and BURNED it', 'supply goes down, conviction goes up. lfg'],
+  poet: ['Wax to smoke, the candle shortens by a breath.', 'A red hour, a golden flame. Burned.', 'The night was slow. I fed the fire anyway.'],
+  pyro: ['MORE FIRE. it was right there, I had to.', 'oh it burns so nicely today', 'they sold. I lit it. everyone wins (the fire wins)'],
+};
+const WAITS = { stoic: 'Not yet. The market is calm, I let the wax gather.', degen: 'holding my fire for the next dip, ser',
+  poet: 'I wait. The flame is patient, and so am I.', pyro: 'waiting is SO hard. but a dip is coming. I can feel it.' };
 
 export function createDemo() {
   const timing = { durationMs: 90_000, matchMs: 6_000 };
@@ -32,6 +45,8 @@ export function createDemo() {
     const amount = Math.round(sol * WICK_PER_SOL * (0.85 + Math.random() * 0.3));
     burned += amount;
     const b = { kind, ref: String(ref), at: Date.now(), burned: amount, sol, sig: null, symbol };
+    // The Wick, le Keeper de la grande bougie, commente chaque buyback.
+    if (kind === 'candle') b.voice = pick(['Breath taken. The great candle grows shorter.', 'Every launch fed this one. Burned.', 'The wax remembers every coin. Gone, now.']);
     burns.unshift(b);
     // Une bougie entière a fondu : elle rejoint la salle.
     const consumed = supplyCandle((burned / SUPPLY) * 100, STEP).consumed;
@@ -46,6 +61,12 @@ export function createDemo() {
       });
     }
     return b;
+  }
+
+  function makeKeeper(m, style = pick(KEEPER_STYLES)[0], model = pick(KEEPER_MODELS)[0]) {
+    const s = KEEPER_STYLES.find((x) => x[0] === style) || KEEPER_STYLES[0];
+    const mm = KEEPER_MODELS.find((x) => x[0] === model) || KEEPER_MODELS[0];
+    return { style: s[0], label: s[1], model: mm[1], by: mm[2], intro: `I keep the candle of $${m.symbol}. Every burn, I will tell you why.`, thought: null, thoughtAt: null };
   }
 
   function make(at, extra = {}) {
@@ -63,7 +84,7 @@ export function createDemo() {
     };
     // La plupart des coins qui partagent ont choisi « Make it burn ».
     if (m.share && m.candle === null && !extra.share && Math.random() < 0.8) {
-      m.candle = { bps: pick([1000, 2000, 2000, 3000, 5000]), burned: 0, pct: 0, sol: 0, burns: 0, live: true };
+      m.candle = { bps: pick([1000, 2000, 2000, 3000, 5000]), burned: 0, pct: 0, sol: 0, burns: 0, live: true, keeper: makeKeeper(m) };
     }
     all.push(m);
     breath.matches++;
@@ -99,7 +120,11 @@ export function createDemo() {
     m.candle.pct = (m.candle.burned / SUPPLY) * 100;
     m.candle.sol += sol;
     m.candle.burns++;
-    const b = { mint: m.mint, symbol: m.symbol, image: m.image, at, burned: amount, sol, sig: null };
+    const k = m.candle.keeper;
+    // Jamais deux fois la même phrase d'affilée pour un même Keeper.
+    const voice = k ? pick(VOICES[k.style].filter((v) => v !== k.thought)) : null;
+    if (k) Object.assign(k, { thought: Math.random() < 0.3 ? WAITS[k.style] : voice, thoughtAt: at });
+    const b = { mint: m.mint, symbol: m.symbol, image: m.image, at, burned: amount, sol, sig: null, voice };
     coinBurns.unshift(b);
     return b;
   }
@@ -191,6 +216,10 @@ export function createDemo() {
           maxDevBuy: 5, feeSol: FEE, burnSol: FEE / 2, teamSol: FEE / 2,
           sharedFeeSol: SHARED_FEE, sharedBurnSol: SHARED_FEE / 2, sharedTeamSol: SHARED_FEE / 2,
           shareBps: 1000, split: { creatorBps: 9000, burnBps: 500, teamBps: 500 }, selfOptions: [1000, 2000, 3000, 5000],
+          keepers: {
+            styles: KEEPER_STYLES.map(([id, label, hint]) => ({ id, label, hint })),
+            models: KEEPER_MODELS.map(([id, name, by]) => ({ id, name, by })),
+          },
         },
       };
     },
@@ -281,8 +310,11 @@ export function createDemo() {
         name: fields.name, symbol: fields.symbol, creator: 'YouDemo1111111111111111111111111111111111111',
         image: image ? URL.createObjectURL(image) : null, devBuy: Number(fields.devBuy) || 0, mcap: null, change: null, holder: false,
         share: fields.share === '1' ? { bps: 1000, teamBps: 500, live: true } : null,
-        candle: Number(fields.burn) > 0 ? { bps: Number(fields.burn) * 100, burned: 0, pct: 0, sol: 0, burns: 0, live: true } : null,
+        candle: null,
       });
+      if (Number(fields.burn) > 0) {
+        m.candle = { bps: Number(fields.burn) * 100, burned: 0, pct: 0, sol: 0, burns: 0, live: true, keeper: makeKeeper(m, fields.keeper_style, fields.keeper_model) };
+      }
       return { match: pub(m), signature: null };
     },
     // La forêt des bougies, et la page d'un coin.

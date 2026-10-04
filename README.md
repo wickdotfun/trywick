@@ -115,6 +115,23 @@ A coin's candle is fed by its own creator fees (`lib/candles.js`, `lib/sharing.j
 `GET /api/candles` returns the forest (coins that burn themselves, most burned first), their latest burns and totals;
 `GET /api/coin?mint=…` returns one coin, its candle and every burn.
 
+## Keepers
+
+Every coin that burns itself gets a **Keeper**: an AI agent that tends its candle (`lib/keepers.js`). The creator picks
+its personality (Stoic, Degen, Poet, Pyromaniac) and its mind (Llama, gpt-oss, Qwen, Mistral, Gemma, DeepSeek) in the
+launch form. The models run on [Workers AI](https://developers.cloudflare.com/workers-ai/), inside its free daily quota.
+
+- **What it decides**: only *when* to burn. Once a coin has at least 0.01 SOL set aside, the Keeper is asked at most
+  once an hour: `burn` or `wait`, with one short line for the holders. It never picks how much, nor where the SOL goes:
+  the SOL set aside can only buy back that coin and burn it, through the same burn queue as above.
+- **Guardrails**: past 0.25 SOL waiting, or 24 hours since its last burn, it burns anyway. At most 3 Keepers a minute
+  and 150 AI calls a day (`keepers` in `lib/config.js`). If the chosen model fails, Llama answers; if the AI is out
+  (no binding, quota spent), the coin burns as it would without a Keeper, with a written line.
+- **Its voice**: each burn carries the Keeper's line (`burns.voice`), shown in the feed, the burn pop-up and the coin's
+  page. A Keeper introduces itself once its coin is live, and The Wick speaks for the $WICK buybacks.
+
+Coins launched without a Keeper (or before Keepers) burn as soon as 0.01 SOL is set aside.
+
 ## Creator fee sharing
 
 pump.fun lets a coin's creator split its creator fees between up to 10 wallets, once and for all
@@ -187,6 +204,8 @@ small JSON API, backed by a [D1](https://developers.cloudflare.com/d1/) database
 | The breath (30-minute buyback countdown) | `lib/cycles.js` |
 | Burn queue: buybacks and launch burns | `lib/buyback.js` |
 | Creator fee sharing (pump.fun fee sharing, distributions) | `lib/sharing.js` |
+| Coins that burn themselves (Candles page, coin pages) | `lib/candles.js`, `src/client/candles.js` |
+| Keepers (the AI agent of each candle) | `lib/keepers.js` |
 | Living matches (DexScreener market caps) | `lib/markets.js` |
 | Pyromaniacs leaderboard | `lib/leaderboard.js`, `src/api/leaderboard.js` |
 | Telegram bot | `lib/telegram.js` |
@@ -208,12 +227,16 @@ npm run dev      # http://localhost:8787  (and /?demo for the demo)
 npm test
 ```
 
+Workers AI has no local version: `wrangler dev` asks for `npx wrangler login` because of the `[ai]` binding
+(without the binding, the Keepers fall back to written lines). The tests never call the AI.
+
 Locally, `CYCLE_MINUTES=1` in `.dev.vars` makes the breath (buyback countdown) 1 minute long.
 `npx wrangler dev --test-scheduled` then `curl "localhost:8787/__scheduled?cron=*+*+*+*+*"` runs the cron by hand.
 
 ## Deploy (Cloudflare)
 
-1. The D1 database id is in `wrangler.toml`. The table is created on the first request.
+1. The D1 database id is in `wrangler.toml`. The table is created on the first request. The Workers AI binding (`AI`,
+   for the Keepers) is in `wrangler.toml` too: nothing to set up, and the admin page shows the AI calls of the day.
 2. Workers & Pages → Import a repository. Build command: empty. Deploy command: `npx wrangler deploy`.
    Every push to `main` then redeploys the site.
 3. Variables (Worker → Settings → **Runtime variables and secrets**, not the Build ones):

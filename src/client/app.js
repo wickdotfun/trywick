@@ -177,7 +177,7 @@ function burnCard(b) {
 function coinBurnCard(b) {
   return `<li class="ev burn coin"><a href="#coin/${esc(b.mint)}" data-coin="${esc(b.mint)}">
       ${avatar(b)}
-      <span class="ev-main"><b>${compact(b.burned)} $${esc(b.symbol || '?')} burned</b><span>${sol(b.sol)} of its fees · its own candle</span></span>
+      <span class="ev-main"><b>${compact(b.burned)} $${esc(b.symbol || '?')} burned</b><span${b.voice ? ` class="voice" title="${esc(b.voice)}"` : ''}>${b.voice ? `“${esc(b.voice)}”` : `${sol(b.sol)} of its fees · its own candle`}</span></span>
       <span class="ev-meta"><span class="mono">${icon('candle')}</span><time data-at="${b.at}">${ago(b.at)}</time></span>
     </a></li>`;
 }
@@ -225,6 +225,7 @@ function nextPop() {
   el.classList.toggle('coin', coin);
   el.innerHTML = `<strong>${coin ? avatar(b, 30) : icon('flame')} ${fmt(Math.round(b.burned))} $${coin ? esc(b.symbol || '?') : ticker()} burned</strong>
     <span>${sol(b.sol)} used · ${coin ? 'its own candle' : b.kind === 'match' ? `$${esc(b.symbol || '?')}'s Ignition Fee` : `buyback #${esc(b.ref)}`}</span>
+    ${b.voice ? `<em class="pop-voice">${icon('keeper')} “${esc(b.voice)}”</em>` : ''}
     ${coin ? `<a href="#coin/${esc(b.mint)}" data-coin="${esc(b.mint)}">See its candle →</a>`
     : b.sig ? `<a href="${solscan(esc(b.sig))}" target="_blank" rel="noopener">View TX ↗</a>` : ''}`;
   el.hidden = false;
@@ -544,7 +545,7 @@ const ERRORS = {
 
 let busy = false;
 // burn : « Make it burn », la part (en %) des creator fees qui rachète et brûle le coin lui-même.
-const DRAFT = () => ({ fields: {}, image: null, preview: null, burn: 20 });
+const DRAFT = () => ({ fields: {}, image: null, preview: null, burn: 20, keeper: { style: 'stoic', model: 'llama' } });
 let draft = DRAFT();
 
 
@@ -575,6 +576,22 @@ function costLine(burnPct) {
   return `${fee
     ? `<b>${fee} SOL WICK Ignition Fee</b>: ${split}. Plus ≈ 0.02 SOL of pump.fun creation and network costs, and your dev buy.`
     : '≈ 0.02 SOL of pump.fun creation and network costs, plus your dev buy.'} Your wallet signs, your coin${withShare ? `, ${(l.split?.creatorBps ?? 10_000 - l.shareBps) / 100 - burnPct}% of your creator fees` : ', your pump.fun creator fees'}.`;
+}
+
+// Le Keeper de la bougie (avec « Make it burn ») : sa personnalité et son esprit (le modèle).
+function keeperBlock() {
+  const k = world.launch?.keepers;
+  if (!k) return '';
+  const mono = (by) => esc(by.slice(0, 2));
+  return `<div class="keeper-opt" id="lf-keeper"${burning() ? '' : ' hidden'}>
+    <div class="burn-head"><b>${icon('keeper')} Your <span class="grad">Keeper</span></b>
+      <small>An AI agent tends your candle. It picks the moments to buy your coin back and burn it, and tells your holders why.
+      It decides when, never how much: the SOL can only burn your coin.</small></div>
+    <span class="k-label">Personality</span>
+    <div class="k-styles" role="group" aria-label="Personality">${k.styles.map((s) => `<button type="button" class="k-style${draft.keeper.style === s.id ? ' on' : ''}" data-kstyle="${esc(s.id)}" aria-pressed="${draft.keeper.style === s.id}"><b>${esc(s.label)}</b><small>${esc(s.hint)}</small></button>`).join('')}</div>
+    <span class="k-label">The mind <em>· runs free on Cloudflare</em></span>
+    <div class="k-minds" role="group" aria-label="The mind">${k.models.map((m) => `<button type="button" class="k-mind${draft.keeper.model === m.id ? ' on' : ''}" data-kmodel="${esc(m.id)}" aria-pressed="${draft.keeper.model === m.id}"><i>${mono(m.by)}</i><span><b>${esc(m.name)}</b><small>${esc(m.by)}</small></span></button>`).join('')}</div>
+  </div>`;
 }
 
 function launchForm(error = '') {
@@ -613,7 +630,9 @@ function launchForm(error = '') {
         <small class="muted" id="lf-legend">${burnSplit(burning()).legend}</small>
         <small class="lock">${icon('lock')} Locked on pump.fun. Nobody can change it, not even WICK.</small>
       </div>` : ''}
+      ${keeperBlock()}
       <input type="hidden" name="burn" value="${burning()}"><input type="hidden" name="share" value="${burning() ? '1' : ''}">
+      <input type="hidden" name="keeper_style" value="${esc(draft.keeper.style)}"><input type="hidden" name="keeper_model" value="${esc(draft.keeper.model)}">
       <p class="cost" id="lf-cost">${costLine(burning())}</p>
       <p class="error" id="lf-error"${error ? '' : ' hidden'}>${esc(error)}</p>
       <button class="cta wide" type="submit">${DEMO ? 'Launch (demo)' : connect.current() ? 'Launch your coin' : 'Connect wallet & launch'}</button>
@@ -633,6 +652,17 @@ function launchForm(error = '') {
   });
   form.querySelectorAll('[data-sol]').forEach((b) => b.addEventListener('click', () => { form.devBuy.value = b.dataset.sol; }));
   form.addEventListener('input', () => { draft.fields = Object.fromEntries(new FormData(form)); });
+  const pickKeeper = (attr, key) => form.querySelectorAll(`[${attr}]`).forEach((b) => b.addEventListener('click', () => {
+    draft.keeper[key] = b.getAttribute(attr);
+    form.querySelectorAll(`[${attr}]`).forEach((x) => {
+      const on = x === b;
+      x.classList.toggle('on', on);
+      x.setAttribute('aria-pressed', String(on));
+    });
+    form[`keeper_${key}`].value = draft.keeper[key];
+  }));
+  pickKeeper('data-kstyle', 'style');
+  pickKeeper('data-kmodel', 'model');
   form.querySelectorAll('[data-burn]').forEach((b) => b.addEventListener('click', () => {
     draft.burn = Number(b.dataset.burn);
     const pct = burning();
@@ -643,6 +673,8 @@ function launchForm(error = '') {
     });
     form.burn.value = String(pct);
     form.share.value = pct ? '1' : '';
+    const kb = $('lf-keeper');
+    if (kb) kb.hidden = !pct;
     const split = burnSplit(pct);
     $('lf-split').innerHTML = split.bar;
     $('lf-legend').textContent = split.legend;
@@ -829,6 +861,8 @@ function start() {
   // Une page demandée dans l'adresse (trywick.fun/#wick…) s'ouvre une fois l'état chargé.
   const page = location.hash.slice(1);
   poll(true).then(() => { if (isRoute(page)) go(page); });
+  // Un lien vers une autre page du site (#candles, #coin/…) depuis la même page l'ouvre aussi.
+  window.addEventListener('hashchange', () => { const next = location.hash.slice(1); if (isRoute(next)) go(next); });
   tokenPage.prefetch();
 }
 

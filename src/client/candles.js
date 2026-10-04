@@ -58,7 +58,8 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
           <span class="eyebrow">Make it burn</span>
           <h2>Every coin is a <span class="grad">candle</span>.</h2>
           <p class="muted">Coins launched on WICK can burn themselves: a share of their creator fees buys them back and
-            burns them, forever. Locked on pump.fun. Every candle also burns ${tk()}.</p>
+            burns them, forever, locked on pump.fun. Each candle has an AI Keeper that picks the moments and tells you why.
+            Every candle also burns ${tk()}.</p>
         </div>
         <button class="cta" id="cd-light">Light your candle</button>
       </div>
@@ -81,7 +82,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
             <span class="mono dim">${String(i + 1).padStart(2, '0')}</span>
             ${candleHtml({ pct: m.candle?.pct ?? 0, w: 11, full: 30, gold: m.holder })}
             ${avatar(m, 30)}
-            <span class="cd-name"><b>$${esc(m.symbol)} ${holderTag(m)}</b><small>burns ${m.candle.bps / 100}% of its fees</small></span>
+            <span class="cd-name"><b>$${esc(m.symbol)} ${holderTag(m)}</b><small>burns ${m.candle.bps / 100}% of its fees${m.candle.keeper ? ` · ${esc(m.candle.keeper.label)} Keeper` : ''}</small></span>
             <span class="cd-num gold">${pctText(m.candle.pct)}<small>burned</small></span>
             <span class="cd-num hide-sm">${usd(m.mcap)}<small>mcap</small></span>
           </button></li>`).join('')}</ol>`
@@ -160,11 +161,22 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
             <a class="wbtn" href="https://x.com/intent/post?text=${encodeURIComponent(tweet)}" target="_blank" rel="noopener">Share its candle</a>
             <a class="wbtn" href="https://solscan.io/token/${esc(m.mint)}" target="_blank" rel="noopener">Solscan ↗</a>
           </div>
+          ${c?.keeper ? `<section class="keeper-card">
+            <div class="kc-head">
+              <span class="kc-avatar">${icon('keeper')}</span>
+              <div><b>Keeper of $${esc(m.symbol)}</b><small>${esc(c.keeper.label)} · runs on ${esc(c.keeper.model)} (${esc(c.keeper.by)})</small></div>
+              <span class="kc-status"><i></i>tending</span>
+            </div>
+            ${c.keeper.intro ? `<blockquote>“${esc(c.keeper.intro)}”</blockquote>` : ''}
+            <p class="kc-thought">${c.keeper.thought
+              ? `Latest thought, ${ago(c.keeper.thoughtAt)}: <b>“${esc(c.keeper.thought)}”</b>`
+              : `It wakes up once ${esc(m.symbol)}'s fees fill its candle (0.01 SOL), then picks the moment to burn. Never more than 24 hours.`}</p>
+          </section>` : ''}
           ${m.share ? `<div class="cn-split">
             <small class="eyebrow">Where its creator fees go</small>
             <div class="split-bar">
               <span style="width:${creatorBps / 100}%">Creator ${creatorBps / 100}%</span>
-              ${selfBps ? `<span class="self" style="width:${selfBps / 100}%">${selfBps >= 1500 ? `Burns $${esc(m.symbol)} ` : ''}${selfBps / 100}%</span>` : ''}
+              ${selfBps ? `<span class="self" style="width:${selfBps / 100}%">${selfBps >= 1500 ? (selfBps >= 2000 && m.symbol.length <= 5 ? `Burns $${esc(m.symbol)} ` : 'Burns ') : ''}${selfBps / 100}%</span>` : ''}
               ${wickBps - teamBps > 0 ? `<span class="wick" style="width:${(wickBps - teamBps) / 100}%"></span>` : ''}
               ${teamBps ? `<span class="team" style="width:${teamBps / 100}%"></span>` : ''}
             </div>
@@ -180,7 +192,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
                 <td>${sol(b.sol)}</td>
                 <td class="dim">${pctText((b.burned / 1e9) * 100)}</td>
                 <td>${b.sig ? `<a href="${solscan(esc(b.sig))}" target="_blank" rel="noopener">TX ↗</a>` : ''}</td>
-              </tr>`).join('')}</tbody></table></div>`
+              </tr>${b.voice ? `<tr class="voice"><td colspan="5">${icon('keeper')} “${esc(b.voice)}”</td></tr>` : ''}`).join('')}</tbody></table></div>`
               : `<p class="muted">${c ? 'No burn yet. Its first buyback happens once its creator fees pile up (at least 0.01 SOL for its candle).' : 'This coin was launched without Make it burn.'}</p>`}
           </section>
         </div>

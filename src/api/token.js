@@ -3,6 +3,7 @@
 //   POST /api/trade/prepare  { owner, side, amount, slippage } → la transaction à signer
 //   POST /api/trade/send     { owner, tx }   → envoyée sur Solana
 //   GET  /api/trade/status?sig=…             → pending | ok | failed
+import { shortOfFunds, tradeNeedSol } from '../../lib/funds.js';
 import { json } from '../../lib/http.js';
 import { base64FromBytes, bytesFromBase64, sendTransaction, signatureOf, signatureStatus } from '../../lib/solana.js';
 import { buildTradeTx, checkTradeTx, tokenView, validateTrade } from '../../lib/token.js';
@@ -16,6 +17,9 @@ export async function tradePrepare({ request, env }) {
   if (!env.TOKEN_MINT) return json({ error: 'not_live' }, 409);
   const { value: t, error } = validateTrade(await request.json().catch(() => null));
   if (error) return json({ error }, 400);
+  // Assez de SOL pour l'achat (ou les frais de la vente) avant de proposer la signature.
+  const short = await shortOfFunds(env, t.owner, tradeNeedSol(t));
+  if (short) return json({ error: 'no_funds', ...short }, 409);
   let tx;
   try {
     tx = await buildTradeTx(env, t);

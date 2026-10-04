@@ -22,7 +22,7 @@ const b64 = {
 async function call(url, init) {
   const res = await fetch(url, init);
   const data = await res.json().catch(() => ({ error: 'server_error' }));
-  if (data.error) throw Object.assign(new Error(data.error), { code: data.error });
+  if (data.error) throw Object.assign(new Error(data.error), { code: data.error, data });
   return data;
 }
 const post = (url, body) => call(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });

@@ -515,6 +515,12 @@ function go(page) {
 }
 
 // ------------------------------------------------------------ frapper une allumette
+// Le serveur vérifie le solde avant de faire signer : il dit combien il faut, et combien le wallet a.
+function noFunds(err, what) {
+  const d = err.code === 'no_funds' ? err.data : null;
+  if (!(d?.needSol > 0)) return '';
+  return `Not enough SOL in your wallet. ${what} needs about ${d.needSol} SOL (fees included), your wallet has ${d.haveSol ?? 0} SOL. Nothing was sent.`;
+}
 const ERRORS = {
   bad_name: 'Give your coin a name (32 characters max).',
   bad_symbol: 'Ticker: letters and numbers only, 10 max.',
@@ -796,7 +802,7 @@ async function submitLaunch(form) {
   } catch (err) {
     busy = false;
     if (err.code === 'mint_taken') mod?.resetMint();
-    launchForm(ERRORS[err.code] || 'Something went wrong. Try again.');
+    launchForm(noFunds(err, 'This launch') || ERRORS[err.code] || 'Something went wrong. Try again.');
   }
 }
 

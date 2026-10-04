@@ -39,6 +39,7 @@ const ICONS = {
   dashboard: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
   pillar: '<path d="M3 21h18M5 21V10M19 21V10M9.5 21V10M14.5 21V10M2.5 10 12 3.5l9.5 6.5z"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
 };
 export function icon(name, cls = '') {
   return `<svg class="ico${cls ? ` ${cls}` : ''}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ICONS.flame}</svg>`;

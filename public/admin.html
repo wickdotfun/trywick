@@ -314,6 +314,7 @@
         <dd class="sep"></dd>
         <dt>Ignition Fees to the burn</dt><dd>${solv(t.ignitionBurnSol ?? t.ignitionSol ?? 0)}</dd>
         <dt>Shared fees to the burn</dt><dd>${solv(t.sharedSol || 0)}</dd>
+        <dt>Coins burning themselves</dt><dd>${num(t.candles || 0, 0)} <small>· ${solv(t.selfSharedSol || 0)} set aside · ${num(t.candleBurns || 0, 0)} burns</small></dd>
         <dt>Total SOL turned into burns</dt><dd>${solv(t.sol || 0)}${inUsd(t.sol || 0)}</dd>` : '<dt>Dev wallet</dt><dd class="dim">not set</dd>';
       const sp = c.fees?.split;
       $('earn-note').innerHTML = `<b>Where the money goes:</b> $${T}'s own creator fees are <b>100% yours</b>: they wait on pump.fun for the dev wallet, the site never touches them.
@@ -410,10 +411,10 @@
       const STATUS = { queued: ['queued', 'work'], buying: ['buying…', 'work'], bought: ['bought, burning next', 'work'], burning_tx: ['burning…', 'work'], burned: ['burned', 'ok'], skipped: ['skipped', ''], failed: ['failed', 'bad'], ended: ['waiting', 'work'], burning: ['now', 'ok'] };
       const status = (s, note) => `${pill(...(STATUS[s] || [s]))}${note ? ` <small class="dim">${esc(NOTES[note] || note)}</small>` : ''}`;
       $('burns').innerHTML = d.burns.length ? d.burns.map((b) => `<tr>
-        <td>${b.id}</td><td>${b.kind === 'candle' ? `Buyback · breath #${esc(b.ref)}` : `Ignition Fee · $${esc(b.symbol || '?')}`}</td>
+        <td>${b.id}</td><td>${b.kind === 'candle' ? `Buyback · breath #${esc(b.ref)}` : b.kind === 'coin' ? `Its own candle · $${esc(b.symbol || '?')}` : `Ignition Fee · $${esc(b.symbol || '?')}`}</td>
         <td>${status(b.status, b.note)}</td>
         <td>${b.sol != null ? `${num(b.sol)} ${tx(b.buy_sig, '↗')}` : ''}</td>
-        <td>${b.burned_ui != null ? `<b>${num(b.burned_ui, 0)}</b> ${tx(b.burn_sig, '↗')}` : tx(b.burn_sig, 'pending ↗')}</td>
+        <td>${b.burned_ui != null ? `<b>${num(b.burned_ui, 0)}</b>${b.kind === 'coin' ? ` <small class="dim">$${esc(b.symbol || '?')}</small>` : ''} ${tx(b.burn_sig, '↗')}` : tx(b.burn_sig, 'pending ↗')}</td>
         <td>${ago(b.created_at)}</td></tr>`).join('') : '<tr><td colspan="6" class="dim">No burn yet.</td></tr>';
       $('cycles').innerHTML = d.cycles.map((r) => `<tr>
         <td>${r.id}</td><td>${r.ended_at ? ago(r.ended_at) : '<span class="ok">now</span>'}</td><td>${r.matches}</td>

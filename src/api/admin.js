@@ -8,6 +8,7 @@ import { CONFIG, candlePct, cycleTiming } from '../../lib/config.js';
 import { burnTotals, launchTotals, publicCycle, tickCycle } from '../../lib/cycles.js';
 import { json } from '../../lib/http.js';
 import { pinataStatus } from '../../lib/pump.js';
+import { candleTotals } from '../../lib/candles.js';
 import { ensureSchema } from '../../lib/schema.js';
 import { deployer } from '../../lib/announce.js';
 import { PUMP, PUMP_AMM, shareTotals } from '../../lib/sharing.js';
@@ -109,7 +110,8 @@ export const adminStatus = guarded(async ({ env }) => {
       ORDER BY c.id DESC LIMIT 20`).all(),
     db.prepare('SELECT COUNT(*) AS n FROM matches WHERE seq IS NULL AND signature IS NOT NULL').first(),
     db.prepare(`SELECT b.id, b.kind, b.ref, b.created_at, b.status, b.note, b.sol, b.buy_sig, b.burn_sig, b.burned_ui, m.symbol
-      FROM burns b LEFT JOIN matches m ON b.kind = 'match' AND m.mint = b.ref ORDER BY b.id DESC LIMIT 20`).all(),
+      FROM burns b LEFT JOIN matches m ON m.mint = CASE b.kind WHEN 'match' THEN b.ref
+        WHEN 'coin' THEN substr(b.ref, 1, instr(b.ref, ':') - 1) END ORDER BY b.id DESC LIMIT 20`).all(),
     feeSummary(env),
     shareTotals(db),
     getSetting(db, 'launch.announced'),
@@ -168,7 +170,7 @@ export const adminStatus = guarded(async ({ env }) => {
     lastError,
     // Le tableau de bord du jour J.
     heartbeat,
-    totals: { ...burned, ...launched, ...shares },
+    totals: { ...burned, ...launched, ...shares, ...(await candleTotals(db)) },
     supply: supply?.original ? { ...supply, candle: supplyCandle(supply.pct, candlePct(env)) } : null,
     day,
     market: market?.market ? { ...market.market, curve: market.curve, holders: market.holders } : null,

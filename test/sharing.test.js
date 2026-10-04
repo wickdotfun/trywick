@@ -139,8 +139,11 @@ test('the reduced Ignition Fee only exists with sharing', async () => {
   const burn = wallet.publicKey.toBase58(), team = CONFIG.launch.deployer;
   assert.deepEqual(await launchFee(env, { shared: true }), {
     lamports: 10_000_000, to: burn, burn: 5_000_000, team: { to: team, lamports: 5_000_000 }, teamWallet: team,
-    holders: [{ address: burn, bps: 500 }, { address: team, bps: 500 }],
+    holders: [{ address: burn, bps: 500 }, { address: team, bps: 500 }], selfBps: 0,
   });
+  // « Make it burn » : le wallet burn reçoit aussi la part qui rachète le coin lui-même.
+  assert.deepEqual((await launchFee(env, { shared: true, selfBps: 2000 })).holders, [{ address: burn, bps: 2500 }, { address: team, bps: 500 }]);
+  assert.equal((await launchFee(env, { shared: true, selfBps: 1234 })).selfBps, 0);   // seules les parts proposées
   assert.equal((await launchFee(env)).lamports, 20_000_000);
   assert.equal(await launchFee({ ...env, SHARE_BURN_BPS: '5000', SHARE_TEAM_BPS: '5000' }, { shared: true }), null);
   const free = await launchFee({ ...env, SHARE_BURN_BPS: '1000', SHARE_TEAM_BPS: '0', LAUNCH_FEE_SHARED_SOL: '0' }, { shared: true });
@@ -262,7 +265,7 @@ test('launch with sharing: held until the coin exists, then shared, then distrib
   assert.ok(dist.keys.includes(creator.publicKey.toBase58()));
   assert.ok(dist.keys.includes(CONFIG.launch.deployer));
   assert.equal(await runShares(env, Date.now() + 7 * 3600_000 + 60_000), 0);   // déjà distribué : on attend 6 h
-  assert.deepEqual(await shareTotals(db), { sharedSol: 0.02, teamSharedSol: 0.02, sharingCoins: 1 });
+  assert.deepEqual(await shareTotals(db), { sharedSol: 0.02, selfSharedSol: 0, teamSharedSol: 0.02, sharingCoins: 1 });
 
   // Trop peu accumulé : pas de distribution.
   vault = 890_880 + 1000;

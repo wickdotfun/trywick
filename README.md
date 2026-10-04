@@ -2,8 +2,9 @@
 
 **[trywick.fun](https://trywick.fun)** · [@trywickdotfun](https://x.com/trywickdotfun) · [Telegram](https://t.me/trywickdotfun)
 
-**The candle is $WICK. Every coin melts it.** Every token launched through WICK becomes a match. Every match
-feeds the flame. Every flame burns $WICK: launch a coin → Ignition Fee → buy $WICK → burn $WICK.
+**Every coin is a candle.** Launch a coin on pump.fun through WICK and it can burn itself, forever: a share of its
+creator fees buys it back and burns it. Every launch and every candle also burns $WICK, the big candle in the middle.
+Launch a coin → it burns itself → it feeds $WICK → burn $WICK.
 
 - **One candle = 0.5% of the $WICK supply.** When it's fully consumed, that slice of $WICK is gone forever:
   the candle joins the **candle hall** (with its story: launches, hottest coin) and the next one is lit.
@@ -12,10 +13,12 @@ feeds the flame. Every flame burns $WICK: launch a coin → Ignition Fee → buy
 - **Every launch burns $WICK.** The **WICK Ignition Fee** (0.02 SOL, WICK's own fee, not a pump.fun fee), signed
   together with the launch: **50% burns $WICK, 50% funds the team**. Both transfers are in the same transaction; the
   burn half buys $WICK and burns it within a minute.
-- **Share the fire (optional).** At launch, the creator can share **10% of the coin's pump.fun creator fees** with
-  WICK, forever, and pays a reduced **0.01 SOL** Ignition Fee instead of 0.02 (also 50/50). The split
-  (**90% creator · 5% burn · 5% team**) is set with pump.fun's own fee sharing and locked on-chain: nobody can change
-  it, not even WICK. The burn part buys $WICK and burns it at the next buyback. See "Creator fee sharing" below.
+- **Make it burn (optional).** At launch, the creator picks **10, 20, 30 or 50% of the coin's pump.fun creator fees**
+  to buy the coin itself back and burn it, forever: the coin becomes a **candle**, with its own page (`/#coin/<mint>`),
+  every burn on Solscan, and its place in the forest (`/#candles`). On top of that, 5% burns $WICK and 5% funds the
+  team; the rest is the creator's. The Ignition Fee drops to **0.01 SOL** (also 50/50). The split is set with pump.fun's
+  own fee sharing and locked on-chain: nobody can change it, not even WICK. See "Make it burn" below.
+  (Without a candle, a creator can still share 10%: 90% creator · 5% burn · 5% team.)
 - **The breath: a buyback every 30 minutes at most.** Everything waiting in the burn wallet buys back and burns
   $WICK. Every launch brings the next buyback 1 minute closer. The countdown is on screen.
 - **$WICK's own creator fees** are not part of the burn: they go to the dev wallet that launched $WICK, like any
@@ -92,6 +95,25 @@ $WICK in the wallet (a dev buy, for example) is never touched. Two kinds:
 Each step is claimed by an atomic database write, so two overlapping crons never buy twice. A failed buy
 leaves the SOL in the wallet. Without `TOKEN_MINT` and `BUYBACK_SECRET_KEY`, the breath still runs, nothing is
 bought ("no buyback yet"), and launching costs nothing extra.
+
+## Make it burn
+
+A coin's candle is fed by its own creator fees (`lib/candles.js`, `lib/sharing.js`, `lib/buyback.js`):
+
+1. **Launch**: the creator picks the share (`burn` = 10, 20, 30 or 50). The locked split gives the burn wallet that
+   share plus the 5% for $WICK (one shareholder), the team wallet 5%, the creator the rest.
+2. **Distribution** (cron, every 6 hours at most per coin): what the burn wallet receives from a coin is split. The
+   coin's part (its share over the burn wallet's whole share) is set aside for that coin (`matches.self_pending`); the
+   rest joins the $WICK pot.
+3. **Queue**: once a coin has at least 0.01 SOL set aside, a burn of kind `coin` joins the burn queue
+   (`ref` = `mint:distribution id`), minus 0.0005 SOL kept for network fees. The coin's SOL never counts in the $WICK pot;
+   a failed buy gives it back to the coin.
+4. **Buy and burn**: the same safe state machine as the $WICK burns, but the bought token is the coin itself. Once
+   burned, the coin's candle melts (`self_burned`, `self_sol`, `self_burns`), and the burn shows on the site, in the
+   feed and on the coin's page. $WICK's own numbers (supply burned, candles, Hall of Flames) never count coin burns.
+
+`GET /api/candles` returns the forest (coins that burn themselves, most burned first), their latest burns and totals;
+`GET /api/coin?mint=…` returns one coin, its candle and every burn.
 
 ## Creator fee sharing
 

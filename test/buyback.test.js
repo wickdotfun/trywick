@@ -7,6 +7,7 @@ import { buybackWallet, parseSecretKey, runBuyback } from '../lib/buyback.js';
 import { tickCycle } from '../lib/cycles.js';
 import { ensureSchema } from '../lib/schema.js';
 import { base58, buildBurnTx, signTransaction } from '../lib/solana.js';
+import { fakeChain } from './helpers/chain.js';
 import { fakeD1 } from './helpers/d1.js';
 
 const MIN = 60_000;
@@ -69,59 +70,6 @@ test('the burn transaction is a valid SPL Burn, signed by the owner', async () =
   assert.equal(ix.data[0], 8);
   assert.equal(ix.data.readBigUInt64LE(1), 123456789012345n);
 });
-
-// Un faux Solana + PumpPortal : chaque achat rapporte 1 000 000 de jetons au wallet.
-export function fakeChain(wallet, { lamports, held = 5_000_000n, failBuy = false }) {
-  const calls = [];
-  const portal = [];          // les actions PumpPortal, dans l'ordre où leurs transactions partent
-  const sent = [];
-  const buys = [];
-  let tokens = held;
-  globalThis.fetch = async (url, init) => {
-    const body = init?.body;
-    if (String(url).includes('pumpportal')) {
-      const req = JSON.parse(body);
-      calls.push(`portal:${req.action}`);
-      portal.push(req);
-      const msg = new TransactionMessage({
-        payerKey: new PublicKey(wallet.publicKey), recentBlockhash: BLOCKHASH,
-        instructions: [SystemProgram.transfer({ fromPubkey: new PublicKey(wallet.publicKey), toPubkey: new PublicKey(wallet.publicKey), lamports: portal.length })],
-      }).compileToV0Message();
-      return new Response(new VersionedTransaction(msg).serialize());
-    }
-    const { method, params } = JSON.parse(body);
-    calls.push(method);
-    const ok = (result) => Response.json({ jsonrpc: '2.0', id: 1, result });
-    switch (method) {
-      case 'getBalance': return ok({ value: lamports });
-      case 'getTokenAccountsByOwner': return ok({ value: [{ pubkey: 'Acc1111111111111111111111111111111111111111', account: { owner: TOKEN_PROGRAM, data: { parsed: { info: { tokenAmount: { amount: String(tokens), decimals: 6 } } } } } }] });
-      case 'sendTransaction': {
-        const raw = Buffer.from(params[0], 'base64');
-        const tx = VersionedTransaction.deserialize(raw);
-        const sig = base58(tx.signatures[0]);
-        const key = await crypto.subtle.importKey('raw', new PublicKey(wallet.publicKey).toBytes(), { name: 'Ed25519' }, false, ['verify']);
-        assert.ok(await crypto.subtle.verify('Ed25519', key, tx.signatures[0], tx.message.serialize()));
-        sent.push(sig);
-        const isBurn = tx.message.staticAccountKeys.some((k) => k.toBase58() === TOKEN_PROGRAM);
-        if (!isBurn) {
-          const req = portal.shift();
-          if (req?.action === 'buy') {
-            buys.push({ sig, ...req });
-            if (!failBuy) tokens += 1_000_000n;
-          }
-        }
-        return ok(sig);
-      }
-      case 'getSignatureStatuses': {
-        const fail = failBuy && buys.some((b) => b.sig === params[0][0]);
-        return ok({ value: [{ confirmationStatus: 'confirmed', err: fail ? { InstructionError: [0, 'x'] } : null }] });
-      }
-      case 'getLatestBlockhash': return ok({ value: { blockhash: BLOCKHASH } });
-      default: throw new Error(`unexpected rpc ${method}`);
-    }
-  };
-  return { calls, sent, buys, tokens: () => tokens };
-}
 
 async function world(lamports, opts = {}) {
   const kp = Keypair.generate();

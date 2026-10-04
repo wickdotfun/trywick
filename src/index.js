@@ -1,6 +1,7 @@
 // Point d'entrée du Worker Cloudflare. Les fichiers de public/ (le site) sont
 // servis directement ; tout le reste arrive ici, et seules les routes /api existent.
 import { adminPause, adminRun, adminStatus, recordRun } from './api/admin.js';
+import { candles, coin } from './api/candles.js';
 import { launches, profile } from './api/explore.js';
 import { prepare, status, submit } from './api/launch.js';
 import { board } from './api/leaderboard.js';
@@ -23,6 +24,8 @@ const ROUTES = {
   'GET /api/leaderboard': board,
   'GET /api/launches': launches,
   'GET /api/profile': profile,
+  'GET /api/candles': candles,
+  'GET /api/coin': coin,
   'GET /api/token': token,
   'POST /api/trade/prepare': tradePrepare,
   'POST /api/trade/send': tradeSend,

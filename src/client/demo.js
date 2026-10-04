@@ -4,7 +4,7 @@
 // et un lancement factice (pas de wallet).
 import { cycleProgress, supplyCandle } from '../../lib/candle.js';
 
-const WORDS = ['Moon', 'Wax', 'Ember', 'Pepe', 'Wick', 'Cat', 'Dog', 'Frog', 'Spark', 'Flare', 'Torch', 'Smoke',
+const WORDS = ['Moon', 'Wax', 'Ember', 'Pepe', 'Moth', 'Cat', 'Dog', 'Frog', 'Spark', 'Flare', 'Torch', 'Smoke',
   'Ash', 'Burn', 'Lit', 'Glow', 'Fuse', 'Blaze', 'Melt', 'Drip', 'Sol', 'Bonk', 'Goblin', 'Chad', 'Based', 'Tiny'];
 const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
@@ -22,6 +22,7 @@ export function createDemo() {
   const burns = [];
   const history = [];
   const hall = [];
+  const coinBurns = [];      // « Make it burn » : les coins qui se brûlent eux-mêmes
   let seq = 0;
   let pot = 0.42;
   let burned = 0;
@@ -57,8 +58,13 @@ export function createDemo() {
       holder: Math.random() < 0.18, mcap, change: mcap ? Math.round((Math.random() - 0.35) * 160) : null, burned: null,
       volume: mcap ? Math.round(mcap * (0.2 + Math.random() * 1.5)) : null, sig: null, fee: null,
       share: Math.random() < 0.65 ? { bps: 1000, teamBps: 500, live: true } : null,
+      candle: null,
       ...extra,
     };
+    // La plupart des coins qui partagent ont choisi « Make it burn ».
+    if (m.share && m.candle === null && !extra.share && Math.random() < 0.8) {
+      m.candle = { bps: pick([1000, 2000, 2000, 3000, 5000]), burned: 0, pct: 0, sol: 0, burns: 0, live: true };
+    }
     all.push(m);
     breath.matches++;
     pot += 0.01 + Math.random() * 0.02;     // les creator fees qui coulent
@@ -83,6 +89,34 @@ export function createDemo() {
   }
   burns.sort((a, b) => b.at - a.at);
   breath.matches = 3;
+
+  // Une bougie de coin fond : ses fees le rachètent et le brûlent.
+  function coinBurn(m, at = Date.now()) {
+    const share = (0.002 + Math.random() * 0.012) * (m.candle.bps / 2000);
+    const amount = Math.round(SUPPLY * share * (1 - m.candle.pct / 100));
+    const sol = Math.round((0.05 + Math.random() * 0.6) * (m.candle.bps / 2000) * 1000) / 1000;
+    m.candle.burned += amount;
+    m.candle.pct = (m.candle.burned / SUPPLY) * 100;
+    m.candle.sol += sol;
+    m.candle.burns++;
+    const b = { mint: m.mint, symbol: m.symbol, image: m.image, at, burned: amount, sol, sig: null };
+    coinBurns.unshift(b);
+    return b;
+  }
+  // Un passé : les plus anciennes bougies ont déjà bien fondu.
+  for (const m of all.filter((x) => x.candle)) {
+    const n = 2 + Math.floor(Math.random() * 10);
+    for (let k = 0; k < n; k++) coinBurn(m, Date.now() - 6 * 3600_000 + Math.random() * 6 * 3600_000 - 60_000);
+  }
+  coinBurns.sort((a, b) => b.at - a.at);
+  setInterval(() => {
+    const lit = all.filter((m) => m.candle && m.mcap);
+    if (lit.length) coinBurn(pick(lit));
+  }, 11000);
+  const candleTotals = () => {
+    const lit = all.filter((m) => m.candle);
+    return { candles: lit.length, candleBurns: lit.reduce((n, m) => n + m.candle.burns, 0), candleSol: lit.reduce((n, m) => n + m.candle.sol, 0) };
+  };
 
   // Le souffle s'achève : faux buyback, puis le suivant.
   function tick() {
@@ -142,9 +176,11 @@ export function createDemo() {
           teamSharedSol: all.filter((m) => m.share).reduce((n, m) => n + (m.volume || 0) / 180 * 0.0005, 0),
           sharedSol: all.filter((m) => m.share).reduce((n, m) => n + (m.volume || 0) / 180 * 0.0005, 0), sharingCoins: all.filter((m) => m.share).length,
           volume24h: all.reduce((n, m) => n + (m.volume || 0), 0), supply: { original: SUPPLY, current: SUPPLY - burned },
+          ...candleTotals(),
           lastLaunch: all.length ? { mint: all.at(-1).mint, symbol: all.at(-1).symbol, at: all.at(-1).at, sig: null } : null,
         },
         burns: { full, list: (full ? burns : burns.slice(0, 20)).map((b) => ({ ...b })) },
+        coinBurns: coinBurns.slice(0, full ? 30 : 10).map((b) => ({ ...b })),
         hall: hall.map((h) => ({ ...h })),
         recent: full ? all.slice(-30).reverse().map(pub) : null,
         hot: all.filter((m) => m.mcap && m.at > now - 86_400_000).sort((a, b) => b.mcap - a.mcap).slice(0, 5).map(pub),
@@ -154,7 +190,7 @@ export function createDemo() {
         launch: {
           maxDevBuy: 5, feeSol: FEE, burnSol: FEE / 2, teamSol: FEE / 2,
           sharedFeeSol: SHARED_FEE, sharedBurnSol: SHARED_FEE / 2, sharedTeamSol: SHARED_FEE / 2,
-          shareBps: 1000, split: { creatorBps: 9000, burnBps: 500, teamBps: 500 },
+          shareBps: 1000, split: { creatorBps: 9000, burnBps: 500, teamBps: 500 }, selfOptions: [1000, 2000, 3000, 5000],
         },
       };
     },
@@ -180,8 +216,9 @@ export function createDemo() {
         new: (a, b) => b.seq - a.seq,
         volume: (a, b) => (b.volume || 0) - (a.volume || 0),
         burner: (a, b) => (b.burned || 0) - (a.burned || 0),
+        candles: (a, b) => (b.candle?.burned || 0) - (a.candle?.burned || 0),
       }[sort] || ((a, b) => b.seq - a.seq);
-      const list = all.filter((m) => sort !== 'trending' || m.at > now - 3 * 86_400_000).sort(by);
+      const list = all.filter((m) => (sort !== 'trending' || m.at > now - 3 * 86_400_000) && (sort !== 'candles' || m.candle)).sort(by);
       return { sort, coins: list.slice(offset, offset + 30).map(pub), more: list.length > offset + 30 };
     },
     async profile(wallet) {
@@ -244,8 +281,19 @@ export function createDemo() {
         name: fields.name, symbol: fields.symbol, creator: 'YouDemo1111111111111111111111111111111111111',
         image: image ? URL.createObjectURL(image) : null, devBuy: Number(fields.devBuy) || 0, mcap: null, change: null, holder: false,
         share: fields.share === '1' ? { bps: 1000, teamBps: 500, live: true } : null,
+        candle: Number(fields.burn) > 0 ? { bps: Number(fields.burn) * 100, burned: 0, pct: 0, sol: 0, burns: 0, live: true } : null,
       });
       return { match: pub(m), signature: null };
+    },
+    // La forêt des bougies, et la page d'un coin.
+    async candles() {
+      const forest = all.filter((m) => m.candle).sort((a, b) => b.candle.burned - a.candle.burned || (b.mcap || 0) - (a.mcap || 0));
+      return { forest: forest.slice(0, 40).map(pub), burns: coinBurns.slice(0, 30).map((b) => ({ ...b })), totals: candleTotals() };
+    },
+    async coin(mint) {
+      const m = all.find((x) => x.mint === mint);
+      if (!m) throw new Error('unknown_mint');
+      return { match: pub(m), burns: coinBurns.filter((b) => b.mint === mint).map((b) => ({ ...b })) };
     },
   };
 }

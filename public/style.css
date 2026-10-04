@@ -841,3 +841,137 @@ details[open] { display: flex; flex-direction: column; gap: 10px; }
 .tag.gold .ico { color: var(--gold); font-size: 11px; vertical-align: -.1em; }
 .tag.gold { display: inline-flex; align-items: center; }
 #strike-btn .match-ico { width: 20px; height: 20px; }
+
+/* ======================================================================
+   Make it burn : chaque coin devient une bougie (la forêt, la page d'un coin)
+   ====================================================================== */
+.cdl { position: relative; display: inline-flex; flex-direction: column; align-items: center; flex: none; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: default; }
+button.cdl { cursor: pointer; }
+button.cdl:hover .cdl-flame { filter: drop-shadow(0 0 12px rgba(255, 180, 70, 1)) drop-shadow(0 0 36px rgba(255, 130, 30, .8)); }
+button.cdl:focus-visible { outline: 2px solid var(--gold); outline-offset: 6px; border-radius: 8px; }
+.cdl i { display: block; font-style: normal; }
+.cdl-halo { position: absolute; left: 50%; top: calc(var(--fh) * .55); width: calc(var(--fw) * 6); height: calc(var(--fw) * 6); transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 170, 60, .32) 0%, rgba(255, 140, 40, .12) 35%, rgba(255, 120, 30, 0) 68%); }
+.cdl.big .cdl-halo { width: calc(var(--fw) * 9); height: calc(var(--fw) * 9); }
+.cdl-flame { position: relative; z-index: 2; width: var(--fw); height: var(--fh); border-radius: 50% 50% 45% 45% / 62% 62% 38% 38%;
+  background: radial-gradient(ellipse at 50% 74%, #fffbe8 0%, #ffe08a 22%, #ffb347 46%, #ff7a1a 68%, rgba(255, 90, 20, 0) 78%);
+  filter: drop-shadow(0 0 10px rgba(255, 160, 60, .9)) drop-shadow(0 0 28px rgba(255, 120, 30, .55));
+  transform-origin: 50% 92%; animation: flick var(--d, 1.7s) ease-in-out infinite alternate; }
+.cdl-flame > i { position: absolute; left: 33%; right: 33%; bottom: 9%; height: 36%; border-radius: 50%; background: radial-gradient(ellipse at 50% 70%, rgba(140, 180, 255, .6), rgba(140, 180, 255, 0) 70%); }
+.cdl-flame.out { opacity: .18; filter: none; animation: none; }
+@keyframes flick { 0% { transform: scale(1, 1) rotate(-1.5deg); } 35% { transform: scale(.95, 1.06) rotate(1deg); } 70% { transform: scale(1.04, .96) rotate(-.6deg); } 100% { transform: scale(.98, 1.04) rotate(1.6deg); } }
+.cdl-wick { width: 2px; height: 7px; background: #1b120c; border-radius: 1px; position: relative; z-index: 1; }
+.cdl-wax { position: relative; width: var(--w); height: var(--h); border-radius: 7px 7px 5px 5px;
+  background: linear-gradient(90deg, #4f3e2c 0%, #bfa784 16%, #f3e4c8 40%, #fff6e2 52%, #dcc7a2 72%, #5e4a35 100%);
+  box-shadow: inset 0 12px 16px -10px rgba(255, 190, 90, .7), 0 22px 34px -14px rgba(0, 0, 0, .9); }
+.cdl.gold .cdl-wax { background: linear-gradient(90deg, #5e3d0c 0%, #b97a1e 14%, #f1b440 36%, #fff1c4 52%, #f1b440 68%, #b97a1e 86%, #5e3d0c 100%);
+  box-shadow: inset 0 12px 16px -10px rgba(255, 240, 190, .9), 0 22px 40px -14px rgba(0, 0, 0, .9), 0 0 50px rgba(255, 180, 60, .2); }
+.cdl-wax::before { content: ""; position: absolute; left: -2px; right: -2px; top: -4px; height: min(11px, 30%); border-radius: 50%; background: inherit; filter: brightness(1.12); }
+.cdl-wax::after { content: ""; position: absolute; left: 22%; top: 2px; width: max(3px, 12%); height: 38%; border-radius: 0 0 4px 4px; background: inherit; filter: brightness(1.18); }
+.cdl-ghost { position: absolute; left: -3px; right: -3px; bottom: 100%; height: var(--burnt); border: 1px dashed rgba(255, 206, 112, .3); border-bottom: 0; border-radius: 8px 8px 0 0; }
+.cdl-label { position: absolute; top: 100%; margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 2px; white-space: nowrap; font: 500 11px/1.15 var(--mono); max-width: max(calc(var(--w) + 20px), 54px); }
+.cdl-label b { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.cdl.big .cdl-label { max-width: none; }
+.cdl-label small { color: var(--muted); font-size: 10.5px; }
+.cdl.gold .cdl-label b, .cdl.big .cdl-label b { color: var(--gold); }
+.cdl.big .cdl-label { font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { .cdl-flame { animation: none; } }
+
+.ember { position: absolute; bottom: 40px; width: 3px; height: 3px; border-radius: 50%; background: #ffcf6a; box-shadow: 0 0 8px #ff9a2e; animation: rise linear infinite; opacity: 0; pointer-events: none; }
+@keyframes rise { 0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: 1; } 100% { transform: translate(18px, -380px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .ember { display: none; } }
+
+/* La forêt */
+.m-candles, .m-coin { width: min(1080px, calc(100vw - 32px)); }
+.cd-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+.cd-head h2 { font-size: 32px; line-height: 1.05; text-transform: uppercase; letter-spacing: -.035em; margin: 6px 0 8px; }
+.cd-head p { max-width: 560px; margin: 0; }
+.cd-head .cta { height: 48px; padding: 0 22px; font-size: 14.5px; }
+.cd-stage { position: relative; margin-top: 18px; height: 420px; border-radius: 22px; overflow: hidden; border: 1px solid var(--gold-line);
+  background: radial-gradient(ellipse 60% 55% at 50% 100%, rgba(255, 140, 40, .2), rgba(255, 140, 40, 0) 70%), linear-gradient(180deg, #0c0806, #0a0605); }
+.cd-floor { position: absolute; left: 0; right: 0; bottom: 0; height: 64px; background: linear-gradient(180deg, rgba(10, 6, 5, 0), rgba(10, 6, 5, .75)); pointer-events: none; z-index: 2; }
+.cd-row { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: safe center; gap: 24px; padding: 0 28px 64px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; z-index: 3; }
+.cd-row::-webkit-scrollbar { display: none; }
+.cd-row .cdl-label { z-index: 3; }
+.cd-live { z-index: 4; position: absolute; left: 18px; top: 16px; display: flex; align-items: center; gap: 8px; font: 500 10.5px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.cd-live i { width: 7px; height: 7px; border-radius: 50%; background: #3ddc84; box-shadow: 0 0 10px #3ddc84; }
+.cd-hint { z-index: 4; position: absolute; right: 18px; top: 14px; font-size: 11.5px; color: var(--dim); }
+.cd-tiles { grid-template-columns: repeat(3, 1fr); }
+.cd-cols { display: flex; flex-wrap: wrap; gap: 14px; }
+.cd-cols > .cd-card { flex: 1 1 340px; min-width: 0; }
+.cd-card { border-radius: 16px; border: 1px solid var(--line); background: rgba(255, 220, 180, .025); padding: 14px 16px; }
+.cd-card h3 { font-size: 15px; display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.cd-card h3 small { font: 500 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+.cd-list, .cd-burns { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.cd-item, .cd-burns a { width: 100%; display: flex; align-items: center; gap: 12px; padding: 9px 6px; border-radius: 10px; border-top: 1px solid var(--line); color: var(--text); text-align: left; }
+.cd-list li:first-child .cd-item, .cd-burns li:first-child a { border-top: 0; }
+.cd-item:hover, .cd-burns a:hover { background: rgba(255, 206, 112, .05); }
+.cd-item .cdl { height: 44px; justify-content: flex-end; }
+.cd-item .cdl-halo { display: none; }
+.cd-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.cd-name b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cd-name small { font-size: 11.5px; color: var(--muted); }
+.cd-num { display: flex; flex-direction: column; align-items: flex-end; font: 600 13.5px/1.2 var(--mono); flex: none; }
+.cd-num small { font: 400 10.5px var(--sans); color: var(--dim); }
+.cd-burns time { font-size: 11.5px; color: var(--dim); flex: none; }
+.dim { color: var(--dim); }
+
+/* La page d'un coin */
+.cn-grid { display: flex; flex-wrap: wrap; gap: 18px; align-items: stretch; }
+.cn-stage { flex: 1 1 300px; min-width: 0; position: relative; border-radius: 22px; border: 1px solid var(--gold-line); min-height: 480px; padding: 70px 18px 18px; box-sizing: border-box;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 18px; text-align: center;
+  background: radial-gradient(ellipse 70% 45% at 50% 100%, rgba(255, 140, 40, .22), rgba(255, 140, 40, 0) 70%), #0b0705; }
+.cn-corner { position: absolute; left: 18px; top: 16px; display: flex; flex-direction: column; gap: 5px; }
+.cn-corner.right { left: auto; right: 18px; align-items: flex-end; }
+.cn-corner small { font: 500 10px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
+.cn-corner b { font-size: 24px; font-weight: 750; letter-spacing: -.03em; }
+.cn-info { flex: 1.4 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.cn-title { display: flex; align-items: center; gap: 14px; }
+.cn-title h2 { font-size: 30px; letter-spacing: -.03em; }
+.cn-title h2 small { font-size: 15px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.cn-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.cn-tag { font: 500 10.5px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line-2); border-radius: 99px; padding: 5px 9px; }
+.cn-tag.gold { color: #1d1003; background: var(--gold-metal); border-color: transparent; font-weight: 600; }
+.cn-tiles { grid-template-columns: repeat(2, 1fr); margin: 0; }
+.cn-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.cn-actions .wbtn { width: auto; height: 44px; padding: 0 18px; }
+.cta.small-cta { height: 44px; padding: 0 20px; font-size: 14px; }
+.cn-split { display: flex; flex-direction: column; gap: 8px; }
+.cn-table { overflow-x: auto; }
+.cn-table table { width: 100%; border-collapse: collapse; font: 500 12.5px var(--mono); min-width: 420px; }
+.cn-table th { text-align: left; font: 500 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); padding: 6px 6px 8px; }
+.cn-table td { padding: 9px 6px; border-top: 1px solid var(--line); }
+.cn-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+.cn-foot .cta { height: 46px; padding: 0 22px; font-size: 14px; }
+
+/* La barre de partage des fees (formulaire, page d'un coin) */
+.split-bar { display: flex; height: 32px; border-radius: 10px; overflow: hidden; font: 600 11px/32px var(--mono); text-align: center; background: #2a1e15; }
+.split-bar span { background: #2a1e15; color: #e9dccb; white-space: nowrap; overflow: hidden; transition: width .35s ease; min-width: 0; }
+.split-bar .self { background: linear-gradient(180deg, #ffb347, #e8650e); color: #1d1003; }
+.split-bar .wick { background: linear-gradient(180deg, #fff1c4, #c98a24); }
+.split-bar .team { background: #6b5440; }
+
+/* Make it burn, dans le formulaire de lancement */
+.burn-opt { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 16px; border: 1px solid rgba(255, 206, 112, .35);
+  background: linear-gradient(180deg, rgba(255, 190, 80, .08), rgba(20, 13, 9, .6)); }
+.burn-head { display: flex; flex-direction: column; gap: 3px; }
+.burn-head b { font-size: 15px; }
+.burn-head small { font-size: 12px; line-height: 1.45; color: var(--muted); }
+.burn-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.pill { height: 36px; min-width: 56px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(20, 13, 9, .9); color: #e9dccb; font: 600 13px var(--mono); }
+.pill:hover { border-color: var(--gold); }
+.pill.on { background: var(--gold-metal); color: #1d1003; border-color: transparent; box-shadow: 0 0 18px rgba(255, 180, 60, .3); }
+.burn-opt .lock { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--dim); }
+.tag.burn { color: #1d1003; background: var(--gold-metal); font-weight: 600; }
+.ex-coin { display: contents; color: inherit; }
+.ev.burn.coin .ev-ico { color: var(--gold); }
+
+@media (max-width: 760px) {
+  .cd-head h2 { font-size: 24px; }
+  .cd-stage { height: 360px; }
+  .cd-row { justify-content: flex-start; gap: 20px; }
+  .cd-hint { display: none; }
+  .cd-tiles { grid-template-columns: repeat(3, 1fr); }
+  .cn-stage { min-height: 400px; }
+  .cn-title h2 { font-size: 24px; }
+}

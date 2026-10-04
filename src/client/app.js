@@ -173,11 +173,13 @@ function burnCard(b) {
 }
 
 // Un coin qui se brûle lui-même : sa bougie a fondu.
+// (Un clic ouvre la page du coin : sa bougie, ses chiffres et chacun de ses burns, avec Solscan.)
 function coinBurnCard(b) {
-  const inner = `<span class="ev-ico">${icon('candle')}</span>
+  return `<li class="ev burn coin"><a href="#coin/${esc(b.mint)}" data-coin="${esc(b.mint)}">
+      ${avatar(b)}
       <span class="ev-main"><b>${compact(b.burned)} $${esc(b.symbol || '?')} burned</b><span>${sol(b.sol)} of its fees · its own candle</span></span>
-      <span class="ev-meta">${b.sig ? '<span class="mono">TX ↗</span>' : ''}<time data-at="${b.at}">${ago(b.at)}</time></span>`;
-  return `<li class="ev burn coin">${b.sig ? `<a href="${solscan(esc(b.sig))}" target="_blank" rel="noopener">${inner}</a>` : `<div>${inner}</div>`}</li>`;
+      <span class="ev-meta"><span class="mono">${icon('candle')}</span><time data-at="${b.at}">${ago(b.at)}</time></span>
+    </a></li>`;
 }
 
 function pendingCard() {
@@ -219,9 +221,12 @@ function nextPop() {
   if (!b) { popping = false; return; }
   popping = true;
   const coin = b.kind === 'coin';
-  el.innerHTML = `<strong>${icon('flame')} ${fmt(Math.round(b.burned))} $${coin ? esc(b.symbol || '?') : ticker()} burned</strong>
+  // Le burn d'un coin qui se brûle lui-même : son logo, et un lien vers sa bougie.
+  el.classList.toggle('coin', coin);
+  el.innerHTML = `<strong>${coin ? avatar(b, 30) : icon('flame')} ${fmt(Math.round(b.burned))} $${coin ? esc(b.symbol || '?') : ticker()} burned</strong>
     <span>${sol(b.sol)} used · ${coin ? 'its own candle' : b.kind === 'match' ? `$${esc(b.symbol || '?')}'s Ignition Fee` : `buyback #${esc(b.ref)}`}</span>
-    ${b.sig ? `<a href="${solscan(esc(b.sig))}" target="_blank" rel="noopener">View TX ↗</a>` : ''}`;
+    ${coin ? `<a href="#coin/${esc(b.mint)}" data-coin="${esc(b.mint)}">See its candle →</a>`
+    : b.sig ? `<a href="${solscan(esc(b.sig))}" target="_blank" rel="noopener">View TX ↗</a>` : ''}`;
   el.hidden = false;
   el.classList.remove('out');
   void el.offsetWidth;
@@ -800,7 +805,7 @@ function start() {
   }
   $('feed-more').addEventListener('click', () => go('explore'));
   // Un coin (dans le fil, Explore, la forêt…) : sa page, avec sa bougie.
-  for (const root of [$('feed'), $('modal-body')]) {
+  for (const root of [$('feed'), $('modal-body'), $('burn-pop')]) {
     root.addEventListener('click', (e) => {
       const a = e.target.closest('[data-coin]');
       if (!a || e.metaKey || e.ctrlKey) return;

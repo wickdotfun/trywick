@@ -1,4 +1,5 @@
 // Le site : la bougie géante, ses allumettes, le fil, et le bouton pour en frapper une.
+import { createCandles } from './candles.js';
 import { createDemo } from './demo.js';
 import { createPages } from './pages.js';
 import { createScene, headColor } from './scene.js';
@@ -22,6 +23,8 @@ const api = DEMO ? createDemo() : {
   launches: (sort, offset = 0) => get(`/api/launches?sort=${encodeURIComponent(sort)}&offset=${offset}`),
   profile: (wallet) => get(`/api/profile?wallet=${encodeURIComponent(wallet)}`),
   token: () => get('/api/token'),
+  candles: () => get('/api/candles'),
+  coin: (mint) => get(`/api/coin?mint=${encodeURIComponent(mint)}`),
 };
 
 function avatar(m, size = 34) {
@@ -64,6 +67,7 @@ const world = {
   recent: [],                // les derniers lancements, toutes bougies confondues (le fil)
   history: [],               // les buybacks (un par souffle)
   burns: [],                 // le journal des burns, du plus récent au plus ancien
+  coinBurns: [],             // les burns des coins qui se brûlent eux-mêmes (« Make it burn »)
   hall: [],                  // la salle des bougies consumées
   hot: [],                   // les coins WICK les plus chauds
   totals: { burned: 0, supplyPct: null },
@@ -121,7 +125,7 @@ function renderMeter() {
       ? 'Buybacks are paused for now. The candle waits.'
       : `The candle starts melting once ${esc(tk)} is live.`;
   $('cta-sub').innerHTML = fee
-    ? `Launch your coin on pump.fun · <b>Ignition Fee ${from < fee ? `from ${from}` : fee} SOL</b>, ${world.launch.teamSol ? 'half of it burns' : 'burns'} ${esc(tk)}`
+    ? `${world.launch.selfOptions?.length ? 'Launch a coin that burns itself' : 'Launch your coin on pump.fun'} · <b>Ignition Fee ${from < fee ? `from ${from}` : fee} SOL</b>, ${world.launch.teamSol ? 'half of it burns' : 'burns'} ${esc(tk)}`
     : 'Launch your coin on pump.fun · it feeds the flame';
   document.querySelectorAll('[data-t="ticker"]').forEach((el) => { el.textContent = tk; });
   if (!scene?.burning) scene?.setCandle({ melted: c.melted, heat: world.heat / HEAT_FULL });
@@ -140,7 +144,9 @@ function renderStats() {
 }
 
 // Le fil : chaque lancement (et son Ignition Fee ajoutée au feu), chaque burn, le buyback en cours.
-const shareTag = (m) => (m.share ? `<i class="tag share" title="${esc(shareText(m.share))}">${m.share.bps / 100}% shared</i>` : '');
+const shareTag = (m) => (m.candle
+  ? `<i class="tag burn" title="Burns itself: ${m.candle.bps / 100}% of its creator fees buy it back and burn it, forever">burns ${m.candle.bps / 100}%</i>`
+  : m.share ? `<i class="tag share" title="${esc(shareText(m.share))}">${m.share.bps / 100}% shared</i>` : '');
 // « 10% of its creator fees go to WICK, forever (5% burn $WICK, 5% team) »
 function shareText(s) {
   const burn = (s.bps - (s.teamBps || 0)) / 100;
@@ -150,10 +156,10 @@ const holderTag = (m) => (m.holder ? `<i class="tag gold" title="Launched by a $
 function launchCard(m) {
   const fee = m.fee ?? null;
   return `<li class="ev launch${world.mine.has(m.mint) ? ' mine' : ''}${m.holder ? ' holder' : ''}">
-    <a href="${pumpUrl(m.mint)}" target="_blank" rel="noopener">
+    <a href="#coin/${esc(m.mint)}" data-coin="${esc(m.mint)}">
       ${avatar(m)}
       <span class="ev-main"><b>$${esc(m.symbol)} launched ${holderTag(m)}</b>
-        <span>${fee ? `<em class="fire">+${m.burnFee ?? fee} SOL</em> added to the fire` : esc(m.name)}${m.share ? ` · ${m.share.bps / 100}% fees shared` : ''}</span></span>
+        <span>${fee ? `<em class="fire">+${m.burnFee ?? fee} SOL</em> added to the fire` : esc(m.name)}${m.candle ? ` · burns itself ${m.candle.bps / 100}%` : m.share ? ` · ${m.share.bps / 100}% fees shared` : ''}</span></span>
       <span class="ev-meta"><span class="mono">${m.mcap ? `$${compact(m.mcap)}` : `#${fmt(m.seq)}`}</span><time data-at="${m.at}">${ago(m.at)}</time></span>
     </a></li>`;
 }
@@ -164,6 +170,14 @@ function burnCard(b) {
       <span class="ev-main"><b>${compact(b.burned)} $${ticker()} burned</b><span>${sol(b.sol)} used · ${what}</span></span>
       <span class="ev-meta">${b.sig ? '<span class="mono">TX ↗</span>' : ''}<time data-at="${b.at}">${ago(b.at)}</time></span>`;
   return `<li class="ev burn">${b.sig ? `<a href="${solscan(esc(b.sig))}" target="_blank" rel="noopener">${inner}</a>` : `<div>${inner}</div>`}</li>`;
+}
+
+// Un coin qui se brûle lui-même : sa bougie a fondu.
+function coinBurnCard(b) {
+  const inner = `<span class="ev-ico">${icon('candle')}</span>
+      <span class="ev-main"><b>${compact(b.burned)} $${esc(b.symbol || '?')} burned</b><span>${sol(b.sol)} of its fees · its own candle</span></span>
+      <span class="ev-meta">${b.sig ? '<span class="mono">TX ↗</span>' : ''}<time data-at="${b.at}">${ago(b.at)}</time></span>`;
+  return `<li class="ev burn coin">${b.sig ? `<a href="${solscan(esc(b.sig))}" target="_blank" rel="noopener">${inner}</a>` : `<div>${inner}</div>`}</li>`;
 }
 
 function pendingCard() {
@@ -177,6 +191,7 @@ function renderFeed() {
   const events = [
     ...world.recent.map((m) => ({ at: m.at, html: () => launchCard(m) })),
     ...world.burns.slice(0, 40).map((b) => ({ at: b.at, html: () => burnCard(b) })),
+    ...world.coinBurns.slice(0, 12).map((b) => ({ at: b.at, html: () => coinBurnCard(b) })),
   ].sort((a, b) => b.at - a.at).slice(0, 50);
   $('feed').innerHTML = pendingCard() + (events.length
     ? events.map((e) => e.html()).join('')
@@ -203,17 +218,20 @@ function nextPop() {
   const el = $('burn-pop');
   if (!b) { popping = false; return; }
   popping = true;
-  el.innerHTML = `<strong>${icon('flame')} ${fmt(Math.round(b.burned))} $${ticker()} burned</strong>
-    <span>${sol(b.sol)} used · ${b.kind === 'match' ? `$${esc(b.symbol || '?')}'s Ignition Fee` : `buyback #${esc(b.ref)}`}</span>
+  const coin = b.kind === 'coin';
+  el.innerHTML = `<strong>${icon('flame')} ${fmt(Math.round(b.burned))} $${coin ? esc(b.symbol || '?') : ticker()} burned</strong>
+    <span>${sol(b.sol)} used · ${coin ? 'its own candle' : b.kind === 'match' ? `$${esc(b.symbol || '?')}'s Ignition Fee` : `buyback #${esc(b.ref)}`}</span>
     ${b.sig ? `<a href="${solscan(esc(b.sig))}" target="_blank" rel="noopener">View TX ↗</a>` : ''}`;
   el.hidden = false;
   el.classList.remove('out');
   void el.offsetWidth;
   el.classList.add('in');
-  scene?.flare();
-  $('candle-card').classList.remove('melt');
-  void $('candle-card').offsetWidth;
-  $('candle-card').classList.add('melt');
+  if (!coin) {
+    scene?.flare();
+    $('candle-card').classList.remove('melt');
+    void $('candle-card').offsetWidth;
+    $('candle-card').classList.add('melt');
+  }
   setTimeout(() => {
     el.classList.add('out');
     setTimeout(() => { el.hidden = true; el.classList.remove('in', 'out'); nextPop(); }, 500);
@@ -242,6 +260,19 @@ function mergeBurns(data, first) {
   }
 }
 
+// Les burns des coins qui se brûlent eux-mêmes : les nouveaux s'affichent au-dessus de la bougie.
+function mergeCoinBurns(data, first) {
+  const key = (b) => b.sig || `${b.mint}:${b.at}`;
+  const known = new Set(world.coinBurns.map(key));
+  for (const b of (data.coinBurns || []).slice().reverse()) {
+    if (known.has(key(b))) continue;
+    world.coinBurns.unshift(b);
+    if (!first) burnPop({ ...b, kind: 'coin' });
+  }
+  world.coinBurns.sort((a, b) => b.at - a.at);
+  world.coinBurns = world.coinBurns.slice(0, 40);
+}
+
 function applyState(data, first) {
   world.token = data.token;
   world.launch = data.launch;
@@ -254,6 +285,7 @@ function applyState(data, first) {
   world.hot = data.hot || world.hot;
   if (data.hall) world.hall = data.hall;
   mergeBurns(data, first);
+  mergeCoinBurns(data, first);
   // Le fil garde les lancements d'une bougie à l'autre.
   const seen = new Set(world.recent.map((m) => m.mint));
   if (data.recent) world.recent = data.recent.slice().reverse();
@@ -425,6 +457,7 @@ const modal = $('modal');
 function openModal(html, cls = '') {
   $('modal-body').innerHTML = html;
   modal.className = `modal ${cls}`;
+  modal.scrollTop = 0;
   if (!modal.open) modal.showModal();
 }
 modal.addEventListener('click', (e) => { if (e.target === modal && !busy) modal.close(); });
@@ -448,7 +481,14 @@ const pages = createPages({
   onToken: () => go('wick'),
 });
 
+const candlesPage = createCandles({
+  api, openModal, world, ticker, avatar, holderTag, demo: DEMO,
+  onStrike: () => launchForm(),
+  go: (page) => go(page),
+});
+
 const ROUTES = {
+  candles: () => candlesPage.forest(),
   explore: () => pages.explore(),
   wick: () => tokenPage.open(),
   dashboard: () => pages.dashboard(),
@@ -459,9 +499,11 @@ const ROUTES = {
   how: () => pages.how(),
   strike: () => launchForm(),
 };
+const isRoute = (page) => Boolean(ROUTES[page]) || /^coin\/[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(page || '');
 function go(page) {
-  if (busy || !ROUTES[page]) return;
-  ROUTES[page]();
+  if (busy || !isRoute(page)) return;
+  if (page.startsWith('coin/')) candlesPage.coin(page.slice(5));
+  else ROUTES[page]();
   const hash = `#${page}`;
   if (location.hash !== hash) history.replaceState(null, '', location.pathname + location.search + hash);
 }
@@ -496,26 +538,38 @@ const ERRORS = {
 };
 
 let busy = false;
-let draft = { fields: {}, image: null, preview: null, share: true };
+// burn : « Make it burn », la part (en %) des creator fees qui rachète et brûle le coin lui-même.
+const DRAFT = () => ({ fields: {}, image: null, preview: null, burn: 20 });
+let draft = DRAFT();
 
-// « 90% you · 5% burn $WICK · 5% WICK team »
-function splitText(s) {
-  if (!s) return '';
-  return [`${s.creatorBps / 100}% you`, s.burnBps && `${s.burnBps / 100}% burn $${ticker()}`, s.teamBps && `${s.teamBps / 100}% WICK team`]
-    .filter(Boolean).join(' · ');
-}
 
 // Ce que coûte un lancement, avec ou sans partage des creator fees.
-function costLine(shared) {
+// Les parts que le créateur peut choisir (en %), 0 = pas de bougie.
+const burnOptions = () => (world.launch?.selfOptions || []).map((bps) => bps / 100);
+const burning = () => (burnOptions().includes(draft.burn) ? draft.burn : 0);
+
+// La barre : où vont les creator fees du coin, selon la part choisie.
+function burnSplit(pct) {
+  const s = world.launch?.split || { creatorBps: 9000, burnBps: 500, teamBps: 500 };
+  if (!pct) return { bar: '<span style="width:100%">You 100%</span>', legend: 'You keep 100% of your creator fees. Your candle stays unlit.' };
+  const you = s.creatorBps / 100 - pct;
+  return {
+    bar: `<span style="width:${you}%">You ${you}%</span><span class="self" style="width:${pct}%">${pct >= 15 ? 'Burns it ' : ''}${pct}%</span>`
+      + `<span class="wick" style="width:${s.burnBps / 100}%"></span><span class="team" style="width:${s.teamBps / 100}%"></span>`,
+    legend: `You ${you}% · ${pct}% buys your coin back and burns it · ${s.burnBps / 100}% burns $${ticker()} · ${s.teamBps / 100}% WICK team`,
+  };
+}
+
+function costLine(burnPct) {
   const l = world.launch;
-  const withShare = Boolean(shared && l?.shareBps);
+  const withShare = Boolean(burnPct && l?.shareBps);
   const fee = withShare ? l.sharedFeeSol : l?.feeSol;
   const burn = withShare ? l.sharedBurnSol : l?.burnSol;
   const team = withShare ? l.sharedTeamSol : l?.teamSol;
   const split = team ? `${burn} SOL buys $${ticker()} and burns it, ${team} SOL funds the WICK team` : `buys $${ticker()} and burns it`;
   return `${fee
     ? `<b>${fee} SOL WICK Ignition Fee</b>: ${split}. Plus ≈ 0.02 SOL of pump.fun creation and network costs, and your dev buy.`
-    : '≈ 0.02 SOL of pump.fun creation and network costs, plus your dev buy.'} Your wallet signs, your coin${withShare ? `, ${(l.split?.creatorBps ?? 10_000 - l.shareBps) / 100}% of your creator fees` : ', your pump.fun creator fees'}.`;
+    : '≈ 0.02 SOL of pump.fun creation and network costs, plus your dev buy.'} Your wallet signs, your coin${withShare ? `, ${(l.split?.creatorBps ?? 10_000 - l.shareBps) / 100 - burnPct}% of your creator fees` : ', your pump.fun creator fees'}.`;
 }
 
 function launchForm(error = '') {
@@ -545,14 +599,17 @@ function launchForm(error = '') {
         <span class="sol"><input name="devBuy" type="number" min="0" max="${max}" step="0.01" value="${esc(f.devBuy ?? '0')}"><b>SOL</b></span>
       </label>
       <div class="presets">${[0, 0.1, 0.5, 1].map((v) => `<button type="button" data-sol="${v}">${v}</button>`).join('')}</div>
-      ${world.launch?.shareBps ? `<label class="share-opt">
-        <input type="checkbox" name="share" value="1" id="lf-share"${draft.share ? ' checked' : ''}>
-        <span><b>Share ${world.launch.shareBps / 100}% of your creator fees with WICK</b>
-          <small>Your Ignition Fee drops to <b>${world.launch.sharedFeeSol} SOL</b> (instead of ${world.launch.feeSol}).
-          Your pump.fun creator fees split <b>${splitText(world.launch.split)}</b>, forever.
-          Locked on pump.fun: nobody can change it, not even WICK.</small></span>
-      </label>` : ''}
-      <p class="cost" id="lf-cost">${costLine(draft.share)}</p>
+      ${burnOptions().length ? `<div class="burn-opt">
+        <div class="burn-head"><b>Make it <span class="grad">burn</span></b>
+          <small>A share of your creator fees buys your coin back and burns it, forever. Your coin becomes a candle.
+          Your Ignition Fee drops to ${world.launch.sharedFeeSol} SOL.</small></div>
+        <div class="burn-pills" role="group" aria-label="Make it burn">${[0, ...burnOptions()].map((v) => `<button type="button" class="pill${burning() === v ? ' on' : ''}" data-burn="${v}" aria-pressed="${burning() === v}">${v ? `${v}%` : 'Off'}</button>`).join('')}</div>
+        <div class="split-bar" id="lf-split">${burnSplit(burning()).bar}</div>
+        <small class="muted" id="lf-legend">${burnSplit(burning()).legend}</small>
+        <small class="lock">${icon('lock')} Locked on pump.fun. Nobody can change it, not even WICK.</small>
+      </div>` : ''}
+      <input type="hidden" name="burn" value="${burning()}"><input type="hidden" name="share" value="${burning() ? '1' : ''}">
+      <p class="cost" id="lf-cost">${costLine(burning())}</p>
       <p class="error" id="lf-error"${error ? '' : ' hidden'}>${esc(error)}</p>
       <button class="cta wide" type="submit">${DEMO ? 'Launch (demo)' : connect.current() ? 'Launch your coin' : 'Connect wallet & launch'}</button>
     </form>`, 'm-launch');
@@ -571,7 +628,21 @@ function launchForm(error = '') {
   });
   form.querySelectorAll('[data-sol]').forEach((b) => b.addEventListener('click', () => { form.devBuy.value = b.dataset.sol; }));
   form.addEventListener('input', () => { draft.fields = Object.fromEntries(new FormData(form)); });
-  $('lf-share')?.addEventListener('change', (e) => { draft.share = e.target.checked; $('lf-cost').innerHTML = costLine(draft.share); });
+  form.querySelectorAll('[data-burn]').forEach((b) => b.addEventListener('click', () => {
+    draft.burn = Number(b.dataset.burn);
+    const pct = burning();
+    form.querySelectorAll('[data-burn]').forEach((x) => {
+      const on = Number(x.dataset.burn) === pct;
+      x.classList.toggle('on', on);
+      x.setAttribute('aria-pressed', String(on));
+    });
+    form.burn.value = String(pct);
+    form.share.value = pct ? '1' : '';
+    const split = burnSplit(pct);
+    $('lf-split').innerHTML = split.bar;
+    $('lf-legend').textContent = split.legend;
+    $('lf-cost').innerHTML = costLine(pct);
+  }));
   form.addEventListener('submit', (e) => { e.preventDefault(); submitLaunch(form); });
 }
 
@@ -620,7 +691,7 @@ function progress(symbol) {
   STEPS = [
     ['upload', 'Sending your image to pump.fun'],
     ['sign', fee ? 'Approve 1/2 in your wallet: create your coin' : 'Approve in your wallet: create your coin'],
-    ...(fee ? [['sign2', `Approve 2/2: the Ignition Fee${draft.share && world.launch?.shareBps ? ' and fee sharing' : ''}`]] : []),
+    ...(fee ? [['sign2', `Approve 2/2: the Ignition Fee${burning() ? ' and your candle' : ''}`]] : []),
     ['send', 'Sending to Solana'],
     ['confirm', 'Lighting your match'],
   ];
@@ -667,7 +738,7 @@ async function submitLaunch(form) {
     const result = await run({ creator, fields, image: draft.image, onStep: setStep });
     busy = false;
     const m = result.match;
-    draft = { fields: {}, image: null, preview: null, share: true };
+    draft = DRAFT();
     if (m) {
       world.mine.add(m.mint);
       if (m.creator && !DEMO) remember(m.creator);
@@ -699,12 +770,13 @@ function success(m, signature) {
     <h2><span class="grad">$${esc(m.symbol)}</span> is lit</h2>
     <p class="muted">Match #${fmt(m.seq)} is orbiting candle #${pad(world.candle?.number ?? 1)}${world.launch?.feeSol
       ? `, and ${m.burnFee ?? (m.share ? world.launch.sharedBurnSol : world.launch.burnSol)} SOL of its Ignition Fee is buying $${ticker()} to burn it right now` : ''}.${m.share
-      ? ` ${shareText(m.share)}.` : ''} The next buyback just came
+      ? ` ${shareText(m.share)}.` : ''}${m.candle ? ` <b>Its candle burns ${m.candle.bps / 100}% of its creator fees, forever.</b>` : ''} The next buyback just came
     ${span(world.breath?.matchMs ?? 60_000)} closer. Look for the label.</p>
     <div class="wallets">
       <a class="wbtn primary" href="${pumpUrl(m.mint)}" target="_blank" rel="noopener">See it on pump.fun</a>
       <a class="wbtn" href="https://x.com/intent/post?text=${encodeURIComponent(share)}" target="_blank" rel="noopener">Share on X</a>
       ${signature ? `<a class="wbtn" href="https://solscan.io/tx/${esc(signature)}" target="_blank" rel="noopener">Transaction</a>` : ''}
+      ${m.candle ? `<a class="wbtn" href="#coin/${esc(m.mint)}" data-coin="${esc(m.mint)}">See its candle</a>` : ''}
       <button class="wbtn" id="see-flames">Your flames</button>
     </div>`, 'm-done');
   $('see-flames').addEventListener('click', () => go('flames'));
@@ -727,6 +799,15 @@ function start() {
     $('wallet-btn').hidden = true;
   }
   $('feed-more').addEventListener('click', () => go('explore'));
+  // Un coin (dans le fil, Explore, la forêt…) : sa page, avec sa bougie.
+  for (const root of [$('feed'), $('modal-body')]) {
+    root.addEventListener('click', (e) => {
+      const a = e.target.closest('[data-coin]');
+      if (!a || e.metaKey || e.ctrlKey) return;
+      e.preventDefault();
+      go(`coin/${a.dataset.coin}`);
+    });
+  }
   $('feed-toggle').addEventListener('click', () => document.body.classList.toggle('feed-open'));
   wirePointer();
   setInterval(() => {
@@ -742,7 +823,7 @@ function start() {
   startScene();
   // Une page demandée dans l'adresse (trywick.fun/#wick…) s'ouvre une fois l'état chargé.
   const page = location.hash.slice(1);
-  poll(true).then(() => { if (ROUTES[page]) go(page); });
+  poll(true).then(() => { if (isRoute(page)) go(page); });
   tokenPage.prefetch();
 }
 

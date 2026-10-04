@@ -2,7 +2,7 @@
 //   POST /api/launch/prepare  (formulaire + image)  → la transaction à signer
 //   POST /api/launch/submit   (transaction signée)  → envoyée sur Solana
 //   GET  /api/launch/status?mint=…                  → allumée ou pas encore
-import { expectedFee, feeTransfers, launchFee } from '../../lib/buyback.js';
+import { expectedFee, feeTransfers, launchFee, selfBpsOf } from '../../lib/buyback.js';
 import { CONFIG } from '../../lib/config.js';
 import { ipHash, json } from '../../lib/http.js';
 import { isPubkey, validateImage, validateLaunch } from '../../lib/launch.js';
@@ -64,8 +64,11 @@ export async function prepare({ request, env }) {
   // virements (la part brûlée vers le wallet burn, la part de l'équipe vers son wallet). Avec le
   // partage des creator fees (au choix du créateur), elle est réduite et part dans la même
   // transaction que le partage (lib/sharing.js).
-  const shared = fields.share === '1';
-  const fee = (shared && (await launchFee(env, { shared: true }))) || (await launchFee(env));
+  // « Make it burn » (burn = la part en %, 10 à 50) : le partage avec, en plus, la part qui
+  // rachète et brûle le coin lui-même.
+  const selfBps = selfBpsOf(Math.round(Number(fields.burn) * 100));
+  const shared = fields.share === '1' || selfBps > 0;
+  const fee = (shared && (await launchFee(env, { shared: true, selfBps }))) || (await launchFee(env));
 
   // Le nom et le ticker de la transaction sont ceux enregistrés avec les métadonnées.
   const row = existing || launch;
@@ -95,9 +98,10 @@ export async function prepare({ request, env }) {
   }
   // Un nouvel essai repart de zéro : une ancienne transaction de fee gardée ne partira jamais.
   await env.DB.prepare(`UPDATE matches SET fee_lamports = ?, fee_to = ?, team_to = ?, team_lamports = ?, share_bps = ?,
-      share_team_bps = ?, share_msg = NULL, share_tx = NULL, fee_sig = NULL, fee_state = NULL, share_state = NULL
+      share_team_bps = ?, self_bps = ?, share_msg = NULL, share_tx = NULL, fee_sig = NULL, fee_state = NULL, share_state = NULL
       WHERE mint = ? AND seq IS NULL`)
-    .bind(fee?.lamports ?? 0, fee?.to ?? null, fee?.teamWallet ?? null, fee?.team?.lamports ?? 0, shareBps, shareTeamBps, launch.mint).run();
+    .bind(fee?.lamports ?? 0, fee?.to ?? null, fee?.teamWallet ?? null, fee?.team?.lamports ?? 0, shareBps, shareTeamBps,
+      holders.length ? fee.selfBps || 0 : 0, launch.mint).run();
   return json({
     tx: base64FromBytes(tx),
     feeTx,
@@ -105,6 +109,7 @@ export async function prepare({ request, env }) {
     burnSol: fee ? fee.burn / 1e9 : 0,
     teamSol: fee?.team ? fee.team.lamports / 1e9 : 0,
     shareBps,
+    selfBps: holders.length ? fee.selfBps || 0 : 0,
     image: meta.image,
   });
 }

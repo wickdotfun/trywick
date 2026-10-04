@@ -207,6 +207,9 @@ body:has(.demo-bar:not([hidden])) .hero { margin-top: 26px; }
 .burn-pop span { font: 500 11.5px/1.2 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
 .burn-pop a { font: 600 11.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-top: 3px; }
 .burn-pop a:hover { text-decoration: underline; }
+.burn-pop.coin strong { display: inline-flex; align-items: center; gap: 10px; }
+.burn-pop.coin .av { flex: none; letter-spacing: 0; color: inherit; }
+.burn-pop.coin .av b { font: 700 10px/1 var(--mono); letter-spacing: 0; color: rgba(0, 0, 0, .65); }
 .burn-pop.in { animation: pop-in .6s cubic-bezier(.2, 1.4, .3, 1); }
 .burn-pop.out { opacity: 0; transform: translate(-50%, -10px); transition: opacity .5s, transform .5s; }
 @keyframes pop-in { from { opacity: 0; transform: translate(-50%, 16px) scale(.85); } }

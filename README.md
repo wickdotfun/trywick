@@ -216,6 +216,10 @@ the site are left untouched (they can be dropped by hand).
 
 **Fair play**: at most 12 launches prepared per IP per hour. IPs are never stored, only salted hashes.
 
+**Balance check** (`lib/funds.js`): before a launch or a $WICK trade is prepared, the server reads the wallet's SOL
+balance. If it can't pay (dev buy and its fees, Ignition Fee, coin creation, network fees), nothing is uploaded or
+signed and the site says how much is needed. An unreadable balance never blocks: the wallet shows its own warning.
+
 ---
 
 ## Run it locally

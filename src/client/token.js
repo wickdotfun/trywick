@@ -305,7 +305,9 @@ export function createTokenPage({ api, openModal, isOpen, world, ticker, breathT
       setTimeout(refresh, 4000);
     } catch (err) {
       if (err.code === 'rejected' || /reject|cancel|denied/i.test(err.message || '')) showError(ERRORS.rejected);
-      else showError(ERRORS[err.code] || `Something went wrong. Try again.`);
+      else if (err.code === 'no_funds' && err.data?.needSol > 0) {
+        showError(`Not enough SOL in your wallet. This ${side === 'buy' ? 'buy' : 'sale'} needs about ${err.data.needSol} SOL (fees included), your wallet has ${err.data.haveSol ?? 0} SOL. Nothing was sent.`);
+      } else showError(ERRORS[err.code] || `Something went wrong. Try again.`);
     } finally {
       busy = false;
       const b = $('tk-go');

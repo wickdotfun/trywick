@@ -4,6 +4,7 @@
 //   GET  /api/launch/status?mint=…                  → allumée ou pas encore
 import { expectedFee, feeTransfers, launchFee, selfBpsOf } from '../../lib/buyback.js';
 import { CONFIG } from '../../lib/config.js';
+import { launchNeedSol, shortOfFunds } from '../../lib/funds.js';
 import { ipHash, json } from '../../lib/http.js';
 import { isPubkey, validateImage, validateLaunch } from '../../lib/launch.js';
 import { getMatch, publicMatch, settle } from '../../lib/matches.js';
@@ -30,6 +31,21 @@ export async function prepare({ request, env }) {
   if (existing && (existing.seq != null || existing.creator !== launch.creator)) {
     return json({ error: 'mint_taken' }, 409);
   }
+
+  // L'Ignition Fee (quand le buyback tourne) : une seconde transaction à signer, avec deux
+  // virements (la part brûlée vers le wallet burn, la part de l'équipe vers son wallet). Avec le
+  // partage des creator fees (au choix du créateur), elle est réduite et part dans la même
+  // transaction que le partage (lib/sharing.js).
+  // « Make it burn » (burn = la part en %, 10 à 50) : le partage avec, en plus, la part qui
+  // rachète et brûle le coin lui-même.
+  const selfBps = selfBpsOf(Math.round(Number(fields.burn) * 100));
+  const shared = fields.share === '1' || selfBps > 0;
+  const fee = (shared && (await launchFee(env, { shared: true, selfBps }))) || (await launchFee(env));
+
+  // Le wallet doit pouvoir tout payer AVANT qu'on lui propose de signer (et avant d'envoyer
+  // l'image sur l'IPFS) : l'achat du créateur, l'Ignition Fee, la création du coin.
+  const short = await shortOfFunds(env, launch.creator, launchNeedSol(launch.devBuy, fee?.lamports ?? 0));
+  if (short) return json({ error: 'no_funds', ...short }, 409);
 
   // Un nouvel essai avec le même mint (transaction expirée, wallet fermé…) :
   // les métadonnées sont déjà sur l'IPFS, on reconstruit juste la transaction.
@@ -61,15 +77,6 @@ export async function prepare({ request, env }) {
     await env.DB.prepare('UPDATE matches SET dev_buy = ? WHERE mint = ?').bind(launch.devBuy, launch.mint).run();
   }
 
-  // L'Ignition Fee (quand le buyback tourne) : une seconde transaction à signer, avec deux
-  // virements (la part brûlée vers le wallet burn, la part de l'équipe vers son wallet). Avec le
-  // partage des creator fees (au choix du créateur), elle est réduite et part dans la même
-  // transaction que le partage (lib/sharing.js).
-  // « Make it burn » (burn = la part en %, 10 à 50) : le partage avec, en plus, la part qui
-  // rachète et brûle le coin lui-même.
-  const selfBps = selfBpsOf(Math.round(Number(fields.burn) * 100));
-  const shared = fields.share === '1' || selfBps > 0;
-  const fee = (shared && (await launchFee(env, { shared: true, selfBps }))) || (await launchFee(env));
 
   // Le nom et le ticker de la transaction sont ceux enregistrés avec les métadonnées.
   const row = existing || launch;

@@ -26,3 +26,14 @@ test('the admin test says exactly what works and what does not', async () => {
   assert.match(by['Telegram bot'].detail, /Unauthorized/);
   assert.match(by['Other settings'].detail, /IP_SALT/);
 });
+
+test('the admin test lifts the AI pause as soon as the AI answers again (after upgrading the plan)', async () => {
+  const { setSetting, getSetting } = await import('../lib/settings.js');
+  const db = fakeD1();
+  await ensureSchema(db);
+  await setSetting(db, 'ai.out', 20731);
+  globalThis.fetch = async () => Response.json({});
+  const r = await selfTest({ DB: db, AI: { run: async () => ({ response: 'OK' }) } });
+  assert.match(r.steps.find((s) => s.name === 'AI binding (Workers AI)').detail, /AI pause lifted/);
+  assert.equal(await getSetting(db, 'ai.out', 'gone'), null);
+});

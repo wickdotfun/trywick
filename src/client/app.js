@@ -636,7 +636,10 @@ function sparkBlock() {
       <small>One sentence. Your Operator writes the name, the ticker, the story and paints the logo. You can change everything.</small></div>
     <div class="spark-box">
       <textarea id="sp-idea" maxlength="200" rows="2" placeholder="${esc(pick(IDEAS))}">${esc(draft.idea || '')}</textarea>
-      <button type="button" class="cta spark-go" id="sp-go">${icon('sparkle')} <span>${sp ? 'Spark again' : 'Spark it'}</span></button>
+      <div class="spark-btns">
+        <button type="button" class="cta spark-go" id="sp-go">${icon('sparkle')} <span>${sp ? 'Spark again' : 'Spark it'}</span></button>
+        <button type="button" class="wbtn spark-surprise" id="sp-surprise">Surprise me</button>
+      </div>
     </div>
     <div class="spark-status" id="sp-status"${sp ? '' : ' hidden'}>${sp ? sparkDone(sp) : ''}</div>
   </section>`;
@@ -752,6 +755,7 @@ function launchForm(error = '') {
     $('lf-cost').innerHTML = costLine(pct);
   }));
   $('sp-go')?.addEventListener('click', () => runSpark(form));
+  $('sp-surprise')?.addEventListener('click', () => runSpark(form, true));
   $('sp-idea')?.addEventListener('input', (e) => { draft.idea = e.target.value; });
   $('sp-idea')?.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runSpark(form); } });
   bindLogoAgain(form);
@@ -777,19 +781,20 @@ function sparkStatus(html, cls = '') {
 }
 const thinking = (mind, what) => `<span class="sp-think">${aiLogo(mind, 16)} <b>${esc(mind?.name || 'Your Operator')}</b> ${what}<i></i><i></i><i></i></span>`;
 
-async function runSpark(form) {
+async function runSpark(form, surprise = false) {
   if (sparking) return;
-  const idea = ($('sp-idea')?.value || '').trim();
-  draft.idea = idea;
-  if (idea.length < 3) { sparkStatus(SPARK_ERRORS.bad_idea, 'err'); return; }
+  const idea = surprise ? '' : ($('sp-idea')?.value || '').trim();
+  if (!surprise) draft.idea = idea;
+  if (!surprise && idea.length < 3) { sparkStatus(SPARK_ERRORS.bad_idea, 'err'); return; }
   const mind = mindOf(draft.keeper.model);
   const btn = $('sp-go');
   sparking = true;
   btn.disabled = true;
   btn.classList.add('busy');
-  sparkStatus(thinking(mind, 'is thinking'));
+  sparkStatus(thinking(mind, surprise ? 'is inventing a coin' : 'is thinking'));
   try {
-    const sp = await api.spark({ idea, style: draft.keeper.style, model: draft.keeper.model });
+    const sp = await api.spark({ idea, style: draft.keeper.style, model: draft.keeper.model, surprise });
+    if (surprise && $('sp-idea')) { $('sp-idea').value = sp.visual ? `${sp.name}: ${sp.description}`.slice(0, 200) : sp.name; draft.idea = $('sp-idea').value; }
     draft.spark = sp;
     form.name.value = sp.name;
     form.symbol.value = sp.symbol;

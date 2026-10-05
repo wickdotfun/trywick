@@ -258,8 +258,9 @@ export function createDemo() {
     for (const e of log) e.sig = null;
     return {
       log,
-      missions: missions(row, log, Date.now()),
+      missions: missions({ ...row, op_groups: seed(m.mint) % 3 }, log, Date.now()),
       kit,
+      telegram: { bot: 'WickFireBot', groups: seed(m.mint) % 3 },
       constitution: {
         personality: k.label, mind: { name: k.model, by: k.by, logo: k.logo },
         burn: m.candle ? { pct: m.candle.bps / 100, wickPct: 5, teamPct: 5 } : null, proof: null,

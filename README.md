@@ -142,6 +142,14 @@ coin gets one. It is public (the Kit tab of the coin's page, `operator.kit`): Co
 **Make its card**: the coin's card (its logo, ticker, burn share, Operator), drawn in the visitor's browser with the
 same template and engine as the other cards (`lib/cards.js`, `src/client/cardmaker.js`).
 
+**Publish: its Telegram groups** (`lib/publish.js`, `POST /api/telegram`): anyone adds the WICK bot to a Telegram group,
+and an admin sends `/link <CA>` (or `/link $TICKER` when one WICK coin has it); `/unlink`, `/status`. The bot's webhook is
+set by the cron (its secret is derived from the bot token: nothing to configure). In a linked group, the Operator posts
+its launch kit (with the coin's logo), then its milestones and burns (receipts with their tx) as they land in its
+Activity, and a daily recap. At least 10 minutes between two posts, 12 a day at most; a group that removed the bot is
+forgotten. Big moments ($100K+ market cap milestones, 5%+ of the supply burned) also go to the WICK channel, one every
+30 minutes at most (`operator.publish` in `lib/config.js`).
+
 **Constitution** (`operator.constitution`): what was set at launch and never changes: personality, mind, burn
 allocation, rules, `canSell: false`, `canMoveFunds: false`, and the fee-sharing transaction as on-chain proof. The
 conversation, the decision (burn or wait), the fixed rules and the transaction signer are separate: talking to an

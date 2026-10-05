@@ -126,7 +126,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
 
   // Le panneau de l'Operator d'un coin : qui il est, ce qu'il a fait (Activity), ce qui le lie
   // (Constitution), et la conversation avec lui (Talk).
-  const ACT = { kit: 'sparkle', launched: 'rocket', sealed: 'lock', intro: 'chat', journal: 'book', wait: 'wind', decide: 'keeper', burned: 'flame', fed: 'candle', posted: 'send', milestone: 'trophy' };
+  const ACT = { posted: 'send', kit: 'sparkle', launched: 'rocket', sealed: 'lock', intro: 'chat', journal: 'book', wait: 'wind', decide: 'keeper', burned: 'flame', fed: 'candle', posted: 'send', milestone: 'trophy' };
   function activity(log = []) {
     if (!log.length) return '<p class="muted small">Its first actions show up here: the launch, its first words, every decision and every burn.</p>';
     return `<ol class="op-log">${log.map((e) => `<li class="op-ev ${esc(e.kind)}">
@@ -149,8 +149,19 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
   }
   // Le kit de lancement : ce que son Operator a écrit pour qu'on le poste.
   const lines = (t) => esc(t).replace(/\n/g, '<br>');
-  function kitHtml(kit, m) {
-    if (!kit) return '<p class="muted small">Its Operator writes the launch kit right after the launch: the lore, three posts for X and a Telegram announcement.</p>';
+  // Relier un groupe Telegram : l'Operator y postera (lib/publish.js).
+  function telegramHtml(t, m) {
+    const bot = t?.bot ? `@${esc(t.bot)}` : 'the WICK bot';
+    const cmd = `/link ${m.mint}`;
+    return `<section class="kit-tg"><h4>Its Telegram groups${t?.groups ? ` <small>· posting in ${t.groups}</small>` : ''}</h4>
+      <div class="kit-post"><p>Let its Operator post in your group: its launch kit, its milestones, its burns and a daily recap.
+        <b>1.</b> Add ${t?.bot ? `<a href="https://t.me/${esc(t.bot)}" target="_blank" rel="noopener">${bot}</a>` : bot} to the group.
+        <b>2.</b> An admin sends:</p>
+        <code class="kit-cmd">${esc(cmd)}</code>
+        <div class="kit-act"><button type="button" class="wbtn" data-kcopy="${esc(cmd)}">Copy</button></div></div></section>`;
+  }
+  function kitHtml(kit, m, op) {
+    if (!kit) return `<p class="muted small">Its Operator writes the launch kit right after the launch: the lore, three posts for X and a Telegram announcement.</p>${telegramHtml(op?.telegram, m)}`;
     const page = `${location.origin}/#coin/${m.mint}`;
     const xIntent = (t) => `https://x.com/intent/post?text=${encodeURIComponent(t)}&url=${encodeURIComponent(page)}`;
     return `<div class="op-kit">
@@ -163,6 +174,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
         <div class="kit-act"><button type="button" class="wbtn" data-kcopy="${esc(kit.telegram)}">Copy</button></div></div></section>
       <section><h4>Its card</h4><div class="kit-card" id="kit-card-out"><button type="button" class="cta small-cta" id="kit-card">${icon('sparkle')} Make its card</button>
         <small class="muted">1600 × 900, ready for X and Telegram. Drawn right here, in your browser.</small></div></section>
+      ${telegramHtml(op?.telegram, m)}
     </div>`;
   }
   function bindKit(root, m, op) {
@@ -224,7 +236,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
       </div>
       <div class="op-pane" data-oppane="act">${activity(log)}</div>
       <div class="op-pane" data-oppane="missions" hidden>${missionsHtml(op.missions)}</div>
-      <div class="op-pane" data-oppane="kit" hidden>${kitHtml(op.kit, m)}</div>
+      <div class="op-pane" data-oppane="kit" hidden>${kitHtml(op.kit, m, op)}</div>
       <div class="op-pane" data-oppane="const" hidden>${constitutionHtml(op.constitution, m)}</div>
       <div class="op-pane" data-oppane="talk" hidden>${chatHtml({
         mint: m.mint, symbol: m.symbol,

@@ -241,6 +241,17 @@ export function createDemo() {
     row.op_mcap = crossed(CONFIG.operator.mcapSteps, m.mcap) || 0;
     row.op_burn = crossed(CONFIG.operator.burnSteps, burnedPct(row)) || 0;
     const lastBurn = burnsOf[0]?.at;
+    // Son kit de lancement (le vrai est écrit par l'IA : lib/kit.js).
+    const sym = `$${m.symbol}`;
+    const burnL = m.candle ? `${m.candle.bps / 100}% of its creator fees buy it back and burn it, forever.` : 'Launched on WICK, where every coin is a candle.';
+    const voice = { stoic: 'The candle is lit. I will keep it.', degen: 'we are so early it hurts. the candle is lit.', poet: 'A new wick, a new flame, a new story in the wax.', pyro: 'It burns. I love it. Look at it burn.' }[k.style] || '';
+    const kit = {
+      lore: `${m.description} ${sym} was launched on WICK with its own AI Operator, ${k.label}, running on ${k.model}.`,
+      x: [`${sym} is live on pump.fun. ${burnL}\n\nCA: ${m.mint}`, `${voice} ${m.name}: ${m.description}`, `${sym} has its own AI Operator. Every action is public: the launch, its journal, every burn. Watch it work.`],
+      telegram: `${sym} is live.\n\n${m.description}\n\n${burnL}\n\nCA: ${m.mint}`,
+      ai: true, at: t0 + 8000,
+    };
+    log.push({ at: t0 + 8000, kind: 'kit', title: 'Prepared the launch kit', detail: `3 X posts, a Telegram post and the lore of ${sym}.` });
     if (row.op_mcap) log.push({ at: Math.min(Date.now(), t0 + 45 * 60_000), kind: 'milestone', title: `Reached a ${usd(row.op_mcap)} market cap`, detail: `$${m.symbol} trades at a ${usd(m.mcap)} market cap.` });
     if (row.op_burn && lastBurn) log.push({ at: lastBurn + 1, kind: 'milestone', title: `${row.op_burn}% of the $${m.symbol} supply burned`, detail: `${row.self_burns} burns, ${row.self_sol.toFixed(3)} SOL of its creator fees.` });
     log.sort((a, b) => b.at - a.at);
@@ -248,6 +259,7 @@ export function createDemo() {
     return {
       log,
       missions: missions(row, log, Date.now()),
+      kit,
       constitution: {
         personality: k.label, mind: { name: k.model, by: k.by, logo: k.logo },
         burn: m.candle ? { pct: m.candle.bps / 100, wickPct: 5, teamPct: 5 } : null, proof: null,

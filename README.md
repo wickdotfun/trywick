@@ -135,6 +135,13 @@ highest crossed since the last one, never more than one every 15 minutes (`opera
 words, next market cap milestone (with its progress), first burn or next burn milestone, today's journal, and what it
 always does (tracking).
 
+**Create: the launch kit** (`lib/kit.js`, cron): right after a coin's launch (coins under 7 days), its Operator writes
+its kit once, in its personality: the lore, 3 posts for X (the launch, its story, its Operator and burns) and a Telegram
+announcement, with the CA. Without AI (budget spent, unusable or off-limits answer), the kit comes from templates: every
+coin gets one. It is public (the Kit tab of the coin's page, `operator.kit`): Copy, Post on X (intent, free), and
+**Make its card**: the coin's card (its logo, ticker, burn share, Operator), drawn in the visitor's browser with the
+same template and engine as the other cards (`lib/cards.js`, `src/client/cardmaker.js`).
+
 **Constitution** (`operator.constitution`): what was set at launch and never changes: personality, mind, burn
 allocation, rules, `canSell: false`, `canMoveFunds: false`, and the fee-sharing transaction as on-chain proof. The
 conversation, the decision (burn or wait), the fixed rules and the transaction signer are separate: talking to an

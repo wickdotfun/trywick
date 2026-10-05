@@ -82,7 +82,7 @@ test('missions: what it did, what it aims for, what it always does', () => {
     { at: NOW - 3 * HOUR, kind: 'launched', title: 'Launched' },
   ];
   const fresh = missions({ symbol: 'MOTH', self_bps: 2000, self_pending: 4_000_000, self_burns: 0, mcap: 30_000, op_mcap: 25_000 }, log, NOW);
-  assert.deepEqual(fresh.map((x) => [x.id, x.status]), [['launch', 'done'], ['seal', 'done'], ['intro', 'done'], ['mcap', 'active'], ['burn', 'active'], ['journal', 'done'], ['watch', 'ongoing']]);
+  assert.deepEqual(fresh.map((x) => [x.id, x.status]), [['launch', 'done'], ['seal', 'done'], ['intro', 'done'], ['kit', 'active'], ['mcap', 'active'], ['burn', 'active'], ['journal', 'done'], ['watch', 'ongoing']]);
   const mcap = fresh.find((x) => x.id === 'mcap');
   assert.equal(mcap.title, 'Reach a $50K market cap');
   assert.equal(mcap.progress, 0.6);
@@ -95,5 +95,5 @@ test('missions: what it did, what it aims for, what it always does', () => {
   assert.equal(burning.find((x) => x.id === 'mcap').hint, 'Waiting for its first trades on DEX Screener');
 
   const plain = missions({ symbol: 'MOTH', self_bps: 0, mcap: 9_000, op_mcap: 0 }, [], NOW);
-  assert.deepEqual(plain.map((x) => x.id), ['launch', 'intro', 'mcap', 'journal', 'watch']);
+  assert.deepEqual(plain.map((x) => x.id), ['launch', 'intro', 'kit', 'mcap', 'journal', 'watch']);
 });

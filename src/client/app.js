@@ -2,6 +2,7 @@
 import { createCandles } from './candles.js';
 import { createCrew } from './crew.js';
 import { createProof } from './proof.js';
+import { draftCoin, drawLogo } from './draft.js';
 import { createDemo } from './demo.js';
 import { createPages } from './pages.js';
 import { createScene, headColor } from './scene.js';
@@ -932,7 +933,19 @@ async function runSpark(form, surprise = false) {
     sparkStatus(sparkDone(sp), 'done');
     bindLogoAgain(form);
   } catch (err) {
-    sparkStatus(SPARK_ERRORS[err.code] || SPARK_ERRORS.ai_failed, 'err');
+    // L'IA ne répond pas : un brouillon fait ici, pour que ça donne toujours quelque chose.
+    if (['ai_failed', 'ai_busy', 'ai_off'].includes(err.code) || !err.code) {
+      const d = draftCoin(surprise ? pick(IDEAS) : idea);
+      draft.spark = null;
+      form.name.value = d.name;
+      form.symbol.value = d.symbol;
+      form.description.value = d.description;
+      draft.fields = Object.fromEntries(new FormData(form));
+      if (!draft.image) await paintLogo({ visual: d.visual, name: d.name }, true);
+      sparkStatus(`${icon('sparkle')} The AI is busy right now, so here is a quick draft from your idea. Edit anything, or press Spark again in a moment.`, 'err');
+    } else {
+      sparkStatus(SPARK_ERRORS[err.code] || SPARK_ERRORS.ai_failed, 'err');
+    }
   } finally {
     sparking = false;
     if ($('sp-go')) {
@@ -944,11 +957,12 @@ async function runSpark(form, surprise = false) {
 }
 
 // Le logo peint par l'IA devient l'image du coin (recadré comme une image envoyée à la main).
-async function paintLogo(sp) {
+async function paintLogo(sp, local = false) {
   const view = $('drop-view');
   view?.classList.add('painting');
   try {
-    const blob = await api.sparkImage({ visual: sp.visual, name: sp.name });
+    // L'IA d'abord ; si elle ne répond pas, un logo dessiné ici (à remplacer par le sien).
+    const blob = local ? await drawLogo(`${sp.visual}${sp.name}`) : await api.sparkImage({ visual: sp.visual, name: sp.name }).catch(() => drawLogo(`${sp.visual}${sp.name}`));
     draft.image = await prepareImage(new File([blob], 'logo.png', { type: blob.type || 'image/png' }));
     draft.preview = URL.createObjectURL(draft.image);
     if ($('drop-view')) $('drop-view').innerHTML = `<img src="${draft.preview}" alt="">`;

@@ -3,6 +3,7 @@
 //   POST /api/admin/pause   { paused: true | false } → l'interrupteur d'urgence
 //   POST /api/admin/run     → fait avancer le buyback tout de suite
 //   GET  /api/admin/social, POST /api/admin/post → les posts et leurs cartes (plus bas)
+import { selfTest } from '../../lib/selftest.js';
 import { buybackWallet, feeSummary, potSol, runBuyback } from '../../lib/buyback.js';
 import { supplyCandle } from '../../lib/candle.js';
 import { CONFIG, candlePct, cycleTiming } from '../../lib/config.js';
@@ -209,6 +210,9 @@ export const adminRun = guarded(async ({ env }) => {
 });
 
 // Lance le buyback et garde une trace du résultat (ou de l'erreur) pour la page d'admin.
+// Tester chaque étape d'un lancement, en production (lib/selftest.js).
+export const adminSelfTest = guarded(async ({ env }) => json(await selfTest(env)));
+
 export async function recordRun(env, run) {
   try {
     const step = await run();

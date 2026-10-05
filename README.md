@@ -54,6 +54,10 @@ The site posts by itself, each moment once:
 Without X keys (the X API is paid per post), the admin page has a **Post on X** button for every coin and every
 card, with the text already written.
 
+The admin page also keeps a **post library**: every post needed before, during and after the launch, each with its
+card (`lib/posts.js`, drawn by `npm run cards`) and its text. One click copies the image, opens X with the text and
+sends the same post to the Telegram channel. A post written directly on X can be relayed to Telegram from its link.
+
 ## Proof
 
 [trywick.fun/#proof](https://trywick.fun/#proof) lists:

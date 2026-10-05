@@ -14,13 +14,14 @@ import { candleTotals } from '../../lib/candles.js';
 import { ensureSchema } from '../../lib/schema.js';
 import { announceText, deployer } from '../../lib/announce.js';
 import { MILESTONES, milestoneFile } from '../../lib/cards.js';
+import { LIBRARY, libraryFile, libraryPost, libraryText } from '../../lib/posts.js';
 import { cardBytes, coinXText, postText, publish, socialStatus } from '../../lib/social.js';
 import { xReady } from '../../lib/x.js';
 import { PUMP, PUMP_AMM, shareTotals } from '../../lib/sharing.js';
 import { buybackPaused, getSetting, setSetting } from '../../lib/settings.js';
 import { WSOL, ataAddress, findPda, fromBase58, getBalance, rpc, tokenHolding } from '../../lib/solana.js';
 import { supplyBurned } from '../../lib/supply.js';
-import { agentLine, dailyStats, solUsd, telegramReady } from '../../lib/telegram.js';
+import { agentLine, dailyStats, solUsd, telegramReady, tg } from '../../lib/telegram.js';
 import { tokenView } from '../../lib/token.js';
 
 async function digest(text) {
@@ -239,6 +240,8 @@ export const adminSocial = guarded(async ({ env }) => {
   const status = await socialStatus(env);
   return json({
     ...status, mint, ticker, supply: CONFIG.pumpSupply,
+    // La bibliothèque de posts : la carte, le texte prêt (avec le CA une fois $WICK lancé).
+    library: LIBRARY.map((p) => ({ id: p.id, phase: p.phase, label: p.label, when: p.when, file: libraryFile(p.id), text: libraryText(p, { ticker, site, mint }) })),
     texts: {
       live: mint ? announceText(mint, { ticker, site }).replace(/<\/?code>/g, '') : null,
       dexpaid: postText('dexpaid', { mint }, env).x,
@@ -248,6 +251,7 @@ export const adminSocial = guarded(async ({ env }) => {
 });
 
 const B64 = /^[A-Za-z0-9+/]+=*$/;
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 export const adminPost = guarded(async ({ request, env }) => {
   const body = await request.json().catch(() => null);
   const kind = body?.kind;
@@ -270,6 +274,30 @@ export const adminPost = guarded(async ({ request, env }) => {
     const n = Number(body.mcap);
     if (!MILESTONES.includes(n)) return json({ error: 'bad_milestone' }, 400);
     post = { image: await cardBytes(env, milestoneFile(n)), mint, ...postText('mcap', { mint, mcap: n }, env) };
+  } else if (kind === 'library') {
+    // Un post de la bibliothèque, avec son texte (modifiable dans l'admin) : le même sur X et Telegram.
+    const p = libraryPost(body.id);
+    if (!p) return json({ error: 'bad_post' }, 400);
+    const text = typeof body.text === 'string' && body.text.trim() ? body.text.trim().slice(0, 1000) : libraryText(p, { ticker, site, mint });
+    const caption = mint ? esc(text).replace(mint, `<code>${mint}</code>`) : esc(text);
+    post = { image: await cardBytes(env, libraryFile(p.id)), caption, x: text, mint };
+  } else if (kind === 'relay') {
+    // Un post X publié à la main : relayé dans le canal Telegram (son lien, avec l'aperçu de X).
+    const url = String(body.url || '').trim().replace('twitter.com/', 'x.com/').split('?')[0];
+    if (!/^https:\/\/(www\.)?x\.com\/[A-Za-z0-9_]{1,15}\/status\/\d+$/.test(url)) return json({ error: 'bad_url' }, 400);
+    if (!telegramReady(env)) return json({ error: 'no_telegram' }, 409);
+    const note = String(body.note || '').trim().slice(0, 600);
+    try {
+      const msg = await tg(env, 'sendMessage', {
+        text: `${note ? `${esc(note)}\n\n` : ''}𝕏 <a href="${esc(url)}">New post on X</a>`,
+        link_preview_options: { url, prefer_large_media: true },
+        reply_markup: { inline_keyboard: [[{ text: 'Like & repost on X', url }]] },
+      });
+      await setSetting(env.DB, `social.relay.manual.${Date.now()}`, { status: 'posted', at: Date.now(), telegram: msg.message_id, url });
+      return json({ telegram: msg.message_id });
+    } catch (err) {
+      return json({ telegramError: err.message });
+    }
   } else if (kind === 'lock') {
     const l = body.lock || {};
     const amount = Number(l.amount);
@@ -287,7 +315,8 @@ export const adminPost = guarded(async ({ request, env }) => {
   } else {
     return json({ error: 'bad_kind' }, 400);
   }
-  const out = await publish(e, `${kind}${kind === 'mcap' ? `.${body.mcap}` : ''}.manual.${Date.now()}`, post, { once: false });
-  await setSetting(env.DB, `social.${kind}.manual.${Date.now()}`, { status: out.telegram || out.x ? 'posted' : 'failed', at: Date.now(), ...out });
+  const tag = `${kind}${kind === 'mcap' ? `.${body.mcap}` : kind === 'library' ? `.${body.id}` : ''}`;
+  const out = await publish(e, `${tag}.manual.${Date.now()}`, post, { once: false });
+  await setSetting(env.DB, `social.${tag}.manual.${Date.now()}`, { status: out.telegram || out.x ? 'posted' : 'failed', at: Date.now(), ...out });
   return json({ ...out, xText: post.x });
 });

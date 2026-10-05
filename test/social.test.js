@@ -6,6 +6,7 @@ import { MILESTONES, cardSvg, milestoneFile, staticCards, usdShort } from '../li
 import { ensureSchema } from '../lib/schema.js';
 import { getSetting } from '../lib/settings.js';
 import { postText, publish, runSocial } from '../lib/social.js';
+import { LIBRARY } from '../lib/posts.js';
 import { oauthHeader, xPost } from '../lib/x.js';
 import { fakeD1 } from './helpers/d1.js';
 
@@ -62,7 +63,8 @@ test('the cards: one per moment, milestones named and drawn from the same templa
   assert.equal(milestoneFile(1_000_000), 'mcap-1m.png');
   const files = staticCards().map((c) => c.file);
   assert.deepEqual(files.slice(0, 3), ['live.png', 'dex-paid.png', 'mcap-50k.png']);
-  assert.equal(files.length, 2 + MILESTONES.length);
+  assert.equal(files.length, 2 + MILESTONES.length + LIBRARY.length);
+  assert.ok(files.includes('post-teaser.png'));
   const lock = cardSvg('lock', { ticker: 'WICK', amount: 34029058, pct: 3.4, until: 'Oct 30, 2027', where: 'Stream<flow>' });
   assert.match(lock, /34,029,058/);
   assert.match(lock, /\$WICK LOCKED/);

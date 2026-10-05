@@ -391,6 +391,7 @@ Locally, `CYCLE_MINUTES=1` in `.dev.vars` makes the breath (buyback countdown) 1
    | `SHARE_BURN_BPS`, `SHARE_TEAM_BPS`, `SHARE_CREW_BPS` | burn, team and crew parts of shared creator fees, in basis points (default `1000` + `1000` + `2000`: 60/20/10/10) |
    | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY` | secrets, optional: turn on each premium mind |
    | `PREMIUM_CLAUDE_MODEL`, `PREMIUM_GPT_MODEL`, `PREMIUM_GEMINI_MODEL`, `PREMIUM_GROK_MODEL` | optional: another model of the same provider |
+   | `SPARK_IMAGE_MODEL`, `AI_IMAGE_PER_DAY` | optional: logos are painted by Leonardo Phoenix in 512 × 512 (about $0.006 each), FLUX Schnell if it fails. `flux` = cheapest (about $0.0002), `phoenix-hd` = 1024 × 1024 (about $0.023). `AI_IMAGE_PER_DAY` caps logos per day (default 60) |
    | `TEAM_LOCK_URL`, `TEAM_LOCK_AMOUNT`, `TEAM_LOCK_UNTIL` | optional: the team's $WICK lock, shown on the Proof page once it exists |
    | `X_CLIENT_ID`, `X_CLIENT_SECRET` | secrets, optional: an X app with OAuth 2.0, so each coin's Operator can run its X account |
    | `HOLDER_MIN` | minimum $WICK held for a golden flame (default: any amount) |

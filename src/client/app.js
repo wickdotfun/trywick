@@ -1,6 +1,7 @@
 // Le site : la bougie géante, ses allumettes, le fil, et le bouton pour en frapper une.
 import { createCandles } from './candles.js';
 import { createCrew } from './crew.js';
+import { createProof } from './proof.js';
 import { createDemo } from './demo.js';
 import { createPages } from './pages.js';
 import { createScene, headColor } from './scene.js';
@@ -36,6 +37,7 @@ const api = DEMO ? createDemo() : {
   candles: () => get('/api/candles'),
   coin: (mint) => get(`/api/coin?mint=${encodeURIComponent(mint)}`),
   crew: () => get('/api/crew'),
+  proof: () => get('/api/proof'),
   // Le compte X d'un coin : son créateur le relie (signature de son wallet, puis X).
   xStart: (b) => post('/api/x/start', b),
   xUnlink: (b) => post('/api/x/unlink', b),
@@ -521,6 +523,8 @@ const pages = createPages({
 
 // Le crew : sa page (#crew), et les narratifs du Scout proposés au lancement.
 const crewPage = createCrew({ api, openModal, isOpen, world, ticker, avatar, onStrike: () => launchForm() });
+// La page Proof : les wallets, les règles, chaque SOL et chaque burn.
+const proofPage = createProof({ api, openModal, isOpen, ticker, demo: DEMO });
 // Lancer sur un narratif du Scout : l'idée part dans Spark.
 function launchOnIdea(idea) {
   draft.idea = idea;
@@ -546,6 +550,7 @@ const ROUTES = {
   flames: () => pages.flames(),
   how: () => pages.how(),
   crew: () => crewPage.open(launchOnIdea),
+  proof: () => proofPage.open(),
   strike: () => launchForm(),
 };
 const isRoute = (page) => Boolean(ROUTES[page]) || /^coin\/[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(page || '');

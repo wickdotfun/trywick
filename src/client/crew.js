@@ -62,6 +62,7 @@ export function createCrew({ api, openModal, isOpen, world, ticker, avatar, onSt
         <li><b>${p(s.burnBps)}%</b> burns ${tk()}. <span>Every coin feeds the great candle.</span></li>
         <li><b>${p(s.teamBps)}%</b> the WICK team.</li>
       </ul>
+      <p class="muted small"><a class="linkish" href="#proof">${icon('lock')} Verify every SOL on the Proof page</a></p>
       <p class="muted small">Set with pump.fun's own fee sharing at launch and locked on-chain: nobody can change it, not even WICK.
         The Ignition Fee (${world.launch?.sharedFeeSol ?? 0.01} SOL) is split 50% ${tk()} burn, 50% team.</p>`;
   }

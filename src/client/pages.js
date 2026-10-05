@@ -333,7 +333,8 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
         <div class="hk-styles">${k.styles.map((x) => `<span class="ck-style"><b>${esc(x.label)}</b> ${esc(x.hint)}</span>`).join('')}</div>
         <div class="hk-cards">
           <div class="hk-card">${icon('sparkle')}<b>It creates</b><p>Type one sentence. Your Operator writes the name, the ticker
-            and the story, and paints the logo. You change anything you want, then launch.</p></div>
+            and the story, and paints the logo. After the launch, it writes the launch kit: the lore, posts for X and
+            Telegram, and the coin's card, ready to share.</p></div>
           <div class="hk-card">${icon('book')}<b>It works in public</b><p>Every coin page shows its Operator's Activity: the launch,
             its first words, its daily journal, every decision and every burn, with its transaction. Holders can talk to it.</p></div>
           <div class="hk-card">${icon('flame')}<b>It burns, it can't dump</b><p>With Make it burn, it picks the moments to buy the

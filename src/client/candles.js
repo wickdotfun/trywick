@@ -126,7 +126,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
 
   // Le panneau de l'Operator d'un coin : qui il est, ce qu'il a fait (Activity), ce qui le lie
   // (Constitution), et la conversation avec lui (Talk).
-  const ACT = { launched: 'rocket', sealed: 'lock', intro: 'chat', journal: 'book', wait: 'wind', decide: 'keeper', burned: 'flame', fed: 'candle', posted: 'send', milestone: 'trophy' };
+  const ACT = { kit: 'sparkle', launched: 'rocket', sealed: 'lock', intro: 'chat', journal: 'book', wait: 'wind', decide: 'keeper', burned: 'flame', fed: 'candle', posted: 'send', milestone: 'trophy' };
   function activity(log = []) {
     if (!log.length) return '<p class="muted small">Its first actions show up here: the launch, its first words, every decision and every burn.</p>';
     return `<ol class="op-log">${log.map((e) => `<li class="op-ev ${esc(e.kind)}">
@@ -146,6 +146,44 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
           ${x.status === 'active' && x.progress != null ? `<span class="om-bar"><i style="width:${Math.max(3, Math.round(x.progress * 100))}%"></i></span>` : ''}</span>
         <span class="om-meta">${x.status === 'done' ? (x.at ? `<time data-at="${x.at}">${ago(x.at)}</time>` : 'done') : label[x.status]}</span>
       </li>`).join('')}</ol>`;
+  }
+  // Le kit de lancement : ce que son Operator a écrit pour qu'on le poste.
+  const lines = (t) => esc(t).replace(/\n/g, '<br>');
+  function kitHtml(kit, m) {
+    if (!kit) return '<p class="muted small">Its Operator writes the launch kit right after the launch: the lore, three posts for X and a Telegram announcement.</p>';
+    const page = `${location.origin}/#coin/${m.mint}`;
+    const xIntent = (t) => `https://x.com/intent/post?text=${encodeURIComponent(t)}&url=${encodeURIComponent(page)}`;
+    return `<div class="op-kit">
+      <p class="kit-note">${icon('sparkle')} Written by its Operator${kit.ai ? '' : ', from its templates'}. Anyone can post it: the creator, the holders, you.</p>
+      <section><h4>Lore</h4><div class="kit-post"><p>${lines(kit.lore)}</p>
+        <div class="kit-act"><button type="button" class="wbtn" data-kcopy="${esc(kit.lore)}">Copy</button></div></div></section>
+      <section><h4>Posts for X</h4>${kit.x.map((p) => `<div class="kit-post"><p>${lines(p)}</p>
+        <div class="kit-act"><button type="button" class="wbtn" data-kcopy="${esc(p)}">Copy</button><a class="wbtn x" href="${xIntent(p)}" target="_blank" rel="noopener">Post on X</a></div></div>`).join('')}</section>
+      <section><h4>Telegram</h4><div class="kit-post"><p>${lines(kit.telegram)}</p>
+        <div class="kit-act"><button type="button" class="wbtn" data-kcopy="${esc(kit.telegram)}">Copy</button></div></div></section>
+      <section><h4>Its card</h4><div class="kit-card" id="kit-card-out"><button type="button" class="cta small-cta" id="kit-card">${icon('sparkle')} Make its card</button>
+        <small class="muted">1600 × 900, ready for X and Telegram. Drawn right here, in your browser.</small></div></section>
+    </div>`;
+  }
+  function bindKit(root, m, op) {
+    root.querySelectorAll('[data-kcopy]').forEach((b) => b.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(b.dataset.kcopy); b.textContent = 'Copied'; } catch { b.textContent = 'Select it'; }
+      setTimeout(() => { b.textContent = 'Copy'; }, 1600);
+    }));
+    $('kit-card')?.addEventListener('click', async () => {
+      const box = $('kit-card-out');
+      box.innerHTML = '<p class="muted small">Drawing its card…</p>';
+      try {
+        const { imageData, renderCard } = await import('/build/cardmaker.js');
+        const c = op?.constitution;
+        const coin = m.image ? await imageData(m.image) : null;
+        const blob = await renderCard('coin', { symbol: m.symbol, name: m.name, burnPct: c?.burn?.pct || 0, mind: c?.mind?.name || m.keeper?.model }, coin ? { coin } : {});
+        const url = URL.createObjectURL(blob);
+        box.innerHTML = `<img src="${url}" alt="$${esc(m.symbol)}'s card"><div class="kit-act"><a class="wbtn" href="${url}" download="${esc(m.symbol.toLowerCase())}-wick.png">Download</a></div>`;
+      } catch (err) {
+        box.innerHTML = `<p class="muted small">Could not draw the card: ${esc(err.message)}</p>`;
+      }
+    });
   }
   function constitutionHtml(c, m) {
     if (!c) return '<p class="muted small">This coin was launched before Operators had a Constitution.</p>';
@@ -180,11 +218,13 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
       <div class="op-tabs" role="tablist">
         <button type="button" class="on" data-optab="act" role="tab">Activity <small>${log.length}</small></button>
         <button type="button" data-optab="missions" role="tab">Missions <small>${(op.missions || []).filter((x) => x.status === 'done').length}/${(op.missions || []).filter((x) => x.status !== 'ongoing').length}</small></button>
+        <button type="button" data-optab="kit" role="tab">Kit</button>
         <button type="button" data-optab="const" role="tab">Constitution</button>
         <button type="button" data-optab="talk" role="tab">Talk</button>
       </div>
       <div class="op-pane" data-oppane="act">${activity(log)}</div>
       <div class="op-pane" data-oppane="missions" hidden>${missionsHtml(op.missions)}</div>
+      <div class="op-pane" data-oppane="kit" hidden>${kitHtml(op.kit, m)}</div>
       <div class="op-pane" data-oppane="const" hidden>${constitutionHtml(op.constitution, m)}</div>
       <div class="op-pane" data-oppane="talk" hidden>${chatHtml({
         mint: m.mint, symbol: m.symbol,
@@ -288,6 +328,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
     $('cn-light').addEventListener('click', onStrike);
     bindChats(body, api.ask);
     bindTabs(body);
+    bindKit(body, m, data.operator);
   }
 
   return { forest, coin, candleHtml };

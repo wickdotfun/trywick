@@ -16,6 +16,7 @@ import { refreshMarkets } from '../lib/markets.js';
 import { runAnnounce, withLaunch } from '../lib/announce.js';
 import { runJournal, runKeepers, runVoices } from '../lib/keepers.js';
 import { queueSelfBurn, runShares } from '../lib/sharing.js';
+import { runKits } from '../lib/kit.js';
 import { runSocial } from '../lib/social.js';
 import { runTelegram } from '../lib/telegram.js';
 import { sweep } from '../lib/matches.js';
@@ -99,7 +100,7 @@ export default {
       runShares(env, Date.now()),
       runKeepers(env, Date.now(), queueSelfBurn),
       // Les voix des Keepers, puis la page de journal du jour (une à la fois).
-      runVoices(env, Date.now()).then(() => runJournal(env, Date.now())),
+      runVoices(env, Date.now()).then(() => runJournal(env, Date.now())).then(() => runKits(env, Date.now())),
       runTelegram(env, Date.now()),
       // Les grands moments de $WICK (DEX payé, paliers de market cap), avec leur carte.
       runSocial(env, Date.now()),

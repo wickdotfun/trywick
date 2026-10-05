@@ -22,7 +22,9 @@ const KEEPER_STYLES = [['stoic', 'Stoic', 'Calm, patient, few words'], ['degen',
   ['builder', 'Builder', 'Plans, ships, reports'], ['guardian', 'Guardian', 'Watches over the holders'], ['custom', 'Custom', 'Write its character']];
 const KEEPER_GOALS = Object.entries(CONFIG.keepers.goals).map(([id, g]) => ({ id, label: g.label, hint: g.hint }));
 const KEEPER_MODELS = [['llama', 'Llama 3.3 70B', 'Meta', 'meta'], ['gpt-oss', 'gpt-oss 120B', 'OpenAI', 'openai'], ['qwen', 'Qwen3 30B', 'Qwen', 'qwen'],
-  ['mistral', 'Mistral Small 3.1', 'Mistral', 'mistral'], ['gemma', 'Gemma 3 12B', 'Google', 'gemma'], ['deepseek', 'DeepSeek R1 32B', 'DeepSeek', 'deepseek']];
+  ['mistral', 'Mistral Small 3.1', 'Mistral', 'mistral'], ['gemma', 'Gemma 3 12B', 'Google', 'gemma'], ['deepseek', 'DeepSeek R1 32B', 'DeepSeek', 'deepseek'],
+  ['claude', 'Claude Sonnet 5.5', 'Anthropic', 'anthropic', true], ['gpt', 'GPT-5.6 Luna', 'OpenAI', 'openai', true],
+  ['gemini', 'Gemini 3.8 Flash', 'Google', 'gemini', true], ['grok', 'Grok 4.3', 'xAI', 'xai', true]];
 const seed = (k) => [...k].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 7);
 const logoOf = (f) => `/brand/ai/${f}.svg`;
 const HELLOS = {
@@ -277,7 +279,7 @@ export function createDemo() {
     for (const e of log) e.sig = null;
     return {
       log,
-      missions: missions({ ...row, op_groups: seed(m.mint) % 3 }, log, Date.now()),
+      missions: missions({ ...row, op_groups: seed(m.mint) % 3, op_x: m.x || '' }, log, Date.now()),
       kit,
       telegram: { bot: 'WickFireBot', groups: seed(m.mint) % 3 },
       constitution: {
@@ -337,7 +339,8 @@ export function createDemo() {
           shareBps: 4000, split: { creatorBps: 6000, burnBps: 1000, teamBps: 1000, crewBps: 2000 }, selfOptions: [1000, 2000, 3000, 5000],
           keepers: {
             styles: KEEPER_STYLES.map(([id, label, hint]) => ({ id, label, hint })),
-            models: KEEPER_MODELS.map(([id, name, by, f]) => ({ id, name, by, logo: logoOf(f) })),
+            models: KEEPER_MODELS.map(([id, name, by, f, premium]) => ({ id, name, by, logo: logoOf(f), ...(premium ? { premium: true, available: true } : {}) })),
+            premium: { boostDays: 7, minCrewSol: 0.02 },
             goals: KEEPER_GOALS, customMax: CONFIG.keepers.customMax,
           },
         },
@@ -536,7 +539,23 @@ export function createDemo() {
       const m = all.find((x) => x.mint === mint);
       if (!m) throw new Error('unknown_mint');
       const burnsOf = coinBurns.filter((b) => b.mint === mint);
-      return { match: pub(m), burns: burnsOf.map((b) => ({ ...b })), operator: operatorOf(m, burnsOf) };
+      // Son compte X : relié pour certains coins de la démo, et pour les tiens une fois connecté.
+      if (m.x === undefined) m.x = seed(m.mint) % 3 === 0 && !String(m.creator).startsWith('YouDemo') ? `${m.symbol.toLowerCase()}_operator` : null;
+      const op = operatorOf(m, burnsOf);
+      op.x = { enabled: true, handle: m.x, posts: m.x ? 3 + (seed(m.mint) % 20) : 0, perDay: 4 };
+      if (m.x) op.log.unshift({ at: Date.now() - 40 * 60_000, kind: 'posted', title: `Posted on X (@${m.x})`, detail: op.kit.x[1].split('\n')[0], sig: null });
+      return { match: pub(m), burns: burnsOf.map((b) => ({ ...b })), operator: op };
+    },
+    async xStart({ mint }) {
+      await new Promise((r) => setTimeout(r, 900));
+      const m = all.find((x) => x.mint === mint);
+      if (m) m.x = `${m.symbol.toLowerCase()}_operator`;
+      return { url: null };
+    },
+    async xUnlink({ mint }) {
+      const m = all.find((x) => x.mint === mint);
+      if (m) m.x = null;
+      return { ok: true };
     },
   };
 }

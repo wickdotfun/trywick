@@ -36,6 +36,9 @@ const api = DEMO ? createDemo() : {
   candles: () => get('/api/candles'),
   coin: (mint) => get(`/api/coin?mint=${encodeURIComponent(mint)}`),
   crew: () => get('/api/crew'),
+  // Le compte X d'un coin : son créateur le relie (signature de son wallet, puis X).
+  xStart: (b) => post('/api/x/start', b),
+  xUnlink: (b) => post('/api/x/unlink', b),
   // L'IA : Spark (le coin inventé par le Operator), son logo, et les questions aux Operators.
   spark: (b) => post('/api/spark', b),
   sparkImage: (b) => post('/api/spark/image', b, 'blob'),
@@ -673,9 +676,16 @@ function identityStep(f) {
 }
 
 function mindStep(k) {
+  const card = (m) => `<button type="button" class="k-mind${m.premium ? ' premium' : ''}${draft.keeper.model === m.id ? ' on' : ''}" data-kmodel="${esc(m.id)}" aria-pressed="${draft.keeper.model === m.id}"${m.premium && !m.available ? ' disabled' : ''}><i>${aiLogo(m, 22)}</i><span><b>${esc(m.name)}</b><small>${esc(m.by)}${m.premium && !m.available ? ' · soon' : ''}</small></span></button>`;
+  const premium = k.models.filter((m) => m.premium);
+  const p = k.premium || { boostDays: 7, minCrewSol: 0.02 };
   return `<section class="lf-step keeper-opt" data-step="1"${show(1)}>
-    ${head(1, 'Its <span class="grad">mind</span>', 'The model its Operator thinks with. Open models, run by Cloudflare. Locked at launch.')}
-    <div class="k-minds big" role="group" aria-label="The mind">${k.models.map((m) => `<button type="button" class="k-mind${draft.keeper.model === m.id ? ' on' : ''}" data-kmodel="${esc(m.id)}" aria-pressed="${draft.keeper.model === m.id}"><i>${aiLogo(m, 22)}</i><span><b>${esc(m.name)}</b><small>${esc(m.by)}</small></span></button>`).join('')}</div>
+    ${head(1, 'Its <span class="grad">mind</span>', 'The model its Operator thinks with: for its journal, its posts, its answers and its burns. Locked at launch.')}
+    ${premium.length ? `<small class="k-label">Premium <em>· paid by its crew</em></small>
+    <div class="k-minds big premium" role="group" aria-label="Premium minds">${premium.map(card).join('')}</div>
+    <small class="muted k-note">${icon('sparkle')} Free for its first ${p.boostDays} days, then as long as its crew earns ${p.minCrewSol} SOL a week from its fees. Otherwise it thinks with Llama, and says so.</small>
+    <small class="k-label">Open models <em>· free, run by Cloudflare</em></small>` : ''}
+    <div class="k-minds big" role="group" aria-label="The mind">${k.models.filter((m) => !m.premium).map(card).join('')}</div>
   </section>`;
 }
 
@@ -1143,6 +1153,14 @@ function start() {
     if (breathNow().remaining === 0 && !scene?.burning) poll();
   }, 1000);
   startScene();
+  // Retour de X (le compte X d'un coin) : on dit ce qui s'est passé, puis on nettoie l'adresse.
+  const params = new URLSearchParams(location.search);
+  const xs = params.get('x');
+  if (xs) {
+    params.delete('x');
+    history.replaceState(null, '', `${location.pathname}${params.size ? `?${params}` : ''}${location.hash}`);
+    toast({ linked: `${icon('check')} Its Operator now runs its X account. First post within the hour.`, denied: 'X authorization cancelled. Nothing was connected.' }[xs] || 'Could not connect the X account. Try again from its Kit tab.', 7000);
+  }
   // Une page demandée dans l'adresse (trywick.fun/#wick…) s'ouvre une fois l'état chargé.
   const page = location.hash.slice(1);
   poll(true).then(() => { if (isRoute(page)) go(page); });

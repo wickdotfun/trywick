@@ -150,6 +150,10 @@ export const adminStatus = guarded(async ({ env }) => {
         const today = s?.day === Math.floor(now / 86_400_000) ? s : {};
         return Object.fromEntries(Object.entries(CONFIG.keepers.daily).map(([k, max]) => [k, { used: today[k === 'keeper' ? 'count' : k] || 0, max }]));
       }),
+      // Les esprits premium réglés (leur clé), et les comptes X des coins (l'app X de WICK).
+      premium: CONFIG.keepers.models.filter((m) => m.premium).map((m) => ({ name: m.name, key: m.key, ready: Boolean(env[m.key]) })),
+      xApp: Boolean(env.X_CLIENT_ID && env.X_CLIENT_SECRET),
+      xLinks: (await db.prepare('SELECT COUNT(*) AS n, COALESCE(SUM(posts), 0) AS posts FROM x_links').first().catch(() => null)) || { n: 0, posts: 0 },
       customRpc: Boolean(env.SOLANA_RPC),
       ipSalt: Boolean(env.IP_SALT),
       collectFees: env.BUYBACK_COLLECT_FEES === 'on',

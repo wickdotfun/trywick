@@ -12,7 +12,7 @@ export const CREW = [
   { id: 'scout', name: 'Scout', icon: 'scout', role: 'Finds the narrative', text: 'Reads what is trending on Solana every 30 minutes and turns it into narratives, each one with its sources.' },
   { id: 'chandler', name: 'Chandler', icon: 'sparkle', role: 'Makes the coin', text: 'Writes the name, the ticker and the story, paints the logo, then the launch kit: lore, X posts, Telegram post.' },
   { id: 'igniter', name: 'Igniter', icon: 'rocket', role: 'Launches it, you sign', text: 'Prepares the pump.fun launch and the fee split. Nothing leaves without your wallet: you approve every launch.' },
-  { id: 'operator', name: 'Operator', icon: 'keeper', role: 'Works it after launch', text: 'Tracks the market, writes its journal, posts in its Telegram groups, and burns the coin under rules locked at launch.' },
+  { id: 'operator', name: 'Operator', icon: 'keeper', role: 'Works it after launch', text: 'Tracks the market, writes its journal, runs its X account and its Telegram groups, and burns the coin under rules locked at launch.' },
 ];
 
 export function createCrew({ api, openModal, isOpen, world, ticker, avatar, onStrike }) {
@@ -141,7 +141,7 @@ export function createCrew({ api, openModal, isOpen, world, ticker, avatar, onSt
       <section class="cw-sec cw-build">
         <div class="cw-sec-head"><h3>${icon('zap')} Build your crew</h3><small class="muted">locked at launch, in its Constitution</small></div>
         <small class="k-label">Its mind</small>
-        <div class="hk-minds">${k.models.map((m) => `<div class="hk-mind">${aiLogo(m, 26)}<b>${esc(m.name)}</b><small>${esc(m.by)}</small></div>`).join('')}</div>
+        <div class="hk-minds">${k.models.map((m) => `<div class="hk-mind">${aiLogo(m, 26)}<b>${esc(m.name)}</b><small>${esc(m.by)}${m.premium ? (m.available ? ' · premium' : ' · soon') : ''}</small></div>`).join('')}</div>
         <small class="k-label">Its character</small>
         <div class="hk-styles">${k.styles.map((x) => `<span class="ck-style"><b>${esc(x.label)}</b> ${esc(x.hint)}</span>`).join('')}</div>
         <small class="k-label">Its objective</small>

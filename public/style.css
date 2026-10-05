@@ -1429,3 +1429,23 @@ button.cdl:focus-visible { outline: 2px solid var(--gold); outline-offset: 6px; 
   .cw-fresh { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cw-fees { grid-template-columns: 1fr; }
 }
+
+/* Les esprits premium (payés par le crew) */
+.k-minds.premium .k-mind { border-color: var(--gold-line); background: linear-gradient(180deg, rgba(255, 206, 112, .07), rgba(20, 13, 9, .9)); }
+.k-mind.premium i { background: rgba(255, 255, 255, .06); }
+.k-mind:disabled { opacity: .45; cursor: not-allowed; }
+.k-mind:disabled:hover { border-color: var(--gold-line); }
+.k-note { display: flex; gap: 6px; align-items: flex-start; font-size: 11.5px; line-height: 1.4; }
+.k-note .ico { width: 13px; height: 13px; color: var(--gold); flex: none; margin-top: 1px; }
+
+/* Le compte X d'un coin (onglet Kit) */
+.kit-x { border-radius: 14px; }
+.kit-x h4 { display: inline-flex; align-items: center; gap: 7px; }
+.kit-x h4 .x-logo, .kit-x .cta .x-logo { width: 14px; height: 14px; fill: currentColor; stroke: none; }
+.kit-x h4 small { text-transform: none; letter-spacing: 0; color: var(--muted); }
+.kit-x.on h4 small { color: #3ddc84; }
+.kit-x .kit-post { border-color: var(--gold-line); background: linear-gradient(180deg, rgba(255, 206, 112, .06), rgba(20, 13, 9, .7)); }
+.kit-x .kit-post a { color: var(--gold); }
+.kit-x .cta { display: inline-flex; align-items: center; gap: 8px; }
+.kit-x small.muted { display: block; margin-top: 6px; font-size: 11.5px; line-height: 1.4; }
+.k-minds.big.premium { grid-template-columns: repeat(2, minmax(0, 1fr)); }

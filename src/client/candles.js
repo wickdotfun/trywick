@@ -1,9 +1,12 @@
 // « Make it burn » côté site : la forêt des bougies (les coins qui se brûlent eux-mêmes) et la
 // page de chaque coin, avec sa bougie, sa part brûlée et chacun de ses burns.
+import { proofMessage } from '../../lib/xproof.js';
+import * as connect from './connect.js';
 import { bindChats, chatHtml } from './keeper.js';
 import { ago, aiLogo, compact, esc, fmt, icon, pumpUrl, sol, solscan } from './util.js';
 
 const $ = (id) => document.getElementById(id);
+const xLogo = '<svg class="ico x-logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.8 3h3.1l-6.8 7.8L22 21h-6.2l-4.9-6.4L5.3 21H2.2l7.3-8.3L2 3h6.4l4.4 5.8L17.8 3zm-1.1 16.2h1.7L7.4 4.7H5.6l11.1 14.5z"/></svg>';
 const usd = (n) => (n == null ? '—' : `$${compact(n)}`);
 const pctText = (p) => (p == null ? '—' : `${p < 0.01 && p > 0 ? '<0.01' : p.toLocaleString('en-US', { maximumFractionDigits: p >= 10 ? 1 : 2 })}%`);
 
@@ -119,7 +122,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
           <p class="muted">The creator picks its personality and its mind. The Operator picks the moments to buy the coin back
           and burn it, and tells the holders why. It never touches the amounts.</p></div>
       </div>
-      <div class="ck-minds">${k.models.map((m) => `<div class="ck-mind">${aiLogo(m, 22)}<span><b>${esc(m.name)}</b><small>${esc(m.by)}</small></span></div>`).join('')}</div>
+      <div class="ck-minds">${k.models.map((m) => `<div class="ck-mind">${aiLogo(m, 22)}<span><b>${esc(m.name)}</b><small>${esc(m.by)}${m.premium ? (m.available ? ' · premium' : ' · soon') : ''}</small></span></div>`).join('')}</div>
       <div class="ck-styles">${k.styles.map((x) => `<span class="ck-style"><b>${esc(x.label)}</b> ${esc(x.hint)}</span>`).join('')}</div>
     </section>`;
   }
@@ -160,11 +163,31 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
         <code class="kit-cmd">${esc(cmd)}</code>
         <div class="kit-act"><button type="button" class="wbtn" data-kcopy="${esc(cmd)}">Copy</button></div></div></section>`;
   }
+  // Son compte X : son créateur le confie à son Operator, qui y poste tout seul.
+  function xHtml(x, m) {
+    if (!x?.enabled) return '';
+    // La démo : les coins lancés dans la démo sont « les tiens ».
+    const mine = demo ? String(m.creator).startsWith('YouDemo') : connect.current()?.address === m.creator;
+    if (x.handle) {
+      return `<section class="kit-x on"><h4>${xLogo} Its X account <small>· run by its Operator</small></h4>
+        <div class="kit-post"><p><a href="https://x.com/${esc(x.handle)}" target="_blank" rel="noopener"><b>@${esc(x.handle)}</b></a> · ${fmt(x.posts)} post${x.posts === 1 ? '' : 's'} so far.
+          It posts its launch kit, then its milestones, its burns and its journal: ${x.perDay} posts a day at most, never a link.</p>
+          ${mine ? '<div class="kit-act"><button type="button" class="wbtn" id="x-unlink">Take it back</button></div>' : ''}</div></section>`;
+    }
+    return `<section class="kit-x"><h4>${xLogo} Its X account</h4>
+      <div class="kit-post"><p>${mine ? 'Hand its X account to its Operator' : 'Its creator can hand its X account to its Operator'}: it posts there on its own,
+        in character. Its launch kit first, then its milestones, its burns and its journal. ${x.perDay} posts a day at most, never a link.
+        Paid by its crew.</p>
+        ${mine ? `<div class="kit-act"><button type="button" class="cta small-cta" id="x-connect">${xLogo} Connect its X account</button></div>
+        <small class="muted">Your wallet signs a message (not a transaction) to prove the coin is yours, then X asks you to authorize WICK.
+          You can take it back any time, here or in your X settings.</small><p class="error" id="x-error" hidden></p>` : ''}</div></section>`;
+  }
   function kitHtml(kit, m, op) {
-    if (!kit) return `<p class="muted small">Its Operator writes the launch kit right after the launch: the lore, three posts for X and a Telegram announcement.</p>${telegramHtml(op?.telegram, m)}`;
+    if (!kit) return `${xHtml(op?.x, m)}<p class="muted small">Its Operator writes the launch kit right after the launch: the lore, three posts for X and a Telegram announcement.</p>${telegramHtml(op?.telegram, m)}`;
     const page = `${location.origin}/#coin/${m.mint}`;
     const xIntent = (t) => `https://x.com/intent/post?text=${encodeURIComponent(t)}&url=${encodeURIComponent(page)}`;
     return `<div class="op-kit">
+      ${xHtml(op?.x, m)}
       <p class="kit-note">${icon('sparkle')} Written by its Operator${kit.ai ? '' : ', from its templates'}. Anyone can post it: the creator, the holders, you.</p>
       <section><h4>Lore</h4><div class="kit-post"><p>${lines(kit.lore)}</p>
         <div class="kit-act"><button type="button" class="wbtn" data-kcopy="${esc(kit.lore)}">Copy</button></div></div></section>
@@ -177,7 +200,41 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
       ${telegramHtml(op?.telegram, m)}
     </div>`;
   }
+  const X_ERRORS = {
+    not_creator: 'Only the wallet that launched this coin can connect its X account.',
+    bad_signature: 'The signature did not match. Try again.',
+    no_sign_message: 'This wallet cannot sign messages. Try Phantom, Solflare or Backpack.',
+    rejected: 'Signature cancelled.',
+    too_many: 'Too many tries. Wait a moment.',
+    x_off: 'X accounts are not open yet.',
+  };
+  async function xProof(m, action) {
+    const wallet = connect.current()?.address;
+    const message = proofMessage({ action, symbol: m.symbol, mint: m.mint, wallet, at: Date.now() });
+    return { mint: m.mint, wallet, message, signature: await connect.signText(message) };
+  }
+  function bindX(root, m) {
+    $('x-connect')?.addEventListener('click', async (e) => {
+      const b = e.currentTarget;
+      b.disabled = true;
+      try {
+        const { url } = await api.xStart(demo ? { mint: m.mint } : await xProof(m, 'link'));
+        if (url) location.href = url; else go(`coin/${m.mint}`);
+      } catch (err) {
+        const box = $('x-error');
+        box.hidden = false;
+        box.textContent = X_ERRORS[err.code] || 'Could not connect its X account. Try again.';
+        b.disabled = false;
+      }
+    });
+    $('x-unlink')?.addEventListener('click', async (e) => {
+      e.currentTarget.disabled = true;
+      try { await api.xUnlink(demo ? { mint: m.mint } : await xProof(m, 'unlink')); } catch { /* */ }
+      go(`coin/${m.mint}`);
+    });
+  }
   function bindKit(root, m, op) {
+    bindX(root, m);
     root.querySelectorAll('[data-kcopy]').forEach((b) => b.addEventListener('click', async () => {
       try { await navigator.clipboard.writeText(b.dataset.kcopy); b.textContent = 'Copied'; } catch { b.textContent = 'Select it'; }
       setTimeout(() => { b.textContent = 'Copy'; }, 1600);

@@ -241,7 +241,7 @@ export const adminSocial = guarded(async ({ env }) => {
   return json({
     ...status, mint, ticker, supply: CONFIG.pumpSupply,
     // La bibliothèque de posts : la carte, le texte prêt (avec le CA une fois $WICK lancé).
-    library: LIBRARY.map((p) => ({ id: p.id, phase: p.phase, label: p.label, when: p.when, file: libraryFile(p.id), text: libraryText(p, { ticker, site, mint }) })),
+    library: LIBRARY.map((p) => ({ id: p.id, slot: p.slot, phase: p.phase, label: p.label, when: p.when, file: libraryFile(p.id), text: libraryText(p, { ticker, site, mint }) })),
     texts: {
       live: mint ? announceText(mint, { ticker, site }).replace(/<\/?code>/g, '') : null,
       dexpaid: postText('dexpaid', { mint }, env).x,

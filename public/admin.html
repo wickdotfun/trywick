@@ -82,6 +82,7 @@
     .login { max-width: 380px; margin: 14vh auto 0; }
     .login input { width: 100%; height: 44px; padding: 0 12px; margin: 10px 0 12px; border-radius: 11px; color: var(--text);
       border: 1px solid var(--line-2); background: rgba(255,220,180,.04); font: 14px var(--mono); }
+    #action-msg { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 50; width: max-content; max-width: min(640px, calc(100% - 32px)); margin: 0; background: #1a120c; border: 1px solid var(--line-2); box-shadow: 0 12px 40px rgba(0,0,0,.5); }
     .msg { margin: 0 0 14px; padding: 10px 14px; border-radius: 10px; font-size: 13px; background: rgba(255,255,255,.04); }
     .scroll { overflow-x: auto; }
     .mono { font-family: var(--mono); }
@@ -92,6 +93,16 @@
     .soc .b { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
     .soc .b b { font-size: 13px; } .soc .b small { color: var(--muted); font-size: 11.5px; }
     .soc .row .btn { height: 28px; padding: 0 9px; font-size: 12px; border-radius: 8px; }
+    .lib .soc-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+    .lib h3 { margin: 18px 0 0; font-size: 13px; color: var(--gold); letter-spacing: .02em; }
+    .lib .when { color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .lib textarea { width: 100%; min-height: 150px; resize: vertical; padding: 9px 10px; border-radius: 10px; color: var(--text); border: 1px solid var(--line-2); background: rgba(255,220,180,.04); font: 12.5px/1.45 var(--sans); box-sizing: border-box; }
+    .lib .btn.both { color: #1d1003; background: linear-gradient(#ffd978, #f1b440); border-color: transparent; font-weight: 700; }
+    .lib .done { color: #3ddc84; font-size: 11.5px; }
+    .lib-how { margin: 4px 0 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,220,180,.03); font-size: 12.5px; line-height: 1.55; color: var(--muted); }
+    .relay { display: grid; grid-template-columns: 2fr 2fr auto; gap: 8px; margin-top: 10px; }
+    .relay input { height: 38px; padding: 0 10px; border-radius: 10px; color: var(--text); border: 1px solid var(--line-2); background: rgba(255,220,180,.04); font: 13px var(--sans); min-width: 0; }
+    @media (max-width: 760px) { .relay { grid-template-columns: 1fr; } }
     .lock-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-top: 10px; }
     .lock-form label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--muted); }
     .lock-form input[type=text], .lock-form input[type=number], .lock-form input[type=url] { height: 38px; padding: 0 10px; border-radius: 10px; color: var(--text); border: 1px solid var(--line-2); background: rgba(255,220,180,.04); font: 13.5px var(--sans); }
@@ -202,6 +213,22 @@
         <div class="card"><h2>Settings</h2><dl class="kv" id="checks"></dl></div>
       </div>
 
+      <div class="card lib" id="library">
+        <h2>Posts prêts à publier <small>l'image et le texte sont prêts : un clic, et c'est sur X et Telegram</small></h2>
+        <p class="lib-how"><b>Post on X + Telegram</b> fait trois choses d'un coup : il <b>copie l'image</b>, il <b>ouvre X avec le texte</b>, et il <b>envoie le post dans ton canal Telegram</b>.
+          Sur X, appuie juste sur <b>Ctrl+V</b> (Cmd+V sur Mac) pour coller l'image, puis sur <b>Post</b>. Sur téléphone : <b>Image</b> pour l'enregistrer, puis ajoute-la dans X.
+          Tu peux modifier le texte avant de cliquer. Les posts « après le lancement » ajoutent le CA tout seuls dès que $WICK est en ligne.</p>
+        <h3>Avant le lancement</h3><div class="soc-grid" id="lib-before"></div>
+        <h3>Au lancement</h3><div class="soc-grid" id="lib-launch"></div>
+        <h3>Après le lancement</h3><div class="soc-grid" id="lib-after"></div>
+        <h3>Tu as posté sur X directement ? Relaie-le sur Telegram</h3>
+        <form class="relay" id="relay-form">
+          <input name="url" type="url" placeholder="Lien du post X : https://x.com/…/status/…" required>
+          <input name="note" type="text" placeholder="Un petit texte au-dessus (optionnel)">
+          <button class="btn primary" type="submit">Send to Telegram</button>
+        </form>
+      </div>
+
       <div class="card" id="social">
         <h2>Posts &amp; cards <small id="soc-sum">automatic posts with their card: launch, DEX paid, market cap milestones</small></h2>
         <dl class="kv" id="soc-status"></dl>
@@ -287,6 +314,8 @@
       el.className = `msg ${cls}`;
       el.textContent = text;
       el.hidden = false;
+      clearTimeout(flash.t);
+      if (cls !== 'warn') flash.t = setTimeout(() => { el.hidden = true; }, 9000);
     }
 
     // ------------------------------------------------------------ helpers on the data
@@ -638,8 +667,75 @@
       ].join('');
       $('soc-miles').innerHTML = s.milestones.map((m) => socCard({ file: m.file, title: `${m.label} market cap`, hint: 'Posted by itself the first time $WICK crosses it.', kind: 'mcap', mcap: m.value, text: s.texts.mcap[m.value] })).join('');
     }
+    // ------------------------------------------------------------ la bibliothèque de posts
+    const lastPost = (prefix) => soc.posts.filter((p) => p.key.startsWith(prefix) && p.status === 'posted').sort((a, b) => b.at - a.at)[0];
+    function libCard({ id, file, label, when, text, both = true, tgDone = null, disabled = '' }) {
+      const last = id ? lastPost(`library.${id}.`) : null;
+      return `<div class="soc" data-lib="${esc(id || '')}" data-file="${esc(file)}"><img src="/cards/${esc(file)}" alt="" loading="lazy"><div class="b">
+        <b>${esc(label)}</b><span class="when">${when}</span>
+        <textarea spellcheck="false"${disabled ? ' disabled' : ''}>${esc(text || '')}</textarea>
+        ${last ? `<span class="done">✓ Posté ${ago(last.at)}${last.telegram ? ' sur Telegram' : ''}</span>` : tgDone ? `<span class="done">${tgDone}</span>` : ''}
+        <div class="row">
+          ${disabled ? `<span class="dim small">${disabled}</span>` : both
+            ? '<button class="btn both" data-act="both">Post on X + Telegram</button><button class="btn" data-act="x">X only</button><button class="btn" data-act="tg">Telegram only</button>'
+            : '<button class="btn both" data-act="x">Post on X</button>'}
+          <a class="btn" href="/cards/${esc(file)}" download="wick-${esc(id || file)}">Image</a>
+        </div></div></div>`;
+    }
+    function renderLibrary() {
+      const s = soc, L = s.library || [];
+      $('lib-before').innerHTML = L.filter((p) => p.phase === 'before').map((p) => libCard(p)).join('');
+      $('lib-after').innerHTML = L.filter((p) => p.phase === 'after').map((p) => libCard(p)).join('');
+      const live = s.posts.find((p) => p.key === 'live');
+      $('lib-launch').innerHTML = [
+        libCard({ file: 'live.png', label: `$${s.ticker} is live (le CA)`, both: false, text: s.texts.live,
+          when: "Le post le plus important. Sur Telegram, il part <b>tout seul</b> dans la minute du lancement, épinglé. Ici : ton post X, avec le CA, puis épingle-le sur ton profil.",
+          tgDone: live || data?.checks?.announced ? '✓ Déjà posté et épinglé sur Telegram (automatique)' : null,
+          disabled: s.mint ? '' : 'Disponible dès que $WICK est lancé (le CA se remplit tout seul).' }),
+        `<div class="soc"><img src="/cards/post-fees.png" alt="" loading="lazy" style="filter:grayscale(.6) brightness(.7)"><div class="b">
+          <b>Tokens locked</b><span class="when">Après avoir verrouillé tes $WICK sur Streamflow : remplis le formulaire « Tokens locked » plus bas. Sa carte est dessinée avec tes chiffres, et un clic la poste sur Telegram (et l'affiche sur la page Proof).</span>
+          <div class="row"><a class="btn both" href="#lock-form">Aller au formulaire</a></div></div></div>`,
+      ].join('');
+    }
+    async function copyImage(file) {
+      // L'image dans le presse-papier, pour la coller dans X (Ctrl+V). Pas grave si le navigateur refuse.
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': fetch(`/cards/${file}`).then((r) => r.blob()) })]);
+        return true;
+      } catch { return false; }
+    }
+    document.addEventListener('click', async (e) => {
+      const b = e.target.closest('#library [data-act]');
+      if (!b) return;
+      const card = b.closest('.soc'), id = card.dataset.lib, file = card.dataset.file, text = card.querySelector('textarea').value.trim();
+      const act = b.dataset.act;
+      let copied = false;
+      if (act !== 'tg') {
+        const copying = copyImage(file);
+        window.open(xIntent(text), '_blank', 'noopener');
+        copied = await copying;
+      }
+      if (act === 'x') { flash(copied ? 'X est ouvert avec le texte. Fais Ctrl+V pour coller l\'image, puis Post.' : 'X est ouvert avec le texte. Ajoute l\'image (bouton Image), puis Post.', 'ok'); return; }
+      if (!soc.telegram) { flash('Telegram n\'est pas connecté (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID).', 'bad'); return; }
+      flash('Envoi sur Telegram…', 'warn');
+      try {
+        const r = await call('/api/admin/post', { kind: 'library', id, text, channels: ['telegram'] });
+        flash(r.telegram ? `Posté sur Telegram.${act === 'both' ? (copied ? ' Sur X : Ctrl+V pour coller l\'image, puis Post.' : ' Sur X : ajoute l\'image (bouton Image), puis Post.') : ''}` : `Telegram a refusé : ${r.telegramError || 'erreur'}`, r.telegram ? 'ok' : 'bad');
+      } catch (err) { flash(err.message, 'bad'); }
+      loadSocial();
+    });
+    $('relay-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = Object.fromEntries(new FormData(e.target));
+      flash('Envoi sur Telegram…', 'warn');
+      try {
+        const r = await call('/api/admin/post', { kind: 'relay', url: f.url, note: f.note });
+        if (r.telegram) { flash('Relayé sur Telegram.', 'ok'); e.target.reset(); } else flash(`Telegram a refusé : ${r.telegramError || 'erreur'}`, 'bad');
+      } catch (err) { flash(err.message === 'bad_url' ? 'Ce lien n\'est pas un post X (https://x.com/compte/status/123…).' : err.message, 'bad'); }
+    });
+
     async function loadSocial() {
-      try { soc = await call('/api/admin/social'); renderSocial(); } catch (err) { $('soc-status').innerHTML = `<dt>Posts</dt><dd class="bad">${esc(err.message)}</dd>`; }
+      try { soc = await call('/api/admin/social'); renderSocial(); renderLibrary(); } catch (err) { $('soc-status').innerHTML = `<dt>Posts</dt><dd class="bad">${esc(err.message)}</dd>`; }
     }
     async function postCard(body, label) {
       const ch = channels(soc);

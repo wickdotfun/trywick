@@ -394,6 +394,7 @@ Locally, `CYCLE_MINUTES=1` in `.dev.vars` makes the breath (buyback countdown) 1
    | `SPARK`, `SCOUT` | optional, off by default: `on` turns back on the AI at launch (Spark writes the coin and paints its logo) and the Scout. Off, creators bring their own image, like on pump.fun, and nothing at launch costs AI |
    | `SPARK_IMAGE_MODEL`, `AI_IMAGE_PER_DAY` | optional: logos are painted by FLUX Schnell (about 500 a day in the free Workers AI quota). `phoenix` = Leonardo Phoenix 512 × 512 (nicer, about $0.006 each), `phoenix-hd` = 1024 × 1024 (about $0.023). `AI_IMAGE_PER_DAY` caps logos per day (default 60) |
    | `TEAM_LOCK_URL`, `TEAM_LOCK_AMOUNT`, `TEAM_LOCK_UNTIL` | optional: the team's $WICK lock, shown on the Proof page once it exists |
+   | `GROQ_API_KEY` | secret, optional but recommended: a free Groq key (console.groq.com → API Keys, no card). When the free daily Workers AI quota is used up, agents keep answering with it (Llama 3.3 70B) instead of going quiet. `GROQ_MODEL` to pick another Groq model |
    | `X_CLIENT_ID`, `X_CLIENT_SECRET` | secrets, optional: an X app with OAuth 2.0, so each coin's Operator can run its X account |
    | `HOLDER_MIN` | minimum $WICK held for a golden flame (default: any amount) |
    | `TELEGRAM_BOT_TOKEN` (secret), `TELEGRAM_CHAT_ID` | the bot (from @BotFather) and the channel (`@yourchannel` or its numeric id); the bot must be an admin of the channel |

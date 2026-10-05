@@ -130,3 +130,33 @@ test('voices: a Keeper introduces itself once, and The Wick speaks after each $W
   assert.equal(await runVoices(env, NOW + 60_000), 0);   // une seule fois
   assert.ok(await getSetting(db, 'ai.day'));
 });
+
+test('free backup brain: once the Workers AI quota is used up, agents answer with Groq instead of going quiet', async () => {
+  const { setSetting } = await import('../lib/settings.js');
+  const { thinkWith } = await import('../lib/keepers.js');
+  const db = fakeD1();
+  await ensureSchema(db);
+  const now = Date.UTC(2026, 9, 5, 18);
+  let workers = 0;
+  const AI = { run: async () => { workers++; throw new Error('4006: you have used up your daily free allocation of 10,000 neurons'); } };
+  const sent = [];
+  globalThis.fetch = async (url, init) => {
+    sent.push({ url: String(url), body: JSON.parse(init.body), auth: init.headers.authorization });
+    return Response.json({ choices: [{ message: { content: 'Still burning.' } }] });
+  };
+  const env = { DB: db, AI, GROQ_API_KEY: 'gsk_test' };
+  const first = await thinkWith(env, { model: 'kimi', system: 's', prompt: 'p', now });
+  assert.equal(first.text, 'Still burning.');
+  assert.equal(first.mind.id, 'backup');
+  assert.equal(workers, 1, 'Workers AI is tried once, then paused for the day');
+  assert.equal(sent[0].url, 'https://api.groq.com/openai/v1/chat/completions');
+  assert.equal(sent[0].body.model, 'llama-3.3-70b-versatile');
+  assert.equal(sent[0].auth, 'Bearer gsk_test');
+  // Le reste de la journée : directement Groq, sans réessayer Workers AI.
+  await thinkWith(env, { model: 'gemma', system: 's', prompt: 'p', now });
+  assert.equal(workers, 1);
+  assert.equal(sent.length, 2);
+  // Sans clé Groq : rien (les phrases écrites prennent le relais).
+  await setSetting(db, 'ai.out', Math.floor(now / 86_400_000));
+  assert.equal((await thinkWith({ DB: db, AI }, { model: 'gemma', system: 's', prompt: 'p', now })).text, null);
+});

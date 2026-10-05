@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
 import { Keypair, PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
-import { prepare, status, submit } from '../src/api/launch.js';
+import { feeSubmit, feeTx, prepare, status, submit } from '../src/api/launch.js';
 import { CONFIG } from '../lib/config.js';
 import { pinataStatus, uploadMetadata } from '../lib/pump.js';
 import { ensureSchema } from '../lib/schema.js';
@@ -64,7 +64,7 @@ test('the admin page knows whether the Pinata key works', async () => {
 });
 
 // Une fausse chaîne : la création réussit ou échoue, et on regarde quand part l'Ignition Fee.
-async function launchFlow({ launchFails }) {
+async function launchFlow({ launchFails, simFails = 0 }) {
   const wallet = Keypair.generate(), creator = Keypair.generate(), mintKp = Keypair.generate();
   const mint = mintKp.publicKey.toBase58();
   const db = fakeD1();
@@ -97,6 +97,8 @@ async function launchFlow({ launchFails }) {
         return ok(sig);
       }
       case 'getSignatureStatuses': return ok({ value: [{ err: null, confirmationStatus: 'confirmed' }] });
+      // La fee est simulée avant d'être proposée au wallet (les premières fois, le coin n'est pas encore visible).
+      case 'simulateTransaction': return ok({ value: simFails-- > 0 ? { err: { InstructionError: [0, 'AccountNotFound'] }, logs: [] } : { err: null, logs: [] } });
       case 'getTransaction': {
         const tx = readTransaction(Buffer.from(launchBytes));
         return ok({
@@ -116,31 +118,65 @@ async function launchFlow({ launchFails }) {
   const tx = VersionedTransaction.deserialize(Buffer.from(prep.tx, 'base64'));
   tx.sign([creator, mintKp]);
   const launchBytes = tx.serialize();
-  const feeTx = VersionedTransaction.deserialize(Buffer.from(prep.feeTx, 'base64'));
-  feeTx.sign([creator]);
-  const body = JSON.stringify({ mint, tx: Buffer.from(launchBytes).toString('base64'), feeTx: Buffer.from(feeTx.serialize()).toString('base64') });
+  assert.equal(prep.fee, true);
+  assert.equal(prep.feeTx, undefined, 'no fee to sign before the coin exists');
+  const body = JSON.stringify({ mint, tx: Buffer.from(launchBytes).toString('base64') });
   const res = await (await submit({ request: new Request('http://x', { method: 'POST', body }), env })).json();
-  assert.equal(res.status, 'pending');
+  assert.deepEqual([res.status, res.fee], ['pending', true]);
   assert.equal(sent.length, 1, 'only the launch is sent at first');
-  assert.equal((await db.prepare('SELECT fee_state FROM matches WHERE mint = ?').bind(mint).first()).fee_state, 'held');
+  assert.equal((await db.prepare('SELECT fee_state FROM matches WHERE mint = ?').bind(mint).first()).fee_state, 'awaiting');
+  const call = async (fn, b) => fn({ request: new Request('http://x', { method: 'POST', body: JSON.stringify(b) }), env });
   const st = await (await status({ request: new Request(`http://x/api/launch/status?mint=${mint}`), env })).json();
-  return { st, sent, env, row: await db.prepare('SELECT * FROM matches WHERE mint = ?').bind(mint).first() };
+  return { st, sent, env, creator, mint, call, row: await db.prepare('SELECT * FROM matches WHERE mint = ?').bind(mint).first() };
 }
 
-test('the Ignition Fee waits for the launch: sent once the coin is confirmed', async () => {
-  const { st, sent, row } = await launchFlow({ launchFails: false });
-  assert.equal(st.status, 'lit');
-  assert.equal(sent.length, 2);
-  assert.equal(sent[1], row.fee_sig);
-  assert.ok(['sent', 'paid'].includes(row.fee_state));
+// Le coin existe : la fee, faite maintenant (simulée), signée par le créateur, envoyée.
+async function payFee({ call, creator, mint }) {
+  const res = await call(feeTx, { mint });
+  const data = await res.json();
+  if (!data.feeTx) return { res, data };
+  const tx = VersionedTransaction.deserialize(Buffer.from(data.feeTx, 'base64'));
+  tx.sign([creator]);
+  return { data, sent: await (await call(feeSubmit, { mint, feeTx: Buffer.from(tx.serialize()).toString('base64') })).json() };
+}
+
+test('the Ignition Fee is signed once the coin exists, simulated first, then sent', async () => {
+  const flow = await launchFlow({ launchFails: false, simFails: 1 });
+  assert.deepEqual([flow.st.status, flow.st.fee], ['lit', 'awaiting']);
+  // Le RPC ne voit pas encore le coin : la fee n'est pas proposée (le site réessaie).
+  const early = await payFee(flow);
+  assert.deepEqual([early.res.status, early.data.error], [409, 'fee_not_ready']);
+  const { sent } = await payFee(flow);
+  assert.equal(sent.status, 'sent');
+  assert.equal(flow.sent.length, 2);
+  const row = await flow.env.DB.prepare('SELECT * FROM matches WHERE mint = ?').bind(flow.mint).first();
+  assert.equal(flow.sent[1], row.fee_sig);
   assert.equal(row.share_state, null);
+  const st = await (await status({ request: new Request(`http://x/api/launch/status?mint=${flow.mint}`), env: flow.env })).json();
+  assert.equal(st.fee, 'paid');
+  assert.deepEqual((await payFee(flow)).data, { status: 'paid' }, 'never twice');
+});
+
+test('a fee transaction that is not exactly the one expected is refused', async () => {
+  const flow = await launchFlow({ launchFails: false });
+  const other = Keypair.generate();
+  const res = await flow.call(feeTx, { mint: flow.mint });
+  const tx = VersionedTransaction.deserialize(Buffer.from((await res.json()).feeTx, 'base64'));
+  tx.sign([flow.creator]);
+  tx.message.staticAccountKeys[1] = other.publicKey;   // un autre destinataire
+  const out = await (await flow.call(feeSubmit, { mint: flow.mint, feeTx: Buffer.from(tx.serialize()).toString('base64') })).json();
+  assert.ok(out.error, 'refused');
+  assert.equal(flow.sent.length, 1);
 });
 
 test('a failed launch costs no Ignition Fee', async () => {
-  const { st, sent, row, env } = await launchFlow({ launchFails: true });
+  const flow = await launchFlow({ launchFails: true });
+  const { st, sent, row, env } = flow;
   assert.equal(st.status, 'failed');
   assert.equal(sent.length, 1);
-  assert.equal(row.fee_state, 'held');
+  assert.equal(row.fee_state, 'awaiting');
+  const { res } = await payFee(flow);
+  assert.equal(res.status, 409, 'no fee before the coin exists');
   // Un nouvel essai avec le même coin : l'ancienne fee gardée est oubliée.
   const form = new FormData();
   for (const [k, v] of Object.entries({ name: 'Wick Cat', symbol: 'WCAT', creator: row.creator, mint: row.mint, share: '0', devBuy: '0' })) form.append(k, v);

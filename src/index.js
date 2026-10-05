@@ -6,7 +6,7 @@ import { crew } from './api/crew.js';
 import { proof, proofCsv } from './api/proof.js';
 import { xCallback, xStart, xUnlink } from './api/x.js';
 import { launches, profile } from './api/explore.js';
-import { prepare, status, submit } from './api/launch.js';
+import { feeSubmit, feeTx, prepare, status, submit } from './api/launch.js';
 import { board } from './api/leaderboard.js';
 import { ask, spark, sparkLogo } from './api/spark.js';
 import { state } from './api/state.js';
@@ -49,6 +49,8 @@ const ROUTES = {
   'GET /api/trade/status': tradeStatus,
   'POST /api/launch/prepare': prepare,
   'POST /api/launch/submit': submit,
+  'POST /api/launch/fee': feeTx,
+  'POST /api/launch/fee/submit': feeSubmit,
   'GET /api/launch/status': status,
   'POST /api/spark': spark,
   'POST /api/spark/image': sparkLogo,

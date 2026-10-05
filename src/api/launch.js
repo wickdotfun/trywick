@@ -11,7 +11,7 @@ import { getMatch, publicMatch, settle } from '../../lib/matches.js';
 import { buildCreateTx, uploadMetadata } from '../../lib/pump.js';
 import { ensureSchema } from '../../lib/schema.js';
 import { buildShareTx, checkSignedShareTx } from '../../lib/sharing.js';
-import { keeperModel, keeperStyle } from '../../lib/keepers.js';
+import { keeperGoal, keeperModel, keeperPrompt, keeperStyle } from '../../lib/keepers.js';
 import {
   base64FromBytes, buildFeeTx, bytesFromBase64, checkFeeTx, checkSignedLaunch, getLatestBlockhash,
   sendTransaction, signatureOf,
@@ -25,6 +25,10 @@ export async function prepare({ request, env }) {
   const fields = Object.fromEntries([...form.entries()].filter(([, v]) => typeof v === 'string'));
   const { value: launch, error } = validateLaunch(fields);
   if (error) return json({ error }, 400);
+  // Son caractère (« Custom » : écrit par le créateur, filtré), vérifié avant tout envoi.
+  const style = keeperStyle(fields.keeper_style) || 'stoic';
+  const character = style === 'custom' ? keeperPrompt(fields.keeper_prompt) : null;
+  if (style === 'custom' && !character) return json({ error: 'bad_prompt' }, 400);
 
   const ip = await ipHash(request, env);
   const existing = await getMatch(env.DB, launch.mint);
@@ -106,15 +110,16 @@ export async function prepare({ request, env }) {
   }
   // Un nouvel essai repart de zéro : une ancienne transaction de fee gardée ne partira jamais.
   await env.DB.prepare(`UPDATE matches SET fee_lamports = ?, fee_to = ?, team_to = ?, team_lamports = ?, share_bps = ?,
-      share_team_bps = ?, self_bps = ?, share_msg = NULL, share_tx = NULL, fee_sig = NULL, fee_state = NULL, share_state = NULL
+      share_team_bps = ?, share_crew_bps = ?, self_bps = ?, share_msg = NULL, share_tx = NULL, fee_sig = NULL, fee_state = NULL, share_state = NULL
       WHERE mint = ? AND seq IS NULL`)
-    .bind(fee?.lamports ?? 0, fee?.to ?? null, fee?.teamWallet ?? null, fee?.team?.lamports ?? 0, shareBps, shareTeamBps,
+    .bind(fee?.lamports ?? 0, fee?.to ?? null, fee?.teamWallet ?? null, fee?.team?.lamports ?? 0, shareBps, shareTeamBps, holders.length ? fee.crewBps || 0 : 0,
       holders.length ? fee.selfBps || 0 : 0, launch.mint).run();
   // Chaque coin a son Keeper : sa personnalité et son esprit (Stoic sur Llama si rien n'est choisi).
   // Avec « Make it burn », c'est lui qui choisit les moments de brûler.
-  const style = keeperStyle(fields.keeper_style) || 'stoic';
-  await env.DB.prepare('UPDATE matches SET keeper_style = ?, keeper_model = ?, description = ? WHERE mint = ? AND seq IS NULL')
-    .bind(style, keeperModel(fields.keeper_model)?.id || 'llama', launch.description || null, launch.mint).run();
+  // Son caractère et son objectif (Deflation avec « Make it burn », sinon Survive, par défaut).
+  const goal = keeperGoal(fields.keeper_goal) || (fee?.selfBps > 0 ? 'deflation' : 'survive');
+  await env.DB.prepare('UPDATE matches SET keeper_style = ?, keeper_model = ?, keeper_goal = ?, keeper_prompt = ?, description = ? WHERE mint = ? AND seq IS NULL')
+    .bind(style, keeperModel(fields.keeper_model)?.id || 'llama', goal, character, launch.description || null, launch.mint).run();
   return json({
     tx: base64FromBytes(tx),
     feeTx,

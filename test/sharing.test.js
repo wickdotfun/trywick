@@ -139,14 +139,14 @@ test('the reduced Ignition Fee only exists with sharing', async () => {
   const burn = wallet.publicKey.toBase58(), team = CONFIG.launch.deployer;
   assert.deepEqual(await launchFee(env, { shared: true }), {
     lamports: 10_000_000, to: burn, burn: 5_000_000, team: { to: team, lamports: 5_000_000 }, teamWallet: team,
-    holders: [{ address: burn, bps: 500 }, { address: team, bps: 500 }], selfBps: 0,
+    holders: [{ address: burn, bps: 1000 }, { address: team, bps: 3000 }], selfBps: 0, crewBps: 2000,
   });
   // « Make it burn » : le wallet burn reçoit aussi la part qui rachète le coin lui-même.
-  assert.deepEqual((await launchFee(env, { shared: true, selfBps: 2000 })).holders, [{ address: burn, bps: 2500 }, { address: team, bps: 500 }]);
+  assert.deepEqual((await launchFee(env, { shared: true, selfBps: 2000 })).holders, [{ address: burn, bps: 3000 }, { address: team, bps: 3000 }]);
   assert.equal((await launchFee(env, { shared: true, selfBps: 1234 })).selfBps, 0);   // seules les parts proposées
   assert.equal((await launchFee(env)).lamports, 20_000_000);
   assert.equal(await launchFee({ ...env, SHARE_BURN_BPS: '5000', SHARE_TEAM_BPS: '5000' }, { shared: true }), null);
-  const free = await launchFee({ ...env, SHARE_BURN_BPS: '1000', SHARE_TEAM_BPS: '0', LAUNCH_FEE_SHARED_SOL: '0' }, { shared: true });
+  const free = await launchFee({ ...env, SHARE_BURN_BPS: '1000', SHARE_TEAM_BPS: '0', SHARE_CREW_BPS: '0', LAUNCH_FEE_SHARED_SOL: '0' }, { shared: true });
   assert.deepEqual([free.lamports, free.team, free.holders], [0, null, [{ address: burn, bps: 1000 }]]);
 });
 
@@ -208,7 +208,7 @@ test('launch with sharing: held until the coin exists, then shared, then distrib
       case 'getTokenAccountsByOwner': return ok({ value: [] });
       case 'getAccountInfo': {
         if (params[0] === a.sharingConfig) {
-          const cfg = sharingConfigBytes({ mint, admin: creator.publicKey.toBase58(), shareholders: shareholdersFor(creator.publicKey.toBase58(), [{ address: wallet.publicKey.toBase58(), bps: 500 }, { address: CONFIG.launch.deployer, bps: 500 }]) });
+          const cfg = sharingConfigBytes({ mint, admin: creator.publicKey.toBase58(), shareholders: shareholdersFor(creator.publicKey.toBase58(), [{ address: wallet.publicKey.toBase58(), bps: 1000 }, { address: CONFIG.launch.deployer, bps: 3000 }]) });
           return ok({ value: { data: [cfg.toString('base64'), 'base64'], owner: PUMP_FEES } });
         }
         if (params[0] === a.bondingCurve) return ok({ value: { data: [Buffer.alloc(150).toString('base64'), 'base64'], owner: CONFIG.pumpProgram } });
@@ -225,7 +225,7 @@ test('launch with sharing: held until the coin exists, then shared, then distrib
   form.append('image', new Blob([new Uint8Array(100)], { type: 'image/png' }), 'i.png');
   const prep = await (await prepare({ request: new Request('http://x/api/launch/prepare', { method: 'POST', body: form }), env })).json();
   assert.equal(prep.feeSol, 0.01);
-  assert.equal(prep.shareBps, 1000);
+  assert.equal(prep.shareBps, 4000);   // 10 % brûlent $WICK, 10 % l'équipe, 20 % le crew
 
   // 2. Le navigateur signe les deux (le wallet, puis le mint pour la création).
   const tx = VersionedTransaction.deserialize(Buffer.from(prep.tx, 'base64'));
@@ -255,7 +255,7 @@ test('launch with sharing: held until the coin exists, then shared, then distrib
   const burn = await db.prepare("SELECT * FROM burns WHERE kind = 'match'").first();
   assert.equal(row.team_lamports, 5_000_000);           // la moitié de l'Ignition Fee pour l'équipe
   assert.ok(Math.abs(burn.sol - 0.0045) < 1e-9);       // l'autre moitié, moins ce qui paie ses frais réseau
-  assert.deepEqual(st.match.share, { bps: 1000, teamBps: 500, live: true });
+  assert.deepEqual(st.match.share, { bps: 4000, teamBps: 1000, crewBps: 2000, live: true });
   assert.deepEqual([st.match.fee, st.match.burnFee], [0.01, 0.005]);
 
   // 5. Le cron distribue les fees accumulées (0,4 SOL), puis note la part reçue par WICK.

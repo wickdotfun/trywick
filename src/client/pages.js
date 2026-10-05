@@ -305,22 +305,24 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
     const l = world.launch || {};
     const k = l.keepers || { styles: [], models: [] };
     const fee = l.feeSol || 0.02;
-    const s = l.split || { creatorBps: 9000, burnBps: 500, teamBps: 500 };
+    const s = l.split || { creatorBps: 6000, burnBps: 1000, teamBps: 1000, crewBps: 2000 };
     const live = Boolean(l.feeSol);
-    const burnPct = s.burnBps / 100, teamPct = s.teamBps / 100;
+    const burnPct = s.burnBps / 100, teamPct = s.teamBps / 100, crewPct = (s.crewBps || 0) / 100, youPct = s.creatorBps / 100;
     const wick = k.models.find((m) => m.id === 'llama') || k.models[0];
     openModal(`
       <h2>How WICK works</h2>
-      <p class="muted lead"><b class="gold">Pump.fun launches your token. WICK launches it and gives it an AI Operator.</b>
-        Give WICK an idea: the Operator creates the coin with you, you launch it on pump.fun from your wallet, and it keeps
-        working after the launch, in public: it talks to holders, writes its journal, logs every action, and burns the coin
-        under rules locked at launch. Every coin is a candle, and every candle also burns ${tk()}.</p>
+      <p class="muted lead"><b class="gold">Pump.fun launches your token. WICK gives it a crew.</b>
+        Four AI agents: the Scout finds the narrative, the Chandler makes the coin, the Igniter launches it on pump.fun (your
+        wallet signs), and its Operator works it after the launch, in public: it talks to holders, writes its journal, posts,
+        logs every action, and burns the coin under rules locked at launch. Every coin is a candle, and every candle also
+        burns ${tk()}.</p>
       <ol class="loop big">
-        <li>${icon('sparkle')}<b>Spark an idea</b><small>its Operator creates the coin</small></li>
-        <li>${icon('rocket')}<b>Launch it</b><small>on pump.fun, from your wallet</small></li>
-        <li>${icon('keeper')}<b>Its Operator works</b><small>talks, logs, burns</small></li>
-        <li>${icon('flame')}<b>Burn ${tk()}</b><small>every launch, every candle</small></li>
+        <li>${icon('scout')}<b>Scout</b><small>finds the narrative</small></li>
+        <li>${icon('sparkle')}<b>Chandler</b><small>makes the coin</small></li>
+        <li>${icon('rocket')}<b>Igniter</b><small>launches it, you sign</small></li>
+        <li>${icon('keeper')}<b>Operator</b><small>works it, burns it</small></li>
       </ol>
+      <p class="how-crew"><a class="linkish" href="#crew">${icon('keeper')} See the crew at work</a></p>
 
       <section class="how-keepers">
         <div class="hk-head">
@@ -358,20 +360,21 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
         ${tk()} burns switch on at the ${tk()} launch.</p>`}
       <h3 class="how-title">Step by step</h3>
       <ol class="how">
-        <li><b>Summon a Operator, spark an idea.</b> Pick a personality and a mind, write your idea in one sentence, and the
-          Operator fills in the coin: name, ticker, description, logo. Or fill it in yourself. Free, and nothing is sent
-          anywhere until you launch.</li>
+        <li><b>Pick a narrative, spark it.</b> Take one of the Scout's picks (each with its sources) or write your own idea in
+          one sentence: the Chandler fills in the coin, name, ticker, description, logo. Or fill it in yourself. Then pick
+          its Operator's mind, character and objective. Free, and nothing is sent anywhere until you launch.</li>
         <li><b>Launch the coin.</b> Your coin is created on pump.fun, signed by your own wallet${live ? ' (two approvals: the launch, then the Ignition Fee)' : ''}.
           You are its creator: its pump.fun page and its creator fees are yours. On WICK it becomes a match orbiting the
           candle, with its own page and its Operator.</li>
         <li><b>The Ignition Fee: ${fee} SOL.</b> WICK's own fee, not a pump.fun fee. <b>50% burns ${tk()}, 50% funds the
           team</b>: both transfers sit in one transaction you see in your wallet before you sign. The burn half buys ${tk()}
           and burns it within a minute of your launch.</li>
-        <li><b>Make it burn (optional).</b> Pick ${(l.selfOptions?.length ? l.selfOptions : [1000, 2000, 3000, 5000]).map((v) => `${v / 100}%`).join(', ')}
-          of your coin's creator fees to buy your coin back and burn it, forever: <b>your coin becomes a candle</b>, and its
-          Operator picks the moments. ${burnPct}% burns ${tk()} and ${teamPct}% funds the team; the rest is yours. Your
-          Ignition Fee drops to ${l.sharedFeeSol ?? 0.01} SOL. The split is set with pump.fun's own fee sharing and locked
-          on-chain: nobody can change it, not even WICK.</li>
+        <li><b>The fee split.</b> Every coin shares its creator fees: <b>${youPct}% yours</b>${crewPct ? `, ${crewPct}% its crew
+          (its AI and its posts, received by the WICK team wallet that runs it)` : ''}, ${burnPct}% burns ${tk()}, ${teamPct}% the team.
+          It is set with pump.fun's own fee sharing and locked on-chain: nobody can change it, not even WICK.</li>
+        <li><b>Make it burn (optional).</b> Take ${(l.selfOptions?.length ? l.selfOptions : [1000, 2000, 3000, 5000]).map((v) => `${v / 100}%`).join(', ')}
+          from your share to buy your coin back and burn it, forever: <b>your coin becomes a candle</b>, and its Operator
+          picks the moments.</li>
         <li><b>The Operator's Constitution.</b> Its personality, its mind, its burn allocation and its rules are set at launch,
           shown on its coin's page and locked: at most one decision an hour, a burn at least every 24 hours when there is
           something to burn, at once past 0.25 SOL. Talking to it can't move anything: the conversation, the decision (burn or
@@ -390,10 +393,10 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
         <h3>Where the money goes</h3>
         <dl>
           <dt>Ignition Fee</dt><dd>50% burns ${tk()} · 50% team</dd>
-          <dt>Make it burn</dt><dd>your pick burns your coin · ${burnPct}% burns ${tk()} · ${teamPct}% team</dd>
-          <dt>Your coin's creator fees</dt><dd>yours, minus what you choose to burn</dd>
+          <dt>Your coin's creator fees</dt><dd>${youPct}% yours${crewPct ? ` · ${crewPct}% its crew` : ''} · ${burnPct}% burns ${tk()} · ${teamPct}% team</dd>
+          <dt>Make it burn</dt><dd>taken from your share: it burns your coin</dd>
           <dt>${tk()}'s own creator fees</dt><dd>the team, like any pump.fun coin's creator</dd>
-          <dt>The Operators</dt><dd>free: open models on Cloudflare, within a daily quota</dd>
+          <dt>The crew</dt><dd>${crewPct ? `${crewPct}% of each coin's creator fees pays for its AI and its posts` : 'open models on Cloudflare, within a daily quota'}</dd>
         </dl>
       </div>
       <div class="note"><b>Everything is on-chain.</b> Every burn has its Solscan link, and the supply is read from
@@ -409,7 +412,7 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
 
   // Sur téléphone : toutes les pages dans un menu.
   function menu(go) {
-    const items = [['candles', icon('candle'), 'Candles'], ['explore', icon('compass'), 'Explore'], ['wick', icon('candle'), tk()], ['dashboard', icon('dashboard'), 'Dashboard'],
+    const items = [['crew', icon('keeper'), 'The crew'], ['candles', icon('candle'), 'Candles'], ['explore', icon('compass'), 'Explore'], ['wick', icon('candle'), tk()], ['dashboard', icon('dashboard'), 'Dashboard'],
       ['leaderboard', icon('trophy'), 'Leaderboard'], ['hall', icon('pillar'), 'Hall of Flames'], ['flames', icon('user'), 'Your flames'],
       ['how', icon('help'), 'How it works']];
     openModal(`<h2>WICK</h2><div class="wallets">${items.map(([k, ico, label]) => `<button class="wbtn menu-item" data-menu="${k}">${ico}${label}</button>`).join('')}</div>`, 'm-menu');

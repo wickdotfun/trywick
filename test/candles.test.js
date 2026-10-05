@@ -105,7 +105,7 @@ test('a failed coin buy gives its SOL back to the coin, not to the $WICK pot', a
   assert.equal(m.self_pending, 50_500_000);
 });
 
-test('a launch with Make it burn at 20% locks 70% creator / 25% burn wallet (20% its candle + 5% $WICK) / 5% team', async () => {
+test('a launch with Make it burn at 20% locks 40% creator / 30% burn wallet (20% its candle + 10% $WICK) / 30% team wallet (10% team + 20% crew)', async () => {
   const { prepare } = await import('../src/api/launch.js');
   const { CONFIG } = await import('../lib/config.js');
   const { Transaction, TransactionMessage, VersionedTransaction, TransactionInstruction, PublicKey } = await import('@solana/web3.js');
@@ -131,12 +131,12 @@ test('a launch with Make it burn at 20% locks 70% creator / 25% burn wallet (20%
   const prep = await (await prepare({ request: new Request('http://x/api/launch/prepare', { method: 'POST', body: form }), env })).json();
   assert.equal(prep.feeSol, 0.01);
   assert.equal(prep.selfBps, 2000);
-  assert.equal(prep.shareBps, 3000);
-  const row = await env.DB.prepare('SELECT self_bps, share_bps, share_team_bps FROM matches WHERE mint = ?').bind(mintKp.publicKey.toBase58()).first();
-  assert.deepEqual({ ...row }, { self_bps: 2000, share_bps: 3000, share_team_bps: 500 });
-  // Dans la transaction de partage : le créateur 70 %, le wallet burn 25 %, l'équipe 5 %.
+  assert.equal(prep.shareBps, 6000);
+  const row = await env.DB.prepare('SELECT self_bps, share_bps, share_team_bps, share_crew_bps FROM matches WHERE mint = ?').bind(mintKp.publicKey.toBase58()).first();
+  assert.deepEqual({ ...row }, { self_bps: 2000, share_bps: 6000, share_team_bps: 3000, share_crew_bps: 2000 });
+  // Dans la transaction de partage : le créateur 40 %, le wallet burn 30 % (20 % la bougie, 10 % $WICK), l'équipe 30 % (10 % + 20 % le crew).
   const d = Buffer.from(Transaction.from(Buffer.from(prep.feeTx, 'base64')).instructions.at(-1).data);
-  assert.deepEqual([0, 1, 2].map((i) => d.readUInt16LE(44 + i * 34)), [7000, 2500, 500]);
+  assert.deepEqual([0, 1, 2].map((i) => d.readUInt16LE(44 + i * 34)), [4000, 3000, 3000]);
   // Une part qui n'est pas proposée est ignorée (pas de bougie, partage classique).
   const form2 = new FormData();
   const mint2 = Keypair.generate().publicKey.toBase58();
@@ -144,5 +144,5 @@ test('a launch with Make it burn at 20% locks 70% creator / 25% burn wallet (20%
   form2.append('image', new File([new Uint8Array(100)], 'm.png', { type: 'image/png' }));
   const prep2 = await (await prepare({ request: new Request('http://x/api/launch/prepare', { method: 'POST', body: form2 }), env })).json();
   assert.equal(prep2.selfBps, 0);
-  assert.equal(prep2.shareBps, 1000);
+  assert.equal(prep2.shareBps, 4000);
 });

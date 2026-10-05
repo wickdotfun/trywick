@@ -13,7 +13,7 @@ const body = (request) => request.json().catch(() => null);
 export async function spark({ request, env }) {
   await ensureSchema(env.DB);
   const b = await body(request);
-  const res = await sparkCoin(env, { idea: b?.idea, style: b?.style, model: b?.model, surprise: b?.surprise === true, ip: await ipHash(request, env) });
+  const res = await sparkCoin(env, { idea: b?.idea, style: b?.style, model: b?.model, surprise: b?.surprise === true, goal: b?.goal, prompt: b?.prompt, ip: await ipHash(request, env) });
   return res.error ? fail(res.error) : json(res.value);
 }
 

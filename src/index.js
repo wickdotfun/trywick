@@ -2,6 +2,7 @@
 // servis directement ; tout le reste arrive ici, et seules les routes /api existent.
 import { adminPause, adminPost, adminRun, adminSocial, adminStatus, recordRun } from './api/admin.js';
 import { candles, coin } from './api/candles.js';
+import { crew } from './api/crew.js';
 import { launches, profile } from './api/explore.js';
 import { prepare, status, submit } from './api/launch.js';
 import { board } from './api/leaderboard.js';
@@ -19,6 +20,7 @@ import { runJournal, runKeepers, runVoices } from '../lib/keepers.js';
 import { queueSelfBurn, runShares } from '../lib/sharing.js';
 import { runKits } from '../lib/kit.js';
 import { runPublish } from '../lib/publish.js';
+import { runScout } from '../lib/scout.js';
 import { runSocial } from '../lib/social.js';
 import { runTelegram } from '../lib/telegram.js';
 import { sweep } from '../lib/matches.js';
@@ -32,6 +34,7 @@ const ROUTES = {
   'GET /api/profile': profile,
   'GET /api/candles': candles,
   'GET /api/coin': coin,
+  'GET /api/crew': crew,
   'GET /api/token': token,
   'POST /api/trade/prepare': tradePrepare,
   'POST /api/trade/send': tradeSend,
@@ -109,6 +112,8 @@ export default {
       runSocial(env, Date.now()),
       // L'Operator de chaque coin poste dans ses groupes Telegram (et les temps forts sur le canal).
       runPublish(env, Date.now()),
+      // Le Scout lit ce qui monte sur Solana (toutes les 30 minutes).
+      runScout(env, Date.now()),
     ];
     for (const r of await Promise.allSettled(steps)) {
       if (r.status === 'rejected') console.error('cron', r.reason?.message ?? r.reason);

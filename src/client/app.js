@@ -1,5 +1,6 @@
 // Le site : la bougie géante, ses allumettes, le fil, et le bouton pour en frapper une.
 import { createCandles } from './candles.js';
+import { createCrew } from './crew.js';
 import { createDemo } from './demo.js';
 import { createPages } from './pages.js';
 import { createScene, headColor } from './scene.js';
@@ -34,6 +35,7 @@ const api = DEMO ? createDemo() : {
   token: () => get('/api/token'),
   candles: () => get('/api/candles'),
   coin: (mint) => get(`/api/coin?mint=${encodeURIComponent(mint)}`),
+  crew: () => get('/api/crew'),
   // L'IA : Spark (le coin inventé par le Operator), son logo, et les questions aux Operators.
   spark: (b) => post('/api/spark', b),
   sparkImage: (b) => post('/api/spark/image', b, 'blob'),
@@ -161,10 +163,10 @@ function renderStats() {
 const shareTag = (m) => (m.candle
   ? `<i class="tag burn" title="Burns itself: ${m.candle.bps / 100}% of its creator fees buy it back and burn it, forever">burns ${m.candle.bps / 100}%</i>`
   : m.share ? `<i class="tag share" title="${esc(shareText(m.share))}">${m.share.bps / 100}% shared</i>` : '');
-// « 10% of its creator fees go to WICK, forever (5% burn $WICK, 5% team) »
+// « 40% of its creator fees go to WICK, forever (10% burn $WICK, 20% its crew, 10% team) »
 function shareText(s) {
-  const burn = (s.bps - (s.teamBps || 0)) / 100;
-  return `${s.bps / 100}% of its creator fees go to WICK, forever${s.teamBps ? ` (${burn}% burn $${ticker()}, ${s.teamBps / 100}% team)` : ''}`;
+  const burn = (s.bps - (s.teamBps || 0) - (s.crewBps || 0)) / 100;
+  return `${s.bps / 100}% of its creator fees go to WICK, forever${s.teamBps || s.crewBps ? ` (${burn}% burn $${ticker()}${s.crewBps ? `, ${s.crewBps / 100}% its crew` : ''}, ${s.teamBps / 100}% team)` : ''}`;
 }
 const holderTag = (m) => (m.holder ? `<i class="tag gold" title="Launched by a $WICK holder">${icon('crown')}</i>` : '');
 function launchCard(m) {
@@ -514,6 +516,16 @@ const pages = createPages({
   onToken: () => go('wick'),
 });
 
+// Le crew : sa page (#crew), et les narratifs du Scout proposés au lancement.
+const crewPage = createCrew({ api, openModal, isOpen, world, ticker, avatar, onStrike: () => launchForm() });
+// Lancer sur un narratif du Scout : l'idée part dans Spark.
+function launchOnIdea(idea) {
+  draft.idea = idea;
+  draft.step = 0;
+  launchForm();
+  const form = $('launch-form');
+  if (form) runSpark(form);
+}
 const candlesPage = createCandles({
   api, openModal, world, ticker, avatar, holderTag, demo: DEMO,
   onStrike: () => launchForm(),
@@ -530,6 +542,7 @@ const ROUTES = {
   hall: () => pages.leaderboard('hall'),
   flames: () => pages.flames(),
   how: () => pages.how(),
+  crew: () => crewPage.open(launchOnIdea),
   strike: () => launchForm(),
 };
 const isRoute = (page) => Boolean(ROUTES[page]) || /^coin\/[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(page || '');
@@ -570,6 +583,7 @@ const ERRORS = {
   tx_failed: 'The transaction failed on Solana. Try again.',
   send_failed: "Couldn't reach Solana. Try again.",
   mint_taken: 'Something got mixed up. Try again.',
+  bad_prompt: 'Write its character in a few words (8 characters at least), or pick another one.',
   no_fee_tx: 'The Ignition Fee was not signed. Try again and approve both in your wallet.',
   bad_fee_tx: 'The Ignition Fee did not check out. Try again.',
   bad_share_tx: 'The fee sharing did not check out. Try again.',
@@ -578,7 +592,7 @@ const ERRORS = {
 
 let busy = false;
 // burn : « Make it burn », la part (en %) des creator fees qui rachète et brûle le coin lui-même.
-const DRAFT = () => ({ fields: {}, image: null, preview: null, burn: 20, keeper: { style: 'stoic', model: 'llama' }, idea: '', spark: null });
+const DRAFT = () => ({ fields: {}, image: null, preview: null, burn: 20, keeper: { style: 'stoic', model: 'llama', goal: null, prompt: '' }, idea: '', spark: null, step: 0 });
 let draft = DRAFT();
 
 
@@ -587,21 +601,21 @@ let draft = DRAFT();
 const burnOptions = () => (world.launch?.selfOptions || []).map((bps) => bps / 100);
 const burning = () => (burnOptions().includes(draft.burn) ? draft.burn : 0);
 
-// La barre : où vont les creator fees du coin, selon la part choisie.
+// La barre : où vont les creator fees du coin (toi, ta bougie, son crew, $WICK, l'équipe).
 function burnSplit(pct) {
-  const s = world.launch?.split || { creatorBps: 9000, burnBps: 500, teamBps: 500 };
-  if (!pct) return { bar: '<span style="width:100%">You 100%</span>', legend: 'You keep 100% of your creator fees. Your candle stays unlit.' };
+  const s = world.launch?.split || { creatorBps: 6000, burnBps: 1000, teamBps: 1000, crewBps: 2000 };
   const you = s.creatorBps / 100 - pct;
+  const crew = (s.crewBps || 0) / 100;
   return {
-    bar: `<span style="width:${you}%">You ${you}%</span><span class="self" style="width:${pct}%">${pct >= 30 ? 'Burns it ' : ''}${pct}%</span>`
-      + `<span class="wick" style="width:${s.burnBps / 100}%"></span><span class="team" style="width:${s.teamBps / 100}%"></span>`,
-    legend: `You ${you}% · ${pct}% buys your coin back and burns it · ${s.burnBps / 100}% burns $${ticker()} · ${s.teamBps / 100}% WICK team`,
+    bar: `<span style="width:${you}%">You ${you}%</span>${pct ? `<span class="self" style="width:${pct}%">${pct >= 30 ? 'Burns it ' : ''}${pct}%</span>` : ''}`
+      + `${crew ? `<span class="crew" style="width:${crew}%" title="Its crew">${crew}%</span>` : ''}<span class="wick" style="width:${s.burnBps / 100}%"></span><span class="team" style="width:${s.teamBps / 100}%"></span>`,
+    legend: `You ${you}%${pct ? ` · ${pct}% buys your coin back and burns it` : ''}${crew ? ` · ${crew}% its crew (its AI, its posts)` : ''} · ${s.burnBps / 100}% burns $${ticker()} · ${s.teamBps / 100}% WICK team`,
   };
 }
 
 function costLine(burnPct) {
   const l = world.launch;
-  const withShare = Boolean(burnPct && l?.shareBps);
+  const withShare = Boolean(l?.shareBps);
   const fee = withShare ? l.sharedFeeSol : l?.feeSol;
   const burn = withShare ? l.sharedBurnSol : l?.burnSol;
   const team = withShare ? l.sharedTeamSol : l?.teamSol;
@@ -614,36 +628,108 @@ function costLine(burnPct) {
 // Le Operator du coin : sa personnalité et son esprit (le modèle). Chaque coin en a un ; c'est lui
 // qui invente le coin avec Spark, parle à ses holders, et (avec « Make it burn ») le brûle.
 const mindOf = (id) => world.launch?.keepers?.models.find((m) => m.id === id) || world.launch?.keepers?.models[0];
-function keeperBlock() {
-  const k = world.launch?.keepers;
-  if (!k) return '';
-  return `<section class="lf-step keeper-opt" id="lf-keeper">
-    <div class="lf-step-head"><span class="lf-num">1</span><b>Summon its <span class="grad">Operator</span></b>
-      <small>The AI agent of your coin. It creates it with you, talks to its holders, and burns it.</small></div>
-    <span class="k-label">Personality</span>
-    <div class="k-styles" role="group" aria-label="Personality">${k.styles.map((s) => `<button type="button" class="k-style${draft.keeper.style === s.id ? ' on' : ''}" data-kstyle="${esc(s.id)}" aria-pressed="${draft.keeper.style === s.id}"><b>${esc(s.label)}</b><small>${esc(s.hint)}</small></button>`).join('')}</div>
-    <span class="k-label">The mind <em>· open models, run free by Cloudflare</em></span>
-    <div class="k-minds" role="group" aria-label="The mind">${k.models.map((m) => `<button type="button" class="k-mind${draft.keeper.model === m.id ? ' on' : ''}" data-kmodel="${esc(m.id)}" aria-pressed="${draft.keeper.model === m.id}"><i>${aiLogo(m, 18)}</i><span><b>${esc(m.name)}</b><small>${esc(m.by)}</small></span></button>`).join('')}</div>
+// Le tunnel de lancement, en cinq étapes : son identité (Spark ou à la main), son esprit, son
+// caractère, son objectif, puis le feu (Make it burn, dev buy) et le lancement.
+const STEPS5 = [['Identity'], ['Mind'], ['Character'], ['Objective'], ['Fire']];
+function stepper() {
+  return `<ol class="lf-stepper">${STEPS5.map(([label], i) => `<li><button type="button" data-goto="${i}" class="${i === draft.step ? 'on' : ''}${i < draft.step ? ' done' : ''}">
+    <span>${i < draft.step ? icon('check') : i + 1}</span><b>${label}</b></button></li>`).join('')}</ol>`;
+}
+const head = (i, title, sub) => `<div class="lf-step-head"><b>${title}</b><small>${sub}</small></div>`;
+const show = (i) => (draft.step === i ? '' : ' hidden');
+
+function identityStep(f) {
+  const sp = draft.spark;
+  return `<section class="lf-step" data-step="0"${show(0)}>
+    ${head(0, 'Its <span class="grad">identity</span>', 'Spark it with one idea, let its Operator surprise you, or fill it in yourself.')}
+    <div class="spark">
+      <div class="spark-box">
+        <textarea id="sp-idea" maxlength="200" rows="2" placeholder="${esc(pick(IDEAS))}">${esc(draft.idea || '')}</textarea>
+        <div class="spark-btns">
+          <button type="button" class="cta spark-go" id="sp-go">${icon('sparkle')} <span>${sp ? 'Spark again' : 'Spark it'}</span></button>
+          <button type="button" class="wbtn spark-surprise" id="sp-surprise">Surprise me</button>
+        </div>
+      </div>
+      <div class="spark-status" id="sp-status"${sp ? '' : ' hidden'}>${sp ? sparkDone(sp) : ''}</div>
+      <div class="sp-picks" id="sp-picks" hidden></div>
+    </div>
+    <div class="lf-top">
+      <label class="drop">
+        <input type="file" id="lf-image" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+        <span id="drop-view">${draft.preview ? `<img src="${draft.preview}" alt="">` : '＋<small>Image</small>'}</span>
+      </label>
+      <div class="lf-col">
+        <label>Name<input name="name" maxlength="32" autocomplete="off" placeholder="Wick Cat" value="${esc(f.name)}"></label>
+        <label>Ticker<input name="symbol" maxlength="11" autocomplete="off" placeholder="WCAT" value="${esc(f.symbol)}" class="mono up-case"></label>
+      </div>
+    </div>
+    <label><span>Description <em>· optional</em></span><textarea name="description" maxlength="500" rows="3">${esc(f.description)}</textarea></label>
+    <details${f.twitter || f.telegram || f.website ? ' open' : ''}><summary>Links <em>· optional</em></summary>
+      <label>X<input name="twitter" type="url" placeholder="https://x.com/…" value="${esc(f.twitter)}"></label>
+      <label>Telegram<input name="telegram" type="url" placeholder="https://t.me/…" value="${esc(f.telegram)}"></label>
+      <label>Website<input name="website" type="url" placeholder="https://…" value="${esc(f.website)}"></label>
+    </details>
   </section>`;
 }
 
-// Spark : une idée, et le Operator invente le coin (nom, ticker, description, logo).
-function sparkBlock() {
-  if (!world.launch?.keepers) return '';
-  const sp = draft.spark;
-  return `<section class="lf-step spark" id="lf-spark">
-    <div class="lf-step-head"><span class="lf-num">2</span><b>Spark <span class="grad">an idea</span></b>
-      <small>One sentence. Your Operator writes the name, the ticker, the story and paints the logo. You can change everything.</small></div>
-    <div class="spark-box">
-      <textarea id="sp-idea" maxlength="200" rows="2" placeholder="${esc(pick(IDEAS))}">${esc(draft.idea || '')}</textarea>
-      <div class="spark-btns">
-        <button type="button" class="cta spark-go" id="sp-go">${icon('sparkle')} <span>${sp ? 'Spark again' : 'Spark it'}</span></button>
-        <button type="button" class="wbtn spark-surprise" id="sp-surprise">Surprise me</button>
-      </div>
-    </div>
-    <div class="spark-status" id="sp-status"${sp ? '' : ' hidden'}>${sp ? sparkDone(sp) : ''}</div>
+function mindStep(k) {
+  return `<section class="lf-step keeper-opt" data-step="1"${show(1)}>
+    ${head(1, 'Its <span class="grad">mind</span>', 'The model its Operator thinks with. Open models, run by Cloudflare. Locked at launch.')}
+    <div class="k-minds big" role="group" aria-label="The mind">${k.models.map((m) => `<button type="button" class="k-mind${draft.keeper.model === m.id ? ' on' : ''}" data-kmodel="${esc(m.id)}" aria-pressed="${draft.keeper.model === m.id}"><i>${aiLogo(m, 22)}</i><span><b>${esc(m.name)}</b><small>${esc(m.by)}</small></span></button>`).join('')}</div>
   </section>`;
 }
+
+function characterStep(k) {
+  const custom = draft.keeper.style === 'custom';
+  return `<section class="lf-step keeper-opt" data-step="2"${show(2)}>
+    ${head(2, 'Its <span class="grad">character</span>', 'How it talks to its holders: in its journal, its posts and its burns.')}
+    <div class="k-styles four" role="group" aria-label="Character">${k.styles.map((x) => `<button type="button" class="k-style${draft.keeper.style === x.id ? ' on' : ''}" data-kstyle="${esc(x.id)}" aria-pressed="${draft.keeper.style === x.id}"><b>${esc(x.label)}</b><small>${esc(x.hint)}</small></button>`).join('')}</div>
+    <label class="k-custom"${custom ? '' : ' hidden'}><span>Its character, in your words <em>· ${k.customMax || 280} characters max, public</em></span>
+      <textarea name="keeper_prompt" id="lf-prompt" maxlength="${k.customMax || 280}" rows="3" placeholder="A retired samurai who speaks in short proverbs and treats every burn like a duel.">${esc(draft.keeper.prompt || '')}</textarea></label>
+  </section>`;
+}
+
+function objectiveStep(k) {
+  const warn = draft.keeper.goal === 'deflation' && !burnOptions().length;
+  const ico = { deflation: 'flame', survive: 'keeper', openbook: 'book', meme: 'sparkle' };
+  return `<section class="lf-step keeper-opt" data-step="3"${show(3)}>
+    ${head(3, 'Its <span class="grad">objective</span>', 'What it aims for. It shapes what it watches, what it says and its missions.')}
+    <div class="k-goals" role="group" aria-label="Objective">${(k.goals || []).map((g) => `<button type="button" class="k-goal${draft.keeper.goal === g.id ? ' on' : ''}" data-kgoal="${esc(g.id)}" aria-pressed="${draft.keeper.goal === g.id}">${icon(ico[g.id] || 'star')}<b>${esc(g.label)}</b><small>${esc(g.hint)}</small></button>`).join('')}</div>
+    <small class="muted" id="lf-goal-note"${warn ? '' : ' hidden'}>Deflation works best with Make it burn, which unlocks with $${ticker()}. Until then, its Operator watches and tells.</small>
+  </section>`;
+}
+
+function fireStep(max, f) {
+  const k = world.launch?.keepers;
+  const mind = mindOf(draft.keeper.model);
+  const style = k?.styles.find((x) => x.id === draft.keeper.style);
+  const goal = k?.goals?.find((x) => x.id === draft.keeper.goal);
+  return `<section class="lf-step lf-coin" data-step="4"${show(4)}>
+    ${head(4, 'Light the <span class="grad">fire</span>', 'The last settings, then your wallet signs.')}
+    <div class="lf-summary">
+      ${draft.preview ? `<img src="${draft.preview}" alt="">` : '<span class="lf-sum-ph">＋</span>'}
+      <div><b>${esc(f.name || 'Your coin')} <span class="mono gold">${f.symbol ? `$${esc(String(f.symbol).toUpperCase())}` : ''}</span></b>
+        <small>Operator: ${esc(style?.label || '')} · ${aiLogo(mind, 12)} ${esc(mind?.name || '')} · ${esc(goal?.label || '')}</small></div>
+      <button type="button" class="linkish" data-goto="0">Edit</button>
+    </div>
+    <label><span>Dev buy <em>· optional, buy your own coin at launch</em></span>
+      <span class="sol"><input name="devBuy" type="number" min="0" max="${max}" step="0.01" value="${esc(f.devBuy ?? '0')}"><b>SOL</b></span>
+    </label>
+    <div class="presets">${[0, 0.1, 0.5, 1].map((v) => `<button type="button" data-sol="${v}">${v}</button>`).join('')}</div>
+    ${burnOptions().length ? `<div class="burn-opt">
+      <div class="burn-head"><b>Make it <span class="grad">burn</span></b>
+        <small>Take a share of your creator fees to buy your coin back and burn it, forever. Your coin becomes a candle,
+        and its Operator picks the moments. Below: where every creator fee of your coin goes.</small></div>
+      <div class="burn-pills" role="group" aria-label="Make it burn">${[0, ...burnOptions()].map((v) => `<button type="button" class="pill${burning() === v ? ' on' : ''}" data-burn="${v}" aria-pressed="${burning() === v}">${v ? `${v}%` : 'Off'}</button>`).join('')}</div>
+      <div class="split-bar" id="lf-split">${burnSplit(burning()).bar}</div>
+      <small class="muted" id="lf-legend">${burnSplit(burning()).legend}</small>
+      <small class="lock">${icon('lock')} Locked on pump.fun. Nobody can change it, not even WICK.</small>
+    </div>` : ''}
+    ${burnTeaser()}
+    <p class="cost" id="lf-cost">${costLine(burning())}</p>
+  </section>`;
+}
+
 const IDEAS = ['A cat that is terrified of fire but lives in a candle shop', 'A tiny dragon who only breathes birthday candles',
   'A moth that finally caught the flame', 'A frog who runs a candle factory on Solana', 'The last ember of a burned-down casino'];
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
@@ -667,51 +753,30 @@ function burnTeaser() {
 function launchForm(error = '') {
   const f = draft.fields;
   const max = world.launch?.maxDevBuy ?? 5;
+  const k = world.launch?.keepers || { styles: [], models: [], goals: [] };
+  if (!draft.keeper.goal) draft.keeper.goal = burnOptions().length ? 'deflation' : 'survive';
+  if (error) draft.step = STEPS5.length - 1;
+  const last = draft.step === STEPS5.length - 1;
   openModal(`
-    <h2>Launch a coin <span class="grad">with its Operator</span></h2>
-    <p class="muted">A real coin on pump.fun, with an AI agent of its own. It becomes a match orbiting the $${ticker()} candle${world.launch?.feeSol ? `, and ${world.launch.teamSol ? 'half of its Ignition Fee burns' : 'its Ignition Fee burns'} $${ticker()} within a minute` : ''}.</p>
+    <h2>Launch a coin <span class="grad">with its crew</span></h2>
+    <p class="muted">A real coin on pump.fun. Scout, Chandler, Igniter and its Operator do the work, you approve the launch.${world.launch?.feeSol ? ` ${world.launch.teamSol ? 'Half of its Ignition Fee burns' : 'Its Ignition Fee burns'} $${ticker()} within a minute.` : ''}</p>
+    ${stepper()}
     <form id="launch-form" novalidate>
-      ${keeperBlock()}
-      ${sparkBlock()}
-      <section class="lf-step lf-coin">
-      <div class="lf-step-head"><span class="lf-num">${world.launch?.keepers ? 3 : 1}</span><b>Your <span class="grad">coin</span></b>
-        <small>Check it, change it, make it yours.</small></div>
-      <div class="lf-top">
-        <label class="drop">
-          <input type="file" id="lf-image" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
-          <span id="drop-view">${draft.preview ? `<img src="${draft.preview}" alt="">` : '＋<small>Image</small>'}</span>
-        </label>
-        <div class="lf-col">
-          <label>Name<input name="name" maxlength="32" autocomplete="off" placeholder="Wick Cat" value="${esc(f.name)}"></label>
-          <label>Ticker<input name="symbol" maxlength="11" autocomplete="off" placeholder="WCAT" value="${esc(f.symbol)}" class="mono up-case"></label>
-        </div>
-      </div>
-      <label><span>Description <em>· optional</em></span><textarea name="description" maxlength="500" rows="3">${esc(f.description)}</textarea></label>
-      <details${f.twitter || f.telegram || f.website ? ' open' : ''}><summary>Links <em>· optional</em></summary>
-        <label>X<input name="twitter" type="url" placeholder="https://x.com/…" value="${esc(f.twitter)}"></label>
-        <label>Telegram<input name="telegram" type="url" placeholder="https://t.me/…" value="${esc(f.telegram)}"></label>
-        <label>Website<input name="website" type="url" placeholder="https://…" value="${esc(f.website)}"></label>
-      </details>
-      <label><span>Dev buy <em>· optional, buy your own coin at launch</em></span>
-        <span class="sol"><input name="devBuy" type="number" min="0" max="${max}" step="0.01" value="${esc(f.devBuy ?? '0')}"><b>SOL</b></span>
-      </label>
-      <div class="presets">${[0, 0.1, 0.5, 1].map((v) => `<button type="button" data-sol="${v}">${v}</button>`).join('')}</div>
-      ${burnOptions().length ? `<div class="burn-opt">
-        <div class="burn-head"><b>Make it <span class="grad">burn</span></b>
-          <small>A share of your creator fees buys your coin back and burns it, forever. Your coin becomes a candle.
-          Your Ignition Fee drops to ${world.launch.sharedFeeSol} SOL.</small></div>
-        <div class="burn-pills" role="group" aria-label="Make it burn">${[0, ...burnOptions()].map((v) => `<button type="button" class="pill${burning() === v ? ' on' : ''}" data-burn="${v}" aria-pressed="${burning() === v}">${v ? `${v}%` : 'Off'}</button>`).join('')}</div>
-        <div class="split-bar" id="lf-split">${burnSplit(burning()).bar}</div>
-        <small class="muted" id="lf-legend">${burnSplit(burning()).legend}</small>
-        <small class="lock">${icon('lock')} Locked on pump.fun. Nobody can change it, not even WICK.</small>
-      </div>` : ''}
-      ${burnTeaser()}
-      </section>
-      <input type="hidden" name="burn" value="${burning()}"><input type="hidden" name="share" value="${burning() ? '1' : ''}">
+      ${identityStep(f)}
+      ${mindStep(k)}
+      ${characterStep(k)}
+      ${objectiveStep(k)}
+      ${fireStep(max, f)}
+      <input type="hidden" name="burn" value="${burning()}"><input type="hidden" name="share" value="${burnOptions().length ? '1' : ''}">
       <input type="hidden" name="keeper_style" value="${esc(draft.keeper.style)}"><input type="hidden" name="keeper_model" value="${esc(draft.keeper.model)}">
-      <p class="cost" id="lf-cost">${costLine(burning())}</p>
+      <input type="hidden" name="keeper_goal" value="${esc(draft.keeper.goal)}">
       <p class="error" id="lf-error"${error ? '' : ' hidden'}>${esc(error)}</p>
-      <button class="cta wide" type="submit">${DEMO ? 'Launch (demo)' : connect.current() ? 'Launch your coin' : 'Connect wallet & launch'}</button>
+      <div class="lf-nav">
+        <button type="button" class="wbtn" id="lf-back"${draft.step ? '' : ' hidden'}>Back</button>
+        ${last
+    ? `<button class="cta wide" type="submit">${DEMO ? 'Launch (demo)' : connect.current() ? 'Launch your coin' : 'Connect wallet & launch'}</button>`
+    : `<button type="button" class="cta wide" id="lf-next">Next: ${STEPS5[draft.step + 1][0]}</button>`}
+      </div>
     </form>`, 'm-launch');
 
   const form = $('launch-form');
@@ -739,6 +804,37 @@ function launchForm(error = '') {
   }));
   pickKeeper('data-kstyle', 'style');
   pickKeeper('data-kmodel', 'model');
+  form.querySelectorAll('[data-kgoal]').forEach((b) => b.addEventListener('click', () => {
+    draft.keeper.goal = b.dataset.kgoal;
+    form.querySelectorAll('[data-kgoal]').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); });
+    form.keeper_goal.value = draft.keeper.goal;
+    const note = $('lf-goal-note');
+    if (note) note.hidden = !(draft.keeper.goal === 'deflation' && !burnOptions().length);
+  }));
+  form.querySelectorAll('[data-kstyle]').forEach((b) => b.addEventListener('click', () => {
+    const box = form.querySelector('.k-custom');
+    if (box) box.hidden = draft.keeper.style !== 'custom';
+    if (draft.keeper.style === 'custom') $('lf-prompt')?.focus();
+  }));
+  $('lf-prompt')?.addEventListener('input', (e) => { draft.keeper.prompt = e.target.value; if ($('lf-error')) $('lf-error').hidden = true; });
+  // Avancer : chaque étape vérifie la sienne ; on ne saute pas une étape incomplète.
+  const goTo = (i) => {
+    draft.fields = Object.fromEntries(new FormData(form));
+    for (let j = draft.step; j < i; j++) {
+      const problem = stepProblem(j, draft.fields);
+      if (problem) {
+        if (j !== draft.step) { draft.step = j; launchForm(); }
+        showFormError(problem);
+        return;
+      }
+    }
+    draft.step = Math.max(0, Math.min(STEPS5.length - 1, i));
+    launchForm();
+    modal.scrollTop = 0;
+  };
+  $('lf-next')?.addEventListener('click', () => goTo(draft.step + 1));
+  $('lf-back')?.addEventListener('click', () => goTo(draft.step - 1));
+  document.querySelectorAll('#modal-body [data-goto]').forEach((b) => b.addEventListener('click', () => goTo(Number(b.dataset.goto))));
   form.querySelectorAll('[data-burn]').forEach((b) => b.addEventListener('click', () => {
     draft.burn = Number(b.dataset.burn);
     const pct = burning();
@@ -748,13 +844,13 @@ function launchForm(error = '') {
       x.setAttribute('aria-pressed', String(on));
     });
     form.burn.value = String(pct);
-    form.share.value = pct ? '1' : '';
     const split = burnSplit(pct);
     $('lf-split').innerHTML = split.bar;
     $('lf-legend').textContent = split.legend;
     $('lf-cost').innerHTML = costLine(pct);
   }));
   $('sp-go')?.addEventListener('click', () => runSpark(form));
+  if (draft.step === 0) showPicks(form);
   $('sp-surprise')?.addEventListener('click', () => runSpark(form, true));
   $('sp-idea')?.addEventListener('input', (e) => { draft.idea = e.target.value; });
   $('sp-idea')?.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runSpark(form); } });
@@ -781,6 +877,21 @@ function sparkStatus(html, cls = '') {
 }
 const thinking = (mind, what) => `<span class="sp-think">${aiLogo(mind, 16)} <b>${esc(mind?.name || 'Your Operator')}</b> ${what}<i></i><i></i><i></i></span>`;
 
+// Les narratifs du Scout, sous Spark : un clic, et le Chandler fait le coin sur ce narratif.
+async function showPicks(form) {
+  const sc = await crewPage.picks();
+  const box = $('sp-picks');
+  if (!sc?.narratives?.length || !box || !document.body.contains(form)) return;
+  box.innerHTML = `<small>${icon('scout')} Scout's picks <em>· ${ago(sc.at)}</em></small>${sc.narratives.map((n, i) => `<button type="button" class="sp-pick" data-pick="${i}" title="${esc(n.angle)}">${esc(n.title)}</button>`).join('')}<a class="linkish" href="#crew">Sources</a>`;
+  box.hidden = false;
+  box.querySelectorAll('[data-pick]').forEach((b) => b.addEventListener('click', () => {
+    const idea = sc.narratives[Number(b.dataset.pick)].idea;
+    $('sp-idea').value = idea;
+    draft.idea = idea;
+    runSpark(form);
+  }));
+}
+
 async function runSpark(form, surprise = false) {
   if (sparking) return;
   const idea = surprise ? '' : ($('sp-idea')?.value || '').trim();
@@ -793,7 +904,7 @@ async function runSpark(form, surprise = false) {
   btn.classList.add('busy');
   sparkStatus(thinking(mind, surprise ? 'is inventing a coin' : 'is thinking'));
   try {
-    const sp = await api.spark({ idea, style: draft.keeper.style, model: draft.keeper.model, surprise });
+    const sp = await api.spark({ idea, style: draft.keeper.style, model: draft.keeper.model, goal: draft.keeper.goal, prompt: draft.keeper.prompt, surprise });
     if (surprise && $('sp-idea')) { $('sp-idea').value = sp.visual ? `${sp.name}: ${sp.description}`.slice(0, 200) : sp.name; draft.idea = $('sp-idea').value; }
     draft.spark = sp;
     form.name.value = sp.name;
@@ -867,6 +978,18 @@ async function prepareImage(file) {
   let blob = await new Promise((r) => c.toBlob(r, 'image/png'));
   if (blob.size > 900_000) blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.9));
   return new File([blob], blob.type === 'image/png' ? 'image.png' : 'image.jpg', { type: blob.type });
+}
+
+// Ce qui manque à une étape du tunnel (ou null).
+function stepProblem(step, fields) {
+  if (step === 0) {
+    const symbol = (fields.symbol || '').trim().replace(/^\$/, '');
+    if (!fields.name?.trim()) return ERRORS.bad_name;
+    if (!/^[A-Za-z0-9]{1,10}$/.test(symbol)) return ERRORS.bad_symbol;
+    if (!draft.image) return sparking ? 'Your Operator is still painting the logo. One moment.' : ERRORS.no_image;
+  }
+  if (step === 2 && draft.keeper.style === 'custom' && (draft.keeper.prompt || '').trim().length < 8) return ERRORS.bad_prompt;
+  return null;
 }
 
 function checkForm(fields) {

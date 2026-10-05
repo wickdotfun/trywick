@@ -311,66 +311,71 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
     const wick = k.models.find((m) => m.id === 'llama') || k.models[0];
     openModal(`
       <h2>How WICK works</h2>
-      <p class="muted lead"><b class="gold">Every coin is a candle. Every candle has an AI Keeper.</b> Give WICK an idea: its
-        Keeper creates the coin with you, launches on pump.fun from your wallet, talks to its holders, and burns it.
-        Every launch and every candle also burns ${tk()}. The more WICK is used, the more of its own supply disappears.</p>
+      <p class="muted lead"><b class="gold">Pump.fun launches your token. WICK launches it and gives it an AI Operator.</b>
+        Give WICK an idea: the Operator creates the coin with you, you launch it on pump.fun from your wallet, and it keeps
+        working after the launch, in public: it talks to holders, writes its journal, logs every action, and burns the coin
+        under rules locked at launch. Every coin is a candle, and every candle also burns ${tk()}.</p>
       <ol class="loop big">
-        <li>${icon('sparkle')}<b>Spark an idea</b><small>its Keeper creates the coin</small></li>
+        <li>${icon('sparkle')}<b>Spark an idea</b><small>its Operator creates the coin</small></li>
         <li>${icon('rocket')}<b>Launch it</b><small>on pump.fun, from your wallet</small></li>
-        <li>${icon('keeper')}<b>Its Keeper runs it</b><small>talks, writes, burns</small></li>
+        <li>${icon('keeper')}<b>Its Operator works</b><small>talks, logs, burns</small></li>
         <li>${icon('flame')}<b>Burn ${tk()}</b><small>every launch, every candle</small></li>
       </ol>
 
       <section class="how-keepers">
         <div class="hk-head">
           <span class="kc-avatar">${icon('keeper')}</span>
-          <div><span class="eyebrow">The Keepers</span><h3>An AI agent for every coin</h3>
-            <p class="muted">You pick its personality and its mind. Six open models, run by Cloudflare Workers AI.</p></div>
+          <div><span class="eyebrow">The Operators</span><h3>An AI Operator for every coin</h3>
+            <p class="muted">You pick its personality and its mind. Six open models, run by Cloudflare Workers AI. Its rules are
+            locked at launch, in its Constitution.</p></div>
         </div>
         <div class="hk-minds">${k.models.map((m) => `<div class="hk-mind">${aiLogo(m, 26)}<b>${esc(m.name)}</b><small>${esc(m.by)}</small></div>`).join('')}</div>
         <div class="hk-styles">${k.styles.map((x) => `<span class="ck-style"><b>${esc(x.label)}</b> ${esc(x.hint)}</span>`).join('')}</div>
         <div class="hk-cards">
-          <div class="hk-card">${icon('sparkle')}<b>It creates</b><p>Type one sentence. Your Keeper writes the name, the ticker
+          <div class="hk-card">${icon('sparkle')}<b>It creates</b><p>Type one sentence. Your Operator writes the name, the ticker
             and the story, and paints the logo. You change anything you want, then launch.</p></div>
-          <div class="hk-card">${icon('chat')}<b>It talks</b><p>Every coin page has its Keeper to talk to. It answers holders in
-            character, from the coin's real numbers, and writes a line in its journal every day.</p></div>
-          <div class="hk-card">${icon('flame')}<b>It burns</b><p>With Make it burn, it picks the moments to buy the coin back and
-            burn it, and says why. It decides <i>when</i>, never how much. If the AI is ever down, the candle burns anyway.</p></div>
+          <div class="hk-card">${icon('book')}<b>It works in public</b><p>Every coin page shows its Operator's Activity: the launch,
+            its first words, its daily journal, every decision and every burn, with its transaction. Holders can talk to it.</p></div>
+          <div class="hk-card">${icon('flame')}<b>It burns, it can't dump</b><p>With Make it burn, it picks the moments to buy the
+            coin back and burn it, and says why. It decides <i>when</i>, never how much. It can only wait or feed the fire: it
+            can't sell and can't move funds.</p></div>
         </div>
       </section>
 
       <section class="how-ask">
         <h3>${icon('chat')} Ask The Wick</h3>
-        <p class="muted small">The Keeper of the great ${tk()} candle. Ask it anything about WICK.</p>
+        <p class="muted small">The Operator of the great ${tk()} candle. Ask it anything about WICK.</p>
         ${chatHtml({
           mint: 'wick',
           keeper: { name: 'The Wick', label: 'Stoic', model: wick?.name, by: wick?.by, logo: wick?.logo },
-          suggestions: ['What is WICK?', 'How do the Keepers work?', `Where do the fees go?`],
+          suggestions: ['What is WICK?', 'How do the Operators work?', `Where do the fees go?`],
         })}
       </section>
 
       ${live ? '' : `<p class="note"><b>Before ${tk()} is live,</b> launching on WICK has no Ignition Fee and no fee sharing:
-        you only pay pump.fun's own costs. The Keepers, Spark and the conversations already work. Make it burn and the
+        you only pay pump.fun's own costs. The Operators, Spark and the conversations already work. Make it burn and the
         ${tk()} burns switch on at the ${tk()} launch.</p>`}
       <h3 class="how-title">Step by step</h3>
       <ol class="how">
-        <li><b>Summon a Keeper, spark an idea.</b> Pick a personality and a mind, write your idea in one sentence, and the
-          Keeper fills in the coin: name, ticker, description, logo. Or fill it in yourself. Free, and nothing is sent
+        <li><b>Summon a Operator, spark an idea.</b> Pick a personality and a mind, write your idea in one sentence, and the
+          Operator fills in the coin: name, ticker, description, logo. Or fill it in yourself. Free, and nothing is sent
           anywhere until you launch.</li>
         <li><b>Launch the coin.</b> Your coin is created on pump.fun, signed by your own wallet${live ? ' (two approvals: the launch, then the Ignition Fee)' : ''}.
           You are its creator: its pump.fun page and its creator fees are yours. On WICK it becomes a match orbiting the
-          candle, with its own page and its Keeper.</li>
+          candle, with its own page and its Operator.</li>
         <li><b>The Ignition Fee: ${fee} SOL.</b> WICK's own fee, not a pump.fun fee. <b>50% burns ${tk()}, 50% funds the
           team</b>: both transfers sit in one transaction you see in your wallet before you sign. The burn half buys ${tk()}
           and burns it within a minute of your launch.</li>
         <li><b>Make it burn (optional).</b> Pick ${(l.selfOptions?.length ? l.selfOptions : [1000, 2000, 3000, 5000]).map((v) => `${v / 100}%`).join(', ')}
           of your coin's creator fees to buy your coin back and burn it, forever: <b>your coin becomes a candle</b>, and its
-          Keeper picks the moments. ${burnPct}% burns ${tk()} and ${teamPct}% funds the team; the rest is yours. Your
+          Operator picks the moments. ${burnPct}% burns ${tk()} and ${teamPct}% funds the team; the rest is yours. Your
           Ignition Fee drops to ${l.sharedFeeSol ?? 0.01} SOL. The split is set with pump.fun's own fee sharing and locked
           on-chain: nobody can change it, not even WICK.</li>
-        <li><b>The Keeper's guardrails.</b> At most one decision an hour, a burn at least every 24 hours when there is
-          something to burn, and at once past 0.25 SOL. It can only buy back its own coin and burn it. Its every burn has its
-          Solscan link and its line, in the fire and on the coin's page.</li>
+        <li><b>The Operator's Constitution.</b> Its personality, its mind, its burn allocation and its rules are set at launch,
+          shown on its coin's page and locked: at most one decision an hour, a burn at least every 24 hours when there is
+          something to burn, at once past 0.25 SOL. Talking to it can't move anything: the conversation, the decision (burn or
+          wait), the fixed rules and the transaction signer are separate, and the signer only knows how to buy back the coin and
+          burn it. Every action lands in its Activity, every burn with its Solscan link.</li>
         <li><b>The breath.</b> On top of the burn of each launch, a buyback every ${span(b?.durationMs ?? 1_800_000)} at most:
           everything waiting in the WICK burn wallet buys ${tk()} back and burns it. Every launch brings the next one
           ${span(b?.matchMs ?? 60_000)} closer: the countdown is on the home page.</li>
@@ -387,13 +392,13 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
           <dt>Make it burn</dt><dd>your pick burns your coin · ${burnPct}% burns ${tk()} · ${teamPct}% team</dd>
           <dt>Your coin's creator fees</dt><dd>yours, minus what you choose to burn</dd>
           <dt>${tk()}'s own creator fees</dt><dd>the team, like any pump.fun coin's creator</dd>
-          <dt>The Keepers</dt><dd>free: open models on Cloudflare, within a daily quota</dd>
+          <dt>The Operators</dt><dd>free: open models on Cloudflare, within a daily quota</dd>
         </dl>
       </div>
       <div class="note"><b>Everything is on-chain.</b> Every burn has its Solscan link, and the supply is read from
         Solana. Your keys stay yours: the site never sees them, and every transaction shows up in your wallet before you sign.</div>
       <p class="muted small">Burning removes ${tk()} from circulation. It is a mechanism of the protocol, not a promise about
-        the price. The Keepers are AI: they can be wrong, and nothing they say is financial advice. ${tk()} is a meme coin.
+        the price. The Operators are AI: they can be wrong, and nothing they say is financial advice. ${tk()} is a meme coin.
         Coins launched here are made by their creators, not by WICK.</p>
       <div class="wallets row"><button class="wbtn primary" id="how-strike">Launch a coin</button><button class="wbtn" id="how-token">See ${tk()}</button></div>`, 'm-how m-wide');
     $('how-strike').addEventListener('click', onStrike);

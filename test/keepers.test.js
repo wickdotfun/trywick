@@ -59,7 +59,7 @@ test('a Keeper that says burn: the burn is queued with its line, on its chosen m
   assert.equal(b.sol, 0.0195);
   assert.equal(b.voice, 'It dropped. The flame eats.');
   assert.equal(ai.calls[0].model, '@cf/qwen/qwen3-30b-a3b-fp8');
-  assert.match(ai.calls[0].input.messages[0].content, /Keeper of \$MOTH/);
+  assert.match(ai.calls[0].input.messages[0].content, /Operator of \$MOTH/);
   const m = await db.prepare('SELECT * FROM matches WHERE mint = ?').bind(mint).first();
   assert.equal(m.self_pending, 0);
   assert.equal(m.self_last_burn, NOW);

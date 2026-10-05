@@ -115,29 +115,52 @@ A coin's candle is fed by its own creator fees (`lib/candles.js`, `lib/sharing.j
 `GET /api/candles` returns the forest (coins that burn themselves, most burned first), their latest burns and totals;
 `GET /api/coin?mint=…` returns one coin, its candle and every burn.
 
-## Keepers
+## Operators
 
-Every coin launched on WICK has a **Keeper**: its AI agent (`lib/keepers.js`, `lib/spark.js`). The creator picks its
+> Every coin launched on WICK gets an **AI Operator**: it creates the coin with its creator (Spark), works in public
+> (its Activity log), talks to holders, and, with Make it burn, burns the coin under rules locked at launch (its
+> Constitution). In the code and the database, the Operator keeps its first name: `keeper_*`.
+
+**Activity** (`lib/operator.js`, table `operator_log`): every action of a coin's Operator, dated, with its transaction
+when there is one: the launch, the split locked on pump.fun, its first words, its daily journal, its decisions (a wait
+is noted at most every 6 hours), every burn of the coin, and the $WICK its launch burned. Each action has a key and is
+never noted twice. `GET /api/coin` returns it with the coin, under `operator.log`.
+
+**Track** (`lib/track.js`, `lib/missions.js`): the market refresh follows coins with an Operator for 30 days (market
+cap and 24 h volume from DEX Screener, every few minutes), and the Operator notes the milestones it sees: market cap
+($10K → $100M), volume in 24 hours ($10K → $10M) and the share of its own supply burned (1% → 50%). Once each, only the
+highest crossed since the last one, never more than one every 15 minutes (`operator` in `lib/config.js`).
+
+**Missions** (`operator.missions`): computed from the coin and its log, nothing made up: launch, split locked, first
+words, next market cap milestone (with its progress), first burn or next burn milestone, today's journal, and what it
+always does (tracking).
+
+**Constitution** (`operator.constitution`): what was set at launch and never changes: personality, mind, burn
+allocation, rules, `canSell: false`, `canMoveFunds: false`, and the fee-sharing transaction as on-chain proof. The
+conversation, the decision (burn or wait), the fixed rules and the transaction signer are separate: talking to an
+Operator can't move anything, and the signer only knows how to buy back the coin and burn it.
+
+Every coin launched on WICK has a **Operator**: its AI agent (`lib/keepers.js`, `lib/spark.js`). The creator picks its
 personality (Stoic, Degen, Poet, Pyromaniac) and its mind (Llama by Meta, gpt-oss by OpenAI, Qwen, Mistral, Gemma by
 Google, DeepSeek) in the launch form. The models run on [Workers AI](https://developers.cloudflare.com/workers-ai/),
 inside its free daily quota. Logos: `public/brand/ai/` ([@lobehub/icons](https://github.com/lobehub/lobe-icons), MIT).
 
-- **Spark** (`POST /api/spark`, `POST /api/spark/image`): the creator writes one idea; the Keeper invents the coin (name,
+- **Spark** (`POST /api/spark`, `POST /api/spark/image`): the creator writes one idea; the Operator invents the coin (name,
   ticker, description, its first words) and FLUX.1 schnell paints its logo. Everything lands in the form, editable;
   nothing is sent anywhere until the launch. Off-limits ideas (sexual content, minors, hate) are refused.
-- **It talks** (`POST /api/ask`): every coin page has its Keeper to talk to, and How it works has **The Wick** (the Keeper
+- **It talks** (`POST /api/ask`): every coin page has its Operator to talk to, and How it works has **The Wick** (the Operator
   of $WICK). It answers in character, from real facts (the coin's numbers, the site's rules), never with financial
   advice. Answers are not stored or shown to others.
 - **Its journal** (cron): its first words once the coin is live, then at most one line a day (`keeper_thought`), shown in
   the fire on the home page and on the coin's page.
-- **It burns** (with Make it burn): once a coin has at least 0.01 SOL set aside, the Keeper is asked at most once an hour:
+- **It burns** (with Make it burn): once a coin has at least 0.01 SOL set aside, the Operator is asked at most once an hour:
   `burn` or `wait`, with one line for the holders (`burns.voice`). It never picks how much, nor where the SOL goes: the
   SOL set aside can only buy back that coin and burn it, through the burn queue. Past 0.25 SOL waiting, or 24 hours since
   its last burn, it burns anyway.
 - **Limits** (`keepers` in `lib/config.js`): a daily budget per use (`daily`: burns 150, Spark 60, logos 30, questions
   200, journal 30) and per visitor per hour (`perIpHour`: Spark 10, logos 6, questions 15, by salted IP hash in
   `ai_uses`). If the chosen model fails, Llama answers. Without AI (no binding, budget spent), Spark and questions say so,
-  burns happen as without a Keeper with a written line, and no journal line is made up. The admin page shows today's use.
+  burns happen as without a Operator with a written line, and no journal line is made up. The admin page shows today's use.
 
 ## Posts & cards
 
@@ -230,8 +253,8 @@ small JSON API, backed by a [D1](https://developers.cloudflare.com/d1/) database
 | Burn queue: buybacks and launch burns | `lib/buyback.js` |
 | Creator fee sharing (pump.fun fee sharing, distributions) | `lib/sharing.js` |
 | Coins that burn themselves (Candles page, coin pages) | `lib/candles.js`, `src/client/candles.js` |
-| Keepers (the AI agent of each coin): burns, voices, journal | `lib/keepers.js` |
-| Spark (the AI creates the coin), its logo, questions to a Keeper | `lib/spark.js`, `src/api/spark.js`, `src/client/keeper.js` |
+| Operators (the AI agent of each coin): burns, voices, journal | `lib/keepers.js` |
+| Spark (the AI creates the coin), its logo, questions to a Operator | `lib/spark.js`, `src/api/spark.js`, `src/client/keeper.js` |
 | Living matches (DexScreener market caps) | `lib/markets.js` |
 | Pyromaniacs leaderboard | `lib/leaderboard.js`, `src/api/leaderboard.js` |
 | Telegram bot | `lib/telegram.js` |
@@ -259,7 +282,7 @@ npm test
 ```
 
 Workers AI has no local version: `wrangler dev` asks for `npx wrangler login` because of the `[ai]` binding
-(without the binding, Spark and questions are off and the Keepers fall back to written lines; `/?demo` simulates
+(without the binding, Spark and questions are off and the Operators fall back to written lines; `/?demo` simulates
 them). The tests never call the AI.
 
 Locally, `CYCLE_MINUTES=1` in `.dev.vars` makes the breath (buyback countdown) 1 minute long.
@@ -268,7 +291,7 @@ Locally, `CYCLE_MINUTES=1` in `.dev.vars` makes the breath (buyback countdown) 1
 ## Deploy (Cloudflare)
 
 1. The D1 database id is in `wrangler.toml`. The table is created on the first request. The Workers AI binding (`AI`,
-   for the Keepers) is in `wrangler.toml` too: nothing to set up, and the admin page shows the AI calls of the day.
+   for the Operators) is in `wrangler.toml` too: nothing to set up, and the admin page shows the AI calls of the day.
 2. Workers & Pages → Import a repository. Build command: empty. Deploy command: `npx wrangler deploy`.
    Every push to `main` then redeploys the site.
 3. Variables (Worker → Settings → **Runtime variables and secrets**, not the Build ones):

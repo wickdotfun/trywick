@@ -1180,3 +1180,58 @@ button.cdl:focus-visible { outline: 2px solid var(--gold); outline-offset: 6px; 
   .spark-box { flex-direction: column; }
   .spark-go { min-height: 46px; justify-content: center; }
 }
+
+/* ------------------------------------------------------------ l'Operator d'un coin */
+.op-tabs { display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: rgba(10, 6, 4, .6); border: 1px solid var(--line); }
+.op-tabs button { flex: 1; height: 34px; border-radius: 9px; border: 0; background: none; color: var(--muted); font: 600 12.5px/1 var(--sans); cursor: pointer; }
+.op-tabs button small { font: 500 10.5px/1 var(--mono); color: var(--dim); margin-left: 3px; }
+.op-tabs button.on { background: rgba(255, 190, 80, .12); color: var(--text); box-shadow: inset 0 0 0 1px var(--gold-line); }
+.op-log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; max-height: 340px; overflow-y: auto; }
+.op-ev { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: start; padding: 9px 2px; border-bottom: 1px solid var(--line); }
+.op-ev:last-child { border-bottom: 0; }
+.op-ico { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: rgba(20, 13, 9, .9); border: 1px solid var(--line-2); }
+.op-ico .ico { width: 15px; height: 15px; stroke: var(--gold); }
+.op-ev.burned .op-ico, .op-ev.fed .op-ico { background: rgba(255, 140, 40, .14); border-color: rgba(255, 150, 60, .45); }
+.op-ev.sealed .op-ico { background: rgba(61, 220, 132, .1); border-color: rgba(61, 220, 132, .4); }
+.op-ev.sealed .op-ico .ico { stroke: #3ddc84; }
+.op-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.op-txt b { font-size: 13px; font-weight: 600; }
+.op-txt small { font-size: 12px; color: var(--muted); line-height: 1.4; overflow-wrap: anywhere; }
+.op-ev.journal .op-txt small, .op-ev.intro .op-txt small, .op-ev.wait .op-txt small, .op-ev.decide .op-txt small { font-style: italic; color: #e9dccb; }
+.op-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font: 500 11px/1.2 var(--mono); color: var(--dim); white-space: nowrap; }
+.op-meta a { color: var(--gold); }
+.op-const { display: flex; flex-direction: column; gap: 10px; }
+.op-locked { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+.op-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 999px; font: 700 10.5px/1 var(--mono); letter-spacing: .08em;
+  color: #3ddc84; border: 1px solid rgba(61, 220, 132, .45); background: rgba(61, 220, 132, .08); }
+.op-badge .ico { width: 11px; height: 11px; stroke: #3ddc84; }
+.op-const dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 0; font-size: 13px; }
+.op-const dt { color: var(--muted); }
+.op-const dd { margin: 0; text-align: right; }
+.op-const dd small { color: var(--dim); }
+.op-const dd a { color: var(--gold); }
+.op-no { font: 700 11px/1 var(--mono); letter-spacing: .08em; color: #ff8a7a; padding: 3px 7px; border-radius: 6px; background: rgba(255, 90, 70, .1); border: 1px solid rgba(255, 90, 70, .35); }
+.op-rules { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.op-rules li { display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: #e9dccb; }
+.op-rules .ico { width: 14px; height: 14px; stroke: #3ddc84; flex: none; }
+
+/* Les missions de l'Operator */
+.op-missions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.om { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: start; padding: 9px 2px; border-bottom: 1px solid var(--line); }
+.om:last-child { border-bottom: 0; }
+.om-ico { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--line-2); background: rgba(20, 13, 9, .9); }
+.om-ico .ico { width: 15px; height: 15px; stroke: var(--muted); }
+.om.done .om-ico { background: rgba(61, 220, 132, .12); border-color: rgba(61, 220, 132, .45); }
+.om.done .om-ico .ico { stroke: #3ddc84; }
+.om.active .om-ico { border-color: var(--gold-line); }
+.om.active .om-ico .ico { stroke: var(--gold); }
+.om.ongoing .om-ico .ico { stroke: #9fc4ff; }
+.om-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.om-txt b { font-size: 13px; font-weight: 600; }
+.om.done .om-txt b { color: #e9dccb; }
+.om-txt small { font-size: 12px; color: var(--muted); }
+.om-bar { display: block; height: 6px; border-radius: 99px; background: rgba(255, 210, 160, .1); overflow: hidden; margin-top: 3px; }
+.om-bar i { display: block; height: 100%; background: linear-gradient(90deg, #ffd27a, #ff8a1f); border-radius: inherit; }
+.om-meta { font: 500 11px/1.2 var(--mono); color: var(--dim); white-space: nowrap; padding-top: 2px; }
+.om.done .om-meta { color: #3ddc84; }
+.om.active .om-meta { color: var(--gold); }

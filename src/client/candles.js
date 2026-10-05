@@ -59,7 +59,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
           <span class="eyebrow">Make it burn</span>
           <h2>Every coin is a <span class="grad">candle</span>.</h2>
           <p class="muted">Coins launched on WICK can burn themselves: a share of their creator fees buys them back and
-            burns them, forever, locked on pump.fun. Each candle has an AI Keeper that picks the moments and tells you why.
+            burns them, forever, locked on pump.fun. Each candle has an AI Operator that picks the moments and tells you why.
             Every candle also burns ${tk()}.</p>
         </div>
         <button class="cta" id="cd-light">Light your candle</button>
@@ -84,7 +84,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
             <span class="mono dim">${String(i + 1).padStart(2, '0')}</span>
             ${candleHtml({ pct: m.candle?.pct ?? 0, w: 11, full: 30, gold: m.holder })}
             ${avatar(m, 30)}
-            <span class="cd-name"><b>$${esc(m.symbol)} ${holderTag(m)}</b><small>burns ${m.candle.bps / 100}% of its fees${m.candle.keeper ? ` · ${esc(m.candle.keeper.label)} Keeper` : ''}</small></span>
+            <span class="cd-name"><b>$${esc(m.symbol)} ${holderTag(m)}</b><small>burns ${m.candle.bps / 100}% of its fees${m.candle.keeper ? ` · ${esc(m.candle.keeper.label)} Operator` : ''}</small></span>
             <span class="cd-num gold">${pctText(m.candle.pct)}<small>burned</small></span>
             <span class="cd-num hide-sm">${usd(m.mcap)}<small>mcap</small></span>
           </button></li>`).join('')}</ol>`
@@ -108,15 +108,15 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
     body.querySelector('[data-wick]')?.addEventListener('click', () => go('wick'));
   }
 
-  // Les Keepers : les six esprits (avec leur logo) et les quatre personnalités.
+  // Les Operators : les six esprits (avec leur logo) et les quatre personnalités.
   function keepersShowcase() {
     const k = world.launch?.keepers;
     if (!k) return '';
     return `<section class="cd-keepers">
       <div class="ck-head">
         <span class="kc-avatar">${icon('keeper')}</span>
-        <div><h3>Every candle has an AI <span class="grad">Keeper</span></h3>
-          <p class="muted">The creator picks its personality and its mind. The Keeper picks the moments to buy the coin back
+        <div><h3>Every candle has an AI <span class="grad">Operator</span></h3>
+          <p class="muted">The creator picks its personality and its mind. The Operator picks the moments to buy the coin back
           and burn it, and tells the holders why. It never touches the amounts.</p></div>
       </div>
       <div class="ck-minds">${k.models.map((m) => `<div class="ck-mind">${aiLogo(m, 22)}<span><b>${esc(m.name)}</b><small>${esc(m.by)}</small></span></div>`).join('')}</div>
@@ -124,28 +124,80 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
     </section>`;
   }
 
-  // La carte du Keeper d'un coin : qui il est, ce qu'il a dit, et la conversation avec lui.
-  function keeperCard(m) {
+  // Le panneau de l'Operator d'un coin : qui il est, ce qu'il a fait (Activity), ce qui le lie
+  // (Constitution), et la conversation avec lui (Talk).
+  const ACT = { launched: 'rocket', sealed: 'lock', intro: 'chat', journal: 'book', wait: 'wind', decide: 'keeper', burned: 'flame', fed: 'candle', posted: 'send', milestone: 'trophy' };
+  function activity(log = []) {
+    if (!log.length) return '<p class="muted small">Its first actions show up here: the launch, its first words, every decision and every burn.</p>';
+    return `<ol class="op-log">${log.map((e) => `<li class="op-ev ${esc(e.kind)}">
+        <span class="op-ico">${icon(ACT[e.kind] || 'keeper')}</span>
+        <span class="op-txt"><b>${esc(e.title)}</b>${e.detail ? `<small>${esc(e.detail)}</small>` : ''}</span>
+        <span class="op-meta"><time data-at="${e.at}">${ago(e.at)}</time>${e.sig ? `<a href="${solscan(esc(e.sig))}" target="_blank" rel="noopener">TX ↗</a>` : ''}</span>
+      </li>`).join('')}</ol>`;
+  }
+  // Les missions : ce qu'il a fait (coché), ce qu'il vise (avec sa progression), ce qu'il fait tout le temps.
+  function missionsHtml(list = []) {
+    if (!list.length) return '<p class="muted small">This coin was launched before Operators had missions.</p>';
+    const ico = { done: 'check', active: 'clock', ongoing: 'chart' };
+    const label = { active: 'in progress', ongoing: 'always on' };
+    return `<ol class="op-missions">${list.map((x) => `<li class="om ${esc(x.status)}">
+        <span class="om-ico">${icon(ico[x.status] || 'clock')}</span>
+        <span class="om-txt"><b>${esc(x.title)}</b>${x.hint ? `<small>${esc(x.hint)}</small>` : ''}
+          ${x.status === 'active' && x.progress != null ? `<span class="om-bar"><i style="width:${Math.max(3, Math.round(x.progress * 100))}%"></i></span>` : ''}</span>
+        <span class="om-meta">${x.status === 'done' ? (x.at ? `<time data-at="${x.at}">${ago(x.at)}</time>` : 'done') : label[x.status]}</span>
+      </li>`).join('')}</ol>`;
+  }
+  function constitutionHtml(c, m) {
+    if (!c) return '<p class="muted small">This coin was launched before Operators had a Constitution.</p>';
+    const row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
+    const no = '<span class="op-no">NO</span>';
+    return `<div class="op-const">
+      <p class="op-locked"><span class="op-badge">${icon('lock')} LOCKED</span> Set at launch. Nobody can change it, not even WICK.</p>
+      <dl>
+        ${row('Personality', esc(c.personality))}
+        ${row('Mind', `<span class="kc-model">${aiLogo(c.mind, 14)} ${esc(c.mind.name)}</span> <small>by ${esc(c.mind.by)}</small>`)}
+        ${row('Burn allocation', c.burn ? `<b class="gold">${c.burn.pct}%</b> of creator fees <small>· +${c.burn.wickPct}% burns ${tk()} · ${c.burn.teamPct}% team</small>` : 'Off <small>· its creator keeps all creator fees</small>')}
+        ${row('Can sell', no)}
+        ${row('Can move funds', no)}
+        ${c.proof ? row('Proof', `<a href="${solscan(esc(c.proof))}" target="_blank" rel="noopener">Fee split on Solscan ↗</a>`) : ''}
+      </dl>
+      <ul class="op-rules">${c.rules.map((r) => `<li>${icon('check')}${esc(r)}</li>`).join('')}</ul>
+    </div>`;
+  }
+  function operatorPanel(m, op = {}) {
     const k = m.keeper || m.candle?.keeper;
     if (!k) return '';
     const c = m.candle;
-    const idle = c ? `It wakes up once ${esc(m.symbol)}'s fees fill its candle (0.01 SOL), then picks the moment to burn. Never more than 24 hours.`
-      : 'It writes to its holders once a day.';
-    return `<section class="keeper-card">
+    const log = op.log || [];
+    const last = log.find((e) => e.kind !== 'launched');
+    return `<section class="keeper-card op-panel">
       <div class="kc-head">
         <span class="kc-avatar">${icon('keeper')}${k.logo ? `<i class="kc-mind">${aiLogo(k, 14)}</i>` : ''}</span>
-        <div><b>Keeper of $${esc(m.symbol)}</b><small>${esc(k.label)} · runs on <span class="kc-model">${aiLogo(k, 14)} ${esc(k.model)}</span> (${esc(k.by)})</small></div>
-        <span class="kc-status"><i></i>${c ? 'tending' : 'awake'}</span>
+        <div><b>Operator of $${esc(m.symbol)}</b><small>${esc(k.label)} · runs on <span class="kc-model">${aiLogo(k, 14)} ${esc(k.model)}</span> (${esc(k.by)})</small></div>
+        <span class="kc-status"><i></i>${last && Date.now() - last.at < 86_400_000 ? `active ${ago(last.at)}` : 'on duty'}</span>
       </div>
       ${k.intro ? `<blockquote>“${esc(k.intro)}”</blockquote>` : ''}
-      <p class="kc-thought">${k.thought && k.thought !== k.intro
-        ? `${icon('book')} Latest thought, ${ago(k.thoughtAt)}: <b>“${esc(k.thought)}”</b>` : idle}</p>
-      ${chatHtml({
+      <div class="op-tabs" role="tablist">
+        <button type="button" class="on" data-optab="act" role="tab">Activity <small>${log.length}</small></button>
+        <button type="button" data-optab="missions" role="tab">Missions <small>${(op.missions || []).filter((x) => x.status === 'done').length}/${(op.missions || []).filter((x) => x.status !== 'ongoing').length}</small></button>
+        <button type="button" data-optab="const" role="tab">Constitution</button>
+        <button type="button" data-optab="talk" role="tab">Talk</button>
+      </div>
+      <div class="op-pane" data-oppane="act">${activity(log)}</div>
+      <div class="op-pane" data-oppane="missions" hidden>${missionsHtml(op.missions)}</div>
+      <div class="op-pane" data-oppane="const" hidden>${constitutionHtml(op.constitution, m)}</div>
+      <div class="op-pane" data-oppane="talk" hidden>${chatHtml({
         mint: m.mint, symbol: m.symbol,
-        keeper: { name: `Keeper of $${m.symbol}`, label: k.label, model: k.model, by: k.by, logo: k.logo },
-        suggestions: [`What's the story of $${m.symbol}?`, c ? 'When do you burn next?' : 'How is it doing today?', 'Who are you?'],
-      })}
+        keeper: { name: `Operator of $${m.symbol}`, label: k.label, model: k.model, by: k.by, logo: k.logo },
+        suggestions: [`What's the story of $${m.symbol}?`, c ? 'When do you burn next?' : 'How is it doing today?', 'What have you done so far?'],
+      })}</div>
     </section>`;
+  }
+  function bindTabs(root) {
+    root.querySelectorAll('[data-optab]').forEach((b) => b.addEventListener('click', () => {
+      root.querySelectorAll('[data-optab]').forEach((x) => x.classList.toggle('on', x === b));
+      root.querySelectorAll('[data-oppane]').forEach((p) => { p.hidden = p.dataset.oppane !== b.dataset.optab; });
+    }));
   }
 
   // ---------------------------------------------------------- la page d'un coin
@@ -204,7 +256,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
             <a class="wbtn" href="https://solscan.io/token/${esc(m.mint)}" target="_blank" rel="noopener">Solscan ↗</a>
           </div>
           ${m.description ? `<p class="cn-about">${esc(m.description)}</p>` : ''}
-          ${keeperCard(m)}
+          ${operatorPanel(m, data.operator)}
           ${m.share ? `<div class="cn-split">
             <small class="eyebrow">Where its creator fees go</small>
             <div class="split-bar">
@@ -235,6 +287,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
     $('cn-forest').addEventListener('click', () => go('candles'));
     $('cn-light').addEventListener('click', onStrike);
     bindChats(body, api.ask);
+    bindTabs(body);
   }
 
   return { forest, coin, candleHtml };

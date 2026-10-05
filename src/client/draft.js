@@ -14,7 +14,7 @@ export function draftCoin(idea) {
   const symbol = (main.slice(0, 4) + pick(['', 'Y', 'O', 'Z'])).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) || 'SPARK';
   return {
     name, symbol,
-    description: `${name} started as one idea: ${text.slice(0, 90)}. Now it is a candle, and its Operator never lets it go out.`,
+    description: `${name} started as one idea: ${text.slice(0, 90)}. Now it is a candle, and its agent never lets it go out.`,
     visual: text,
   };
 }

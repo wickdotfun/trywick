@@ -94,29 +94,28 @@ test('the daily AI budget is per use: Spark running out never stops the Keepers'
   assert.ok(await spendAi(e.DB, 'spark', NOW + 24 * HOUR), 'a new day, a new budget');
 });
 
-test('the logo: Leonardo Phoenix in 512 x 512 (the size of a coin logo), FLUX if it fails; settings for cheaper or HD', async () => {
+test('the logo: FLUX by default (about 500 a day in the free quota); Leonardo Phoenix when turned on, 512 or HD', async () => {
   const jpeg = new Uint8Array(2000).fill(7);
-  // Phoenix renvoie un flux d'octets.
-  const ai = fakeAI((model) => (model.includes('leonardo') ? new Response(jpeg).body : null));
-  const e = await env(ai);
+  const flux = fakeAI((model) => (model.includes('flux') ? { image: Buffer.from(jpeg).toString('base64') } : new Error('not this one')));
+  const e = await env(flux);
   const res = await sparkImage(e, { visual: 'a tiny red dragon, glossy 3D render', name: 'Dragon Candle', ip: 'ip1', now: NOW });
-  assert.deepEqual([res.bytes.length, res.model], [2000, '@cf/leonardo/phoenix-1.0']);
-  assert.deepEqual([ai.calls[0].input.width, ai.calls[0].input.height], [512, 512]);
-  assert.match(ai.calls[0].input.prompt, /tiny red dragon/);
-  assert.match(ai.calls[0].input.prompt, /No text/);
-  // Phoenix en panne : FLUX (du base64).
-  const flux = await env(fakeAI((model) => (model.includes('leonardo') ? new Error('down') : { image: Buffer.from(jpeg).toString('base64') })));
-  assert.equal((await sparkImage(flux, { visual: 'a dragon', name: 'x', ip: 'ip1', now: NOW })).model, '@cf/black-forest-labs/flux-1-schnell');
-  // SPARK_IMAGE_MODEL=flux : jamais Phoenix ; phoenix-hd : 1024 x 1024.
-  const cheap = fakeAI((model) => (model.includes('flux') ? { image: Buffer.from(jpeg).toString('base64') } : new Error('no')));
-  const c = await env(cheap);
-  c.SPARK_IMAGE_MODEL = 'flux';
-  await sparkImage(c, { visual: 'a dragon', name: 'x', ip: 'ip2', now: NOW });
-  assert.deepEqual(cheap.calls.map((x) => x.model), ['@cf/black-forest-labs/flux-1-schnell']);
+  assert.deepEqual([res.bytes.length, res.model], [2000, '@cf/black-forest-labs/flux-1-schnell']);
+  assert.equal(flux.calls.length, 1, 'Phoenix is never called by default');
+  assert.match(flux.calls[0].input.prompt, /tiny red dragon/);
+  assert.match(flux.calls[0].input.prompt, /No text/);
+  // SPARK_IMAGE_MODEL=phoenix : Phoenix en 512 (un flux d'octets), FLUX s'il échoue ; phoenix-hd : 1024.
+  const phoenix = fakeAI((model) => (model.includes('leonardo') ? new Response(jpeg).body : null));
+  const p = await env(phoenix);
+  p.SPARK_IMAGE_MODEL = 'phoenix';
+  assert.equal((await sparkImage(p, { visual: 'a dragon', name: 'x', ip: 'ip2', now: NOW })).model, '@cf/leonardo/phoenix-1.0');
+  assert.equal(phoenix.calls[0].input.width, 512);
+  const down = await env(fakeAI((model) => (model.includes('leonardo') ? new Error('down') : { image: Buffer.from(jpeg).toString('base64') })));
+  down.SPARK_IMAGE_MODEL = 'phoenix';
+  assert.equal((await sparkImage(down, { visual: 'a dragon', name: 'x', ip: 'ip3', now: NOW })).model, '@cf/black-forest-labs/flux-1-schnell');
   const hd = fakeAI(() => new Response(jpeg).body);
   const h = await env(hd);
   h.SPARK_IMAGE_MODEL = 'phoenix-hd';
-  await sparkImage(h, { visual: 'a dragon', name: 'x', ip: 'ip3', now: NOW });
+  await sparkImage(h, { visual: 'a dragon', name: 'x', ip: 'ip4', now: NOW });
   assert.equal(hd.calls[0].input.width, 1024);
   assert.equal((await sparkImage(e, { visual: 'a naked dragon', name: 'x', ip: 'ip1', now: NOW })).error, 'blocked_idea');
   const broken = await env(fakeAI(new Error('down')));
@@ -149,7 +148,7 @@ test('a coin\'s Keeper answers its holders in character, from the coin\'s real f
   const mint = await coin(e);
   const res = await askKeeper(e, { mint, question: 'what is the story?', ip: 'ip1', now: NOW });
   assert.equal(res.value.answer, 'ser we are just getting started, the candle is lit');
-  assert.deepEqual(res.value.keeper, { name: 'Operator of $MOTH', label: 'Degen', model: 'Qwen3 30B', by: 'Qwen', logo: '/brand/ai/qwen.svg' });
+  assert.deepEqual(res.value.keeper, { name: 'Agent of $MOTH', label: 'Degen', model: 'Qwen3 30B', by: 'Qwen', logo: '/brand/ai/qwen.svg' });
   const sys = ai.calls[0].input.messages[0].content;
   assert.match(sys, /Operator of \$MOTH/);
   assert.match(sys, /Moths love the flame/);

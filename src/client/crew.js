@@ -12,7 +12,7 @@ export const CREW = [
   { id: 'scout', name: 'Scout', icon: 'scout', role: 'Finds the narrative', text: 'Reads what is trending on Solana every 30 minutes and turns it into narratives, each one with its sources.' },
   { id: 'chandler', name: 'Chandler', icon: 'sparkle', role: 'Makes the coin', text: 'Writes the name, the ticker and the story, paints the logo, then the launch kit: lore, X posts, Telegram post.' },
   { id: 'igniter', name: 'Igniter', icon: 'rocket', role: 'Launches it, you sign', text: 'Prepares the pump.fun launch and the fee split. Nothing leaves without your wallet: you approve every launch.' },
-  { id: 'operator', name: 'Operator', icon: 'keeper', role: 'Works it after launch', text: 'Tracks the market, writes its journal, runs its X account and its Telegram groups, and burns the coin under rules locked at launch.' },
+  { id: 'operator', name: 'agent', icon: 'keeper', role: 'Works it after launch', text: 'Tracks the market, writes its journal, runs its X account and its Telegram groups, and burns the coin under rules locked at launch.' },
 ];
 
 export function createCrew({ api, openModal, isOpen, world, ticker, avatar, onStrike }) {
@@ -83,7 +83,7 @@ export function createCrew({ api, openModal, isOpen, world, ticker, avatar, onSt
         <span class="eyebrow">The crew</span>
         <h2>Every coin gets a <span class="grad">crew</span>.</h2>
         <p class="lead muted">Four AI agents take your coin from an idea to a living candle. The Scout finds the narrative, the
-          Chandler makes the coin, the Igniter launches it, the Operator works it. <b>You approve every launch. The crew does the rest.</b></p>
+          Chandler makes the coin, the Igniter launches it, the agent works it. <b>You approve every launch. The crew does the rest.</b></p>
         <div class="cw-stats">
           <div><strong>${fmt(d.stats.coins)}</strong><span>coins with a crew</span></div>
           <div><strong>${fmt(d.stats.actions)}</strong><span>actions, all public</span></div>
@@ -110,7 +110,7 @@ export function createCrew({ api, openModal, isOpen, world, ticker, avatar, onSt
       </section>
 
       <section class="cw-sec">
-        <div class="cw-sec-head"><h3>${icon('keeper')} Operators, right now</h3><small class="muted">Every action, as it happens</small></div>
+        <div class="cw-sec-head"><h3>${icon('keeper')} Agents, right now</h3><small class="muted">Every action, as it happens</small></div>
         ${d.live?.length ? `<ul class="cw-live">${d.live.slice(0, 10).map((e) => `<li>
           ${coinLine(e.coin)}
           <span class="cw-act"><b>${esc(e.title)}</b>${e.detail ? `<small>${esc(e.detail)}</small>` : ''}</span>

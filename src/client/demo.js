@@ -258,8 +258,9 @@ export function createDemo() {
     for (const e of log) e.sig = null;
     return {
       log,
-      missions: missions(row, log, Date.now()),
+      missions: missions({ ...row, op_groups: seed(m.mint) % 3 }, log, Date.now()),
       kit,
+      telegram: { bot: 'WickFireBot', groups: seed(m.mint) % 3 },
       constitution: {
         personality: k.label, mind: { name: k.model, by: k.by, logo: k.logo },
         burn: m.candle ? { pct: m.candle.bps / 100, wickPct: 5, teamPct: 5 } : null, proof: null,
@@ -418,9 +419,9 @@ export function createDemo() {
       return { match: pub(m), signature: null };
     },
     // Spark : le Operator invente le coin à partir d'une idée (ici, sans IA : des mots de l'idée).
-    async spark({ idea, style = 'stoic', model = 'llama' }) {
+    async spark({ idea, style = 'stoic', model = 'llama', surprise = false }) {
       await new Promise((r) => setTimeout(r, 1400));
-      const text = String(idea || '').trim();
+      const text = String(idea || '').trim() || (surprise ? pick(['A frog who runs a candle factory', 'The last ember of a burned-down casino', 'A tiny dragon who only breathes birthday candles']) : '');
       if (text.length < 3) throw Object.assign(new Error('bad_idea'), { code: 'bad_idea' });
       const words = text.split(/\s+/).map((w) => w.replace(/[^\p{L}\p{N}]/gu, '')).filter((w) => w.length > 2);
       const main = (words.sort((a, b) => b.length - a.length)[0] || pick(WORDS)).toLowerCase();

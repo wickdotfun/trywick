@@ -7,6 +7,7 @@ import { prepare, status, submit } from './api/launch.js';
 import { board } from './api/leaderboard.js';
 import { ask, spark, sparkLogo } from './api/spark.js';
 import { state } from './api/state.js';
+import { telegramHook } from './api/telegram.js';
 import { token, tradePrepare, tradeSend, tradeStatus } from './api/token.js';
 import { json } from '../lib/http.js';
 import { runBuyback } from '../lib/buyback.js';
@@ -17,6 +18,7 @@ import { runAnnounce, withLaunch } from '../lib/announce.js';
 import { runJournal, runKeepers, runVoices } from '../lib/keepers.js';
 import { queueSelfBurn, runShares } from '../lib/sharing.js';
 import { runKits } from '../lib/kit.js';
+import { runPublish } from '../lib/publish.js';
 import { runSocial } from '../lib/social.js';
 import { runTelegram } from '../lib/telegram.js';
 import { sweep } from '../lib/matches.js';
@@ -40,6 +42,7 @@ const ROUTES = {
   'POST /api/spark': spark,
   'POST /api/spark/image': sparkLogo,
   'POST /api/ask': ask,
+  'POST /api/telegram': telegramHook,
   'GET /api/admin/status': adminStatus,
   'POST /api/admin/pause': adminPause,
   'POST /api/admin/run': adminRun,
@@ -104,6 +107,8 @@ export default {
       runTelegram(env, Date.now()),
       // Les grands moments de $WICK (DEX payé, paliers de market cap), avec leur carte.
       runSocial(env, Date.now()),
+      // L'Operator de chaque coin poste dans ses groupes Telegram (et les temps forts sur le canal).
+      runPublish(env, Date.now()),
     ];
     for (const r of await Promise.allSettled(steps)) {
       if (r.status === 'rejected') console.error('cron', r.reason?.message ?? r.reason);

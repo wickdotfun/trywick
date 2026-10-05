@@ -1251,3 +1251,12 @@ button.cdl:focus-visible { outline: 2px solid var(--gold); outline-offset: 6px; 
 .kit-card img { width: 100%; border-radius: 12px; border: 1px solid var(--line); }
 .kit-card .cta { display: inline-flex; align-items: center; gap: 6px; }
 .kit-card .cta .ico { width: 15px; height: 15px; stroke: currentColor; }
+
+.kit-tg h4 small { text-transform: none; letter-spacing: 0; color: #3ddc84; }
+.kit-cmd { display: block; padding: 8px 10px; border-radius: 9px; background: rgba(0, 0, 0, .4); border: 1px solid var(--line); font: 500 12px/1.4 var(--mono); color: var(--gold); overflow-wrap: anywhere; }
+.kit-post p a { color: var(--gold); }
+
+.spark-btns { display: flex; flex-direction: column; gap: 6px; flex: none; }
+.spark-btns .spark-go { min-height: 40px; }
+.spark-surprise { height: 30px; padding: 0 12px; font-size: 12px; border-radius: 9px; justify-content: center; }
+@media (max-width: 720px) { .spark-btns { flex-direction: row; } .spark-btns > * { flex: 1; } }

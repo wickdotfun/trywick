@@ -94,18 +94,33 @@ test('the daily AI budget is per use: Spark running out never stops the Keepers'
   assert.ok(await spendAi(e.DB, 'spark', NOW + 24 * HOUR), 'a new day, a new budget');
 });
 
-test('the logo: FLUX paints it from the Keeper\'s idea, as a JPEG', async () => {
-  const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
-  const ai = fakeAI({ image: jpeg.toString('base64') });
+test('the logo: Leonardo Phoenix paints it from the Operator\'s art direction; FLUX if Phoenix fails', async () => {
+  const jpeg = new Uint8Array(2000).fill(7);
+  // Phoenix renvoie un flux d'octets.
+  const ai = fakeAI((model) => (model.includes('leonardo') ? new Response(jpeg).body : null));
   const e = await env(ai);
-  const res = await sparkImage(e, { visual: 'a tiny red dragon', name: 'Dragon Candle', ip: 'ip1', now: NOW });
-  assert.deepEqual([...res.bytes], [...jpeg]);
-  assert.equal(ai.calls[0].model, CONFIG.keepers.imageModel);
+  const res = await sparkImage(e, { visual: 'a tiny red dragon, glossy 3D render', name: 'Dragon Candle', ip: 'ip1', now: NOW });
+  assert.equal(res.bytes.length, 2000);
+  assert.equal(res.model, '@cf/leonardo/phoenix-1.0');
   assert.match(ai.calls[0].input.prompt, /tiny red dragon/);
   assert.match(ai.calls[0].input.prompt, /No text/);
+  assert.equal(ai.calls[0].input.width, 1024);
+  // Phoenix en panne : FLUX (base64).
+  const flux = await env(fakeAI((model) => (model.includes('leonardo') ? new Error('quota') : { image: Buffer.from(jpeg).toString('base64') })));
+  const r2 = await sparkImage(flux, { visual: 'a dragon', name: 'x', ip: 'ip1', now: NOW });
+  assert.equal(r2.model, '@cf/black-forest-labs/flux-1-schnell');
   assert.equal((await sparkImage(e, { visual: 'a naked dragon', name: 'x', ip: 'ip1', now: NOW })).error, 'blocked_idea');
   const broken = await env(fakeAI(new Error('down')));
   assert.equal((await sparkImage(broken, { visual: 'a dragon', name: 'x', ip: 'ip1', now: NOW })).error, 'ai_failed');
+});
+
+test('Spark can surprise: no idea needed, the Operator invents the concept', async () => {
+  const ai = fakeAI({ response: SPARK });
+  const e = await env(ai);
+  const res = await sparkCoin(e, { idea: '', surprise: true, ip: 'ip3', now: NOW });
+  assert.equal(res.value.symbol, 'DRGN');
+  assert.match(ai.calls[0].input.messages[1].content, /invent an original memecoin concept yourself/);
+  assert.equal((await sparkCoin(e, { idea: '', ip: 'ip3', now: NOW })).error, 'bad_idea', 'without surprise, an idea is needed');
 });
 
 test('a coin\'s Keeper answers its holders in character, from the coin\'s real facts', async () => {

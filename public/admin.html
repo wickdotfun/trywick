@@ -96,7 +96,12 @@
     @media (max-width: 760px) { .lock-prev { grid-template-columns: 1fr; } }
     @media (max-width: 1000px) { .kpis { grid-template-columns: repeat(3, 1fr); } }
     @media (max-width: 560px) { .kpis { grid-template-columns: repeat(2, 1fr); } .grid { grid-template-columns: 1fr; } .checklist { grid-template-columns: 1fr; } }
-  </style>
+      .selftest { grid-column: 1 / -1; }
+    .st-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+    .st-list li { padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,.08); font-size: 13px; }
+    .st-list li.ok b { color: #3ddc84; } .st-list li.bad { border-color: rgba(255,107,91,.5); } .st-list li.bad b { color: #ff6b5b; }
+    .st-list small { opacity: .75; }
+</style>
 </head>
 <body>
   <main class="adm">
@@ -138,6 +143,8 @@
       <div class="kpis" id="kpis"></div>
 
       <div class="grid">
+        <div class="card selftest"><h2>Test everything <small>every step of a launch, for real, on the live site: nothing is signed or sent on Solana</small></h2>
+          <button class="btn" id="selftest-go">Run the test</button><ol class="st-list" id="selftest-out"></ol></div>
         <div class="card"><h2>Your wallet &amp; earnings <small>dev wallet</small></h2><dl class="kv" id="earn"></dl><div class="note-box" id="earn-note"></div></div>
         <div class="card"><h2>Buyback &amp; burns</h2><dl class="kv" id="burnbox"></dl></div>
         <div class="card"><h2>$WICK market</h2><dl class="kv" id="market"></dl></div>
@@ -499,6 +506,21 @@
       } catch (err) { flash(err.message, 'bad'); }
       $('pause').disabled = false;
       load();
+    });
+
+    $('selftest-go').addEventListener('click', async () => {
+      const b = $('selftest-go');
+      b.disabled = true;
+      b.textContent = 'Testing… (up to a minute)';
+      $('selftest-out').innerHTML = '';
+      try {
+        const r = await call('/api/admin/selftest', {});
+        $('selftest-out').innerHTML = r.steps.map((s) => `<li class="${s.ok ? 'ok' : 'bad'}"><b>${s.ok ? 'OK' : 'FAIL'}</b> ${esc(s.name)} <small>${esc(s.detail)} · ${s.ms} ms</small></li>`).join('')
+          + `<li class="dim"><small>AI used today: ${esc(JSON.stringify(r.aiToday))}</small></li>`;
+        flash(r.ok ? 'Everything works.' : 'Some steps fail: see the red lines.', r.ok ? 'ok' : 'bad');
+      } catch (err) { flash(err.message, 'bad'); }
+      b.disabled = false;
+      b.textContent = 'Run the test again';
     });
 
     $('run').addEventListener('click', async () => {

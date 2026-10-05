@@ -368,6 +368,9 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
             <a class="wbtn" href="https://solscan.io/token/${esc(m.mint)}" target="_blank" rel="noopener">Solscan ↗</a>
           </div>
           ${m.description ? `<p class="cn-about">${esc(m.description)}</p>` : ''}
+          ${m.feeDue && !demo && connect.current()?.address === m.creator ? `<div class="fee-due"><p><b>Finish your launch.</b> Approve its Ignition Fee and its fee split:
+            until then, $${esc(m.symbol)} doesn't burn ${tk()} and its crew isn't paid.</p><p class="error" id="fee-due-error" hidden></p>
+            <button type="button" class="cta small-cta" id="fee-due-go">Approve the Ignition Fee</button></div>` : ''}
           ${operatorPanel(m, data.operator)}
           ${m.share ? `<div class="cn-split">
             <small class="eyebrow">Where its creator fees go</small>
@@ -402,6 +405,22 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
     bindChats(body, api.ask);
     bindTabs(body);
     bindKit(body, m, data.operator);
+    $('fee-due-go')?.addEventListener('click', async (e) => {
+      const b = e.currentTarget;
+      b.disabled = true;
+      b.textContent = 'Check your wallet…';
+      try {
+        const { payFee } = await import('./wallet.js');
+        await payFee({ mint: m.mint });
+        go(`coin/${m.mint}`);
+      } catch (err) {
+        b.disabled = false;
+        b.textContent = 'Approve the Ignition Fee';
+        const box = $('fee-due-error');
+        box.hidden = false;
+        box.textContent = err.code === 'no_funds' ? 'Your wallet needs a little more SOL for it.' : err.code === 'rejected' ? 'Cancelled in your wallet.' : 'Could not send it. Try again.';
+      }
+    });
   }
 
   return { forest, coin, candleHtml };

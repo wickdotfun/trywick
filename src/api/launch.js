@@ -1,13 +1,18 @@
-// Frapper une allumette = lancer un coin sur pump.fun. Trois étapes :
-//   POST /api/launch/prepare  (formulaire + image)  → la transaction à signer
+// Frapper une allumette = lancer un coin sur pump.fun :
+//   POST /api/launch/prepare  (formulaire + image)  → la transaction de création à signer
 //   POST /api/launch/submit   (transaction signée)  → envoyée sur Solana
 //   GET  /api/launch/status?mint=…                  → allumée ou pas encore
-import { expectedFee, feeTransfers, launchFee, selfBpsOf } from '../../lib/buyback.js';
+// Puis, une fois le coin créé, l'Ignition Fee (et le partage des creator fees) :
+//   POST /api/launch/fee         { mint }           → une transaction neuve, déjà simulée
+//   POST /api/launch/fee/submit  { mint, feeTx }    → signée par le créateur, envoyée
+// La fee est signée APRÈS la création, jamais avant : avant, le coin n'existe pas, la
+// transaction du partage ne peut pas être simulée, et Phantom l'affiche en rouge.
+import { expectedFee, launchFee, selfBpsOf } from '../../lib/buyback.js';
 import { CONFIG } from '../../lib/config.js';
 import { launchNeedSol, shortOfFunds } from '../../lib/funds.js';
 import { ipHash, json } from '../../lib/http.js';
 import { isPubkey, validateImage, validateLaunch } from '../../lib/launch.js';
-import { getMatch, publicMatch, settle } from '../../lib/matches.js';
+import { getMatch, publicMatch, settle, settleFee } from '../../lib/matches.js';
 import { buildCreateTx, uploadMetadata } from '../../lib/pump.js';
 import { ensureSchema } from '../../lib/schema.js';
 import { buildShareTx, checkSignedShareTx } from '../../lib/sharing.js';
@@ -15,7 +20,7 @@ import { keeperGoal, keeperModel, keeperPrompt, keeperStyle } from '../../lib/ke
 import { isPremium, premiumReady } from '../../lib/minds.js';
 import {
   base64FromBytes, buildFeeTx, bytesFromBase64, checkFeeTx, checkSignedLaunch, getLatestBlockhash,
-  sendTransaction, signatureOf,
+  sendTransaction, signatureOf, simulateTransaction,
 } from '../../lib/solana.js';
 
 // L'esprit choisi : un esprit premium seulement s'il est réglé (sa clé), sinon Llama.
@@ -98,23 +103,11 @@ export async function prepare({ request, env }) {
     console.error('pumpportal', err.detail || err.message);
     return json({ error: 'build_failed' }, 502);
   }
-  let feeTx = null;
+  // L'Ignition Fee (et le partage) : ce qui est attendu est noté ici ; la transaction sera faite
+  // une fois le coin créé (POST /api/launch/fee).
   const holders = fee?.holders || [];
   const shareBps = holders.reduce((n, h) => n + h.bps, 0);
   const shareTeamBps = holders.find((h) => h.address === fee?.teamWallet)?.bps ?? 0;
-  if (fee) {
-    try {
-      const blockhash = await getLatestBlockhash(env);
-      const transfers = feeTransfers(fee);
-      const bytes = holders.length
-        ? await buildShareTx({ creator: launch.creator, mint: launch.mint, transfers, holders, blockhash })
-        : buildFeeTx({ from: launch.creator, transfers, blockhash });
-      feeTx = base64FromBytes(bytes);
-    } catch (err) {
-      console.error('fee tx', err.message);
-      return json({ error: 'build_failed' }, 502);
-    }
-  }
   // Un nouvel essai repart de zéro : une ancienne transaction de fee gardée ne partira jamais.
   await env.DB.prepare(`UPDATE matches SET fee_lamports = ?, fee_to = ?, team_to = ?, team_lamports = ?, share_bps = ?,
       share_team_bps = ?, share_crew_bps = ?, self_bps = ?, share_msg = NULL, share_tx = NULL, fee_sig = NULL, fee_state = NULL, share_state = NULL
@@ -129,7 +122,7 @@ export async function prepare({ request, env }) {
     .bind(style, mindOf(env, fields.keeper_model), goal, character, launch.description || null, launch.mint).run();
   return json({
     tx: base64FromBytes(tx),
-    feeTx,
+    fee: Boolean(fee),
     feeSol: fee ? fee.lamports / 1e9 : 0,
     burnSol: fee ? fee.burn / 1e9 : 0,
     teamSol: fee?.team ? fee.team.lamports / 1e9 : 0,
@@ -158,13 +151,11 @@ export async function submit({ request, env }) {
 
   // L'Ignition Fee, s'il y en a une : un virement signé du créateur vers le wallet de buyback, ou,
   // avec le partage, exactement la transaction préparée (fee + partage), signée par le créateur.
+  // (Une ancienne version du site envoyait aussi la fee, signée d'avance : toujours acceptée.)
   let feeBytes = null;
-  if (row.fee_lamports > 0 || row.share_bps > 0) {
-    try { feeBytes = body.feeTx ? bytesFromBase64(body.feeTx) : null; } catch { feeBytes = null; }
-    let feeProblem = 'no_fee_tx';
-    const { transfers, holders } = expectedFee(row);
-    if (feeBytes && row.share_bps > 0) feeProblem = checkSignedShareTx(feeBytes, { creator: row.creator, mint: row.mint, transfers, holders });
-    else if (feeBytes) feeProblem = checkFeeTx(feeBytes, { from: row.creator, transfers });
+  if ((row.fee_lamports > 0 || row.share_bps > 0) && body.feeTx) {
+    try { feeBytes = bytesFromBase64(body.feeTx); } catch { feeBytes = null; }
+    const feeProblem = feeBytes ? checkFee(feeBytes, row) : 'bad_fee_tx';
     if (feeProblem) return json({ error: feeProblem }, 400);
   }
 
@@ -188,8 +179,84 @@ export async function submit({ request, env }) {
     await env.DB.prepare(`UPDATE matches SET share_tx = ?, fee_sig = ?, fee_state = 'held',
         share_state = CASE WHEN share_bps > 0 THEN 'held' ELSE share_state END WHERE mint = ?`)
       .bind(body.feeTx, signatureOf(feeBytes), row.mint).run();
+  } else if (row.fee_lamports > 0 || row.share_bps > 0) {
+    // La fee sera signée une fois le coin créé.
+    await env.DB.prepare(`UPDATE matches SET fee_state = 'awaiting',
+        share_state = CASE WHEN share_bps > 0 THEN 'awaiting' ELSE share_state END WHERE mint = ?`).bind(row.mint).run();
   }
-  return json({ status: 'pending', signature });
+  return json({ status: 'pending', signature, fee: !feeBytes && (row.fee_lamports > 0 || row.share_bps > 0) });
+}
+
+// La transaction de fee signée est-elle exactement celle attendue (montants, wallets, partage) ?
+function checkFee(bytes, row) {
+  const { transfers, holders } = expectedFee(row);
+  return row.share_bps > 0
+    ? checkSignedShareTx(bytes, { creator: row.creator, mint: row.mint, transfers, holders })
+    : checkFeeTx(bytes, { from: row.creator, transfers });
+}
+
+// Une fee à payer : coin créé (allumé), fee attendue ou ratée (on peut réessayer).
+const feeDue = (row) => row && row.seq != null && (row.fee_lamports > 0 || row.share_bps > 0) && ['awaiting', 'failed'].includes(row.fee_state);
+
+export async function feeTx({ request, env }) {
+  await ensureSchema(env.DB);
+  const body = await request.json().catch(() => null);
+  if (!isPubkey(body?.mint)) return json({ error: 'bad_request' }, 400);
+  const row = await getMatch(env.DB, body.mint);
+  if (!row) return json({ error: 'unknown_mint' }, 404);
+  if (row.seq == null) return json({ error: 'not_created' }, 409);
+  if (!feeDue(row)) return json({ status: row.fee_state || 'none' });
+  const { transfers, holders } = expectedFee(row);
+  let bytes;
+  try {
+    const blockhash = await getLatestBlockhash(env);
+    bytes = row.share_bps > 0
+      ? await buildShareTx({ creator: row.creator, mint: row.mint, transfers, holders, blockhash })
+      : buildFeeTx({ from: row.creator, transfers, blockhash });
+  } catch (err) {
+    console.error('fee tx', row.mint, err.message);
+    return json({ error: 'build_failed' }, 502);
+  }
+  // Simulée d'abord : si elle échouerait (le coin pas encore visible du RPC, pas assez de SOL…),
+  // elle n'est pas proposée au wallet. Le site réessaie quelques secondes plus tard.
+  const sim = await simulateTransaction(env, bytes).catch((err) => ({ err: err.message, logs: [] }));
+  if (sim.err) {
+    const text = `${JSON.stringify(sim.err)} ${sim.logs.join(' ')}`;
+    console.log('fee sim', row.mint, text.slice(0, 300));
+    if (/insufficient|InsufficientFunds|0x1\b/i.test(text)) return json({ error: 'no_funds' }, 409);
+    return json({ error: 'fee_not_ready' }, 409);
+  }
+  return json({ feeTx: base64FromBytes(bytes), feeSol: row.fee_lamports / 1e9 });
+}
+
+export async function feeSubmit({ request, env }) {
+  await ensureSchema(env.DB);
+  const body = await request.json().catch(() => null);
+  if (!isPubkey(body?.mint) || typeof body.feeTx !== 'string' || body.feeTx.length > 2400) return json({ error: 'bad_request' }, 400);
+  const row = await getMatch(env.DB, body.mint);
+  if (!row) return json({ error: 'unknown_mint' }, 404);
+  if (!feeDue(row)) return json({ status: row.fee_state || 'none' });
+  let bytes;
+  try { bytes = bytesFromBase64(body.feeTx); } catch { return json({ error: 'bad_fee_tx' }, 400); }
+  const problem = checkFee(bytes, row);
+  if (problem) return json({ error: problem }, 400);
+  const claimed = await env.DB.prepare("UPDATE matches SET fee_state = 'sending' WHERE mint = ? AND fee_state IN ('awaiting', 'failed')").bind(row.mint).run();
+  if (claimed.meta?.changes !== 1) return json({ status: 'sending' });
+  try {
+    await sendTransaction(env, bytes);
+  } catch (err) {
+    const msg = `${err.message} ${JSON.stringify(err.rpc?.data?.logs || '')}`;
+    console.error('fee send', row.mint, msg);
+    await env.DB.prepare("UPDATE matches SET fee_state = 'failed' WHERE mint = ?").bind(row.mint).run();
+    if (/blockhash/i.test(msg)) return json({ error: 'expired' }, 409);
+    if (/insufficient|lamports|0x1\b/i.test(msg)) return json({ error: 'no_funds' }, 409);
+    return json({ error: 'send_failed' }, 502);
+  }
+  // Envoyée : la confirmation est suivie comme avant (settleFee, ici puis par le cron).
+  await env.DB.prepare(`UPDATE matches SET share_tx = ?, fee_sig = ?, fee_state = 'sent', sent_at = ?,
+      share_state = CASE WHEN share_bps > 0 THEN 'sent' ELSE share_state END WHERE mint = ?`)
+    .bind(body.feeTx, signatureOf(bytes), Date.now(), row.mint).run();
+  return json({ status: 'sent', signature: signatureOf(bytes) });
 }
 
 export async function status({ request, env }) {
@@ -202,9 +269,16 @@ export async function status({ request, env }) {
     console.error('status', mint, err.message);
     return { row, status: 'pending' };
   });
+  // Coin créé, fee envoyée : on regarde si elle est confirmée.
+  if (result.status === 'lit' && result.row.fee_state === 'sent') {
+    const fee = await settleFee(env, result.row, Date.now()).catch(() => result.row.fee_state);
+    if (fee !== 'sent') result.row = await getMatch(env.DB, mint);
+  }
   return json({
     status: result.status,
     signature: row.signature,
     match: result.status === 'lit' ? publicMatch(result.row) : null,
+    // La fee : 'awaiting' (à signer), 'failed' (à refaire), 'sent', 'paid'… (null : pas de fee).
+    fee: result.row.fee_lamports > 0 || result.row.share_bps > 0 ? result.row.fee_state : null,
   });
 }

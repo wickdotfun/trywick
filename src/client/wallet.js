@@ -6,7 +6,9 @@
 // - le créateur signe dans son wallet (connect.js, par le Wallet Standard).
 // L'ordre des signatures suit la recommandation de Phantom pour les transactions à plusieurs
 // signataires : le wallet signe d'abord, le mint ensuite. Une transaction par demande de
-// signature (jamais plusieurs d'un coup).
+// signature (jamais plusieurs d'un coup). Et jamais une transaction qui échouerait à la
+// simulation (Phantom l'afficherait en rouge) : l'Ignition Fee et le partage des creator fees se
+// signent une fois le coin créé, quand le serveur a vérifié qu'ils passent.
 import { Keypair, VersionedTransaction } from '@solana/web3.js';
 import { signBytes } from './connect.js';
 
@@ -32,8 +34,33 @@ const post = (url, body) => call(url, { method: 'POST', headers: { 'content-type
 let mintKey = null;
 export function resetMint() { mintKey = null; }
 
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// L'Ignition Fee (et le partage) d'un coin qui existe : le serveur la fait et la simule (en
+// réessayant tant que le coin n'est pas encore visible), le wallet la signe, le serveur l'envoie.
+// Renvoie l'état de la fee ('sent', 'paid'…).
+export async function payFee({ mint, onStep = () => {} }) {
+  const until = Date.now() + 45_000;
+  let fee;
+  for (;;) {
+    try {
+      fee = await post('/api/launch/fee', { mint });
+      break;
+    } catch (err) {
+      if (!['fee_not_ready', 'not_created'].includes(err.code) || Date.now() > until) throw err;
+      await wait(2500);
+    }
+  }
+  if (!fee.feeTx) return fee.status;
+  onStep('sign2');
+  const signed = await signBytes(b64.from(fee.feeTx));
+  onStep('fee');
+  const res = await post('/api/launch/fee/submit', { mint, feeTx: b64.to(signed) });
+  return res.status;
+}
+
 // fields : les textes du formulaire ; image : le fichier (Blob).
-// onStep('upload' | 'sign' | 'sign2' | 'send' | 'confirm')
+// onStep('upload' | 'sign' | 'send' | 'confirm' | 'sign2' | 'fee')
 export async function strike({ creator, fields, image, onStep }) {
   mintKey ??= Keypair.generate();
   const mint = mintKey.publicKey.toBase58();
@@ -52,23 +79,24 @@ export async function strike({ creator, fields, image, onStep }) {
   const tx = VersionedTransaction.deserialize(signedByWallet);
   tx.sign([mintKey]);
 
-  // 2. L'Ignition Fee (et le partage des creator fees, s'il est choisi) : le wallet seul.
-  let feeTx = null;
-  if (prepared.feeTx) {
-    onStep('sign2');
-    feeTx = await signBytes(b64.from(prepared.feeTx));
-  }
-
   onStep('send');
-  const sent = await post('/api/launch/submit', { mint, tx: b64.to(tx.serialize()), feeTx: feeTx ? b64.to(feeTx) : null });
+  const sent = await post('/api/launch/submit', { mint, tx: b64.to(tx.serialize()) });
 
   onStep('confirm');
   const until = Date.now() + 120_000;
   while (Date.now() < until) {
     const s = await call(`/api/launch/status?mint=${mint}`).catch(() => ({ status: 'pending' }));
-    if (s.status === 'lit') { mintKey = null; return { match: s.match, signature: sent.signature }; }
+    if (s.status === 'lit') {
+      mintKey = null;
+      // 2. Le coin existe : l'Ignition Fee et le partage des creator fees, le wallet seul.
+      let feeMissing = false;
+      if (sent.fee) {
+        try { await payFee({ mint, onStep }); } catch (err) { feeMissing = err.code || 'failed'; }
+      }
+      return { match: s.match, signature: sent.signature, mint, feeMissing };
+    }
     if (s.status === 'failed') throw Object.assign(new Error('tx_failed'), { code: 'tx_failed' });
-    await new Promise((r) => setTimeout(r, 2500));
+    await wait(2500);
   }
   // Pas encore confirmée : le serveur continuera de la surveiller.
   mintKey = null;

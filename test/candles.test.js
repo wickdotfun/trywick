@@ -106,7 +106,7 @@ test('a failed coin buy gives its SOL back to the coin, not to the $WICK pot', a
 });
 
 test('a launch with Make it burn at 20% locks 40% creator / 30% burn wallet (20% its candle + 10% $WICK) / 30% team wallet (10% team + 20% crew)', async () => {
-  const { prepare } = await import('../src/api/launch.js');
+  const { feeTx, prepare } = await import('../src/api/launch.js');
   const { CONFIG } = await import('../lib/config.js');
   const { Transaction, TransactionMessage, VersionedTransaction, TransactionInstruction, PublicKey } = await import('@solana/web3.js');
   const { env } = await world();
@@ -123,6 +123,7 @@ test('a launch with Make it burn at 20% locks 40% creator / 30% burn wallet (20%
     }
     const { method } = JSON.parse(init.body);
     if (method === 'getLatestBlockhash') return Response.json({ jsonrpc: '2.0', id: 1, result: { value: { blockhash } } });
+    if (method === 'simulateTransaction') return Response.json({ jsonrpc: '2.0', id: 1, result: { value: { err: null, logs: [] } } });
     throw new Error(`unexpected ${method}`);
   };
   const form = new FormData();
@@ -135,7 +136,10 @@ test('a launch with Make it burn at 20% locks 40% creator / 30% burn wallet (20%
   const row = await env.DB.prepare('SELECT self_bps, share_bps, share_team_bps, share_crew_bps FROM matches WHERE mint = ?').bind(mintKp.publicKey.toBase58()).first();
   assert.deepEqual({ ...row }, { self_bps: 2000, share_bps: 6000, share_team_bps: 3000, share_crew_bps: 2000 });
   // Dans la transaction de partage : le créateur 40 %, le wallet burn 30 % (20 % la bougie, 10 % $WICK), l'équipe 30 % (10 % + 20 % le crew).
-  const d = Buffer.from(Transaction.from(Buffer.from(prep.feeTx, 'base64')).instructions.at(-1).data);
+  // Le coin créé, la fee (et le partage) se signe : sa transaction, faite à ce moment-là.
+  await env.DB.prepare("UPDATE matches SET seq = 999, lit_at = 1, fee_state = 'awaiting' WHERE mint = ?").bind(mintKp.publicKey.toBase58()).run();
+  const fee = await (await feeTx({ request: new Request('http://x', { method: 'POST', body: JSON.stringify({ mint: mintKp.publicKey.toBase58() }) }), env })).json();
+  const d = Buffer.from(Transaction.from(Buffer.from(fee.feeTx, 'base64')).instructions.at(-1).data);
   assert.deepEqual([0, 1, 2].map((i) => d.readUInt16LE(44 + i * 34)), [4000, 3000, 3000]);
   // Une part qui n'est pas proposée est ignorée (pas de bougie, partage classique).
   const form2 = new FormData();

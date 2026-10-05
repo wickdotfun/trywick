@@ -1,12 +1,12 @@
 // Point d'entrée du Worker Cloudflare. Les fichiers de public/ (le site) sont
 // servis directement ; tout le reste arrive ici, et seules les routes /api existent.
-import { adminPause, adminPost, adminRun, adminSocial, adminStatus, recordRun } from './api/admin.js';
+import { adminPause, adminPost, adminRun, adminSelfTest, adminSocial, adminStatus, recordRun } from './api/admin.js';
 import { candles, coin } from './api/candles.js';
 import { crew } from './api/crew.js';
 import { proof, proofCsv } from './api/proof.js';
 import { xCallback, xStart, xUnlink } from './api/x.js';
 import { launches, profile } from './api/explore.js';
-import { prepare, status, submit } from './api/launch.js';
+import { feeSubmit, feeTx, prepare, status, submit } from './api/launch.js';
 import { board } from './api/leaderboard.js';
 import { ask, spark, sparkLogo } from './api/spark.js';
 import { state } from './api/state.js';
@@ -49,6 +49,8 @@ const ROUTES = {
   'GET /api/trade/status': tradeStatus,
   'POST /api/launch/prepare': prepare,
   'POST /api/launch/submit': submit,
+  'POST /api/launch/fee': feeTx,
+  'POST /api/launch/fee/submit': feeSubmit,
   'GET /api/launch/status': status,
   'POST /api/spark': spark,
   'POST /api/spark/image': sparkLogo,
@@ -57,6 +59,7 @@ const ROUTES = {
   'GET /api/admin/status': adminStatus,
   'POST /api/admin/pause': adminPause,
   'POST /api/admin/run': adminRun,
+  'POST /api/admin/selftest': adminSelfTest,
   'GET /api/admin/social': adminSocial,
   'POST /api/admin/post': adminPost,
 };

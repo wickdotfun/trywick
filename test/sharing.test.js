@@ -4,7 +4,7 @@ import { afterEach, test } from 'node:test';
 import {
   Keypair, PublicKey, SystemProgram, Transaction, TransactionInstruction, TransactionMessage, VersionedTransaction,
 } from '@solana/web3.js';
-import { prepare, status, submit } from '../src/api/launch.js';
+import { feeSubmit, feeTx, prepare, status, submit } from '../src/api/launch.js';
 import { launchFee } from '../lib/buyback.js';
 import { CONFIG } from '../lib/config.js';
 import { ensureSchema } from '../lib/schema.js';
@@ -206,6 +206,7 @@ test('launch with sharing: held until the coin exists, then shared, then distrib
         });
       }
       case 'getTokenAccountsByOwner': return ok({ value: [] });
+      case 'simulateTransaction': return ok({ value: { err: null, logs: [] } });
       case 'getAccountInfo': {
         if (params[0] === a.sharingConfig) {
           const cfg = sharingConfigBytes({ mint, admin: creator.publicKey.toBase58(), shareholders: shareholdersFor(creator.publicKey.toBase58(), [{ address: wallet.publicKey.toBase58(), bps: 1000 }, { address: CONFIG.launch.deployer, bps: 3000 }]) });
@@ -227,28 +228,30 @@ test('launch with sharing: held until the coin exists, then shared, then distrib
   assert.equal(prep.feeSol, 0.01);
   assert.equal(prep.shareBps, 4000);   // 10 % brûlent $WICK, 10 % l'équipe, 20 % le crew
 
-  // 2. Le navigateur signe les deux (le wallet, puis le mint pour la création).
+  // 2. Le navigateur signe la création (le wallet, puis le mint), et la soumet seule.
   const tx = VersionedTransaction.deserialize(Buffer.from(prep.tx, 'base64'));
   tx.sign([creator, mintKp]);
-  const feeTx = VersionedTransaction.deserialize(Buffer.from(prep.feeTx, 'base64'));
-  feeTx.sign([creator]);
-
-  // 3. Soumettre : la création part, la transaction fee + partage est gardée.
-  const body = JSON.stringify({ mint, tx: Buffer.from(tx.serialize()).toString('base64'), feeTx: Buffer.from(feeTx.serialize()).toString('base64') });
+  const body = JSON.stringify({ mint, tx: Buffer.from(tx.serialize()).toString('base64') });
   const res = await (await submit({ request: new Request('http://x', { method: 'POST', body }), env })).json();
-  assert.equal(res.status, 'pending');
+  assert.deepEqual([res.status, res.fee], ['pending', true]);
   assert.equal(sent.length, 1);
   let row = await db.prepare('SELECT * FROM matches WHERE mint = ?').bind(mint).first();
-  assert.equal(row.fee_state, 'held');
+  assert.deepEqual([row.fee_state, row.share_state], ['awaiting', 'awaiting']);
 
+  // 3. Le lancement est confirmé : l'allumette s'allume ; la fee + le partage attendent.
+  let st = await (await status({ request: new Request(`http://x/api/launch/status?mint=${mint}`), env })).json();
+  assert.deepEqual([st.status, st.fee], ['lit', 'awaiting']);
+
+  // 4. Le coin existe : la fee + le partage, faits maintenant (simulés), signés par le créateur.
+  const call = async (fn, b) => (await fn({ request: new Request('http://x', { method: 'POST', body: JSON.stringify(b) }), env })).json();
+  const { feeTx: feeB64 } = await call(feeTx, { mint });
+  const fee = VersionedTransaction.deserialize(Buffer.from(feeB64, 'base64'));
+  fee.sign([creator]);
   // Une transaction de partage modifiée est refusée.
-  const bad = JSON.stringify({ mint, tx: Buffer.from(tx.serialize()).toString('base64'), feeTx: Buffer.from(tx.serialize()).toString('base64') });
-  assert.equal((await (await submit({ request: new Request('http://x', { method: 'POST', body: bad }), env })).json()).error, 'bad_share_tx');
-
-  // 4. Le lancement est confirmé : l'allumette s'allume, la transaction fee + partage part.
-  const st = await (await status({ request: new Request(`http://x/api/launch/status?mint=${mint}`), env })).json();
-  assert.equal(st.status, 'lit');
+  assert.equal((await call(feeSubmit, { mint, feeTx: Buffer.from(tx.serialize()).toString('base64') })).error, 'bad_share_tx');
+  assert.equal((await call(feeSubmit, { mint, feeTx: Buffer.from(fee.serialize()).toString('base64') })).status, 'sent');
   assert.equal(sent.length, 2);
+  st = await (await status({ request: new Request(`http://x/api/launch/status?mint=${mint}`), env })).json();
   row = await db.prepare('SELECT * FROM matches WHERE mint = ?').bind(mint).first();
   assert.equal(row.fee_state, 'paid');
   assert.equal(row.share_state, 'shared');

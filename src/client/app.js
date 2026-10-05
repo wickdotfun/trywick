@@ -2,6 +2,7 @@
 import { createCandles } from './candles.js';
 import { createCrew } from './crew.js';
 import { createProof } from './proof.js';
+import { draftCoin, drawLogo } from './draft.js';
 import { createDemo } from './demo.js';
 import { createPages } from './pages.js';
 import { createScene, headColor } from './scene.js';
@@ -932,7 +933,19 @@ async function runSpark(form, surprise = false) {
     sparkStatus(sparkDone(sp), 'done');
     bindLogoAgain(form);
   } catch (err) {
-    sparkStatus(SPARK_ERRORS[err.code] || SPARK_ERRORS.ai_failed, 'err');
+    // L'IA ne répond pas : un brouillon fait ici, pour que ça donne toujours quelque chose.
+    if (['ai_failed', 'ai_busy', 'ai_off'].includes(err.code) || !err.code) {
+      const d = draftCoin(surprise ? pick(IDEAS) : idea);
+      draft.spark = null;
+      form.name.value = d.name;
+      form.symbol.value = d.symbol;
+      form.description.value = d.description;
+      draft.fields = Object.fromEntries(new FormData(form));
+      if (!draft.image) await paintLogo({ visual: d.visual, name: d.name }, true);
+      sparkStatus(`${icon('sparkle')} The AI is busy right now, so here is a quick draft from your idea. Edit anything, or press Spark again in a moment.`, 'err');
+    } else {
+      sparkStatus(SPARK_ERRORS[err.code] || SPARK_ERRORS.ai_failed, 'err');
+    }
   } finally {
     sparking = false;
     if ($('sp-go')) {
@@ -944,11 +957,12 @@ async function runSpark(form, surprise = false) {
 }
 
 // Le logo peint par l'IA devient l'image du coin (recadré comme une image envoyée à la main).
-async function paintLogo(sp) {
+async function paintLogo(sp, local = false) {
   const view = $('drop-view');
   view?.classList.add('painting');
   try {
-    const blob = await api.sparkImage({ visual: sp.visual, name: sp.name });
+    // L'IA d'abord ; si elle ne répond pas, un logo dessiné ici (à remplacer par le sien).
+    const blob = local ? await drawLogo(`${sp.visual}${sp.name}`) : await api.sparkImage({ visual: sp.visual, name: sp.name }).catch(() => drawLogo(`${sp.visual}${sp.name}`));
     draft.image = await prepareImage(new File([blob], 'logo.png', { type: blob.type || 'image/png' }));
     draft.preview = URL.createObjectURL(draft.image);
     if ($('drop-view')) $('drop-view').innerHTML = `<img src="${draft.preview}" alt="">`;
@@ -1028,9 +1042,9 @@ function progress(symbol) {
   STEPS = [
     ['upload', 'Sending your image to pump.fun'],
     ['sign', fee ? 'Approve 1/2 in your wallet: create your coin' : 'Approve in your wallet: create your coin'],
-    ...(fee ? [['sign2', `Approve 2/2: the Ignition Fee${burning() ? ' and your candle' : ''}`]] : []),
     ['send', 'Sending to Solana'],
-    ['confirm', 'Lighting your match'],
+    ['confirm', 'Creating your coin on pump.fun'],
+    ...(fee ? [['sign2', `Approve 2/2: the Ignition Fee and the fee split${burning() ? ', with your candle' : ''}`], ['fee', 'Lighting your match']] : []),
   ];
   openModal(`
     <h2>Launching <span class="grad">$${esc(symbol)}</span></h2>
@@ -1076,7 +1090,10 @@ async function submitLaunch(form) {
     busy = false;
     const m = result.match;
     draft = DRAFT();
-    if (m) {
+    if (m && result.feeMissing) {
+      world.mine.add(m.mint);
+      feeDue(m, mod, result.feeMissing);
+    } else if (m) {
       world.mine.add(m.mint);
       if (m.creator && !DEMO) remember(m.creator);
       await poll();
@@ -1098,6 +1115,39 @@ async function submitLaunch(form) {
     if (err.code === 'mint_taken') mod?.resetMint();
     launchForm(noFunds(err, 'This launch') || ERRORS[err.code] || 'Something went wrong. Try again.');
   }
+}
+
+// Le coin est créé, mais sa fee (et son partage) n'est pas signée : on la propose encore. Sans
+// elle, pas de burn de $WICK, pas de partage, pas de crew payé.
+function feeDue(m, mod, why = 'rejected') {
+  openModal(`
+    <div class="lit">${avatar(m, 72)}</div>
+    <h2><span class="grad">$${esc(m.symbol)}</span> is live on pump.fun</h2>
+    <p class="muted">One last approval lights it on WICK: its Ignition Fee and its fee split. Until then it doesn't burn
+      $${ticker()}, and its crew isn't paid.${why === 'no_funds' ? ' <b>Your wallet needs a little more SOL for it.</b>' : ''}</p>
+    <p class="error" id="fee-error" hidden></p>
+    <div class="wallets">
+      <button class="wbtn primary" id="fee-go">Approve the Ignition Fee</button>
+      <a class="wbtn" href="${pumpUrl(m.mint)}" target="_blank" rel="noopener">See it on pump.fun</a>
+      <a class="wbtn" href="#coin/${esc(m.mint)}">Later, from its page</a>
+    </div>`, 'm-done');
+  $('fee-go').addEventListener('click', async (e) => {
+    const b = e.currentTarget;
+    b.disabled = true;
+    b.textContent = 'Check your wallet…';
+    try {
+      const w = mod || await import('./wallet.js');
+      await w.payFee({ mint: m.mint });
+      await poll();
+      success(world.matches.find((x) => x.mint === m.mint) || m, null);
+    } catch (err) {
+      b.disabled = false;
+      b.textContent = 'Approve the Ignition Fee';
+      const box = $('fee-error');
+      box.hidden = false;
+      box.textContent = noFunds(err, 'The Ignition Fee') || ERRORS[err.code] || 'Could not send it. Try again.';
+    }
+  });
 }
 
 function success(m, signature) {

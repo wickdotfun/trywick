@@ -1497,3 +1497,9 @@ button.cdl:focus-visible { outline: 2px solid var(--gold); outline-offset: 6px; 
   .pf-wallets, .pf-rules, .pf-flows { grid-template-columns: 1fr; }
   .pf-lock { flex-wrap: wrap; }
 }
+
+/* Un lancement à finir : la fee pas encore signée */
+.fee-due { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 16px; border: 1px solid var(--gold);
+  background: linear-gradient(90deg, rgba(255, 190, 80, .14), rgba(20, 13, 9, .6)); }
+.fee-due p { margin: 0; font-size: 13px; }
+.fee-due .cta { align-self: flex-start; }

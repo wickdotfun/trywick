@@ -104,6 +104,9 @@
     .lib textarea { width: 100%; min-height: 150px; resize: vertical; padding: 9px 10px; border-radius: 10px; color: var(--text); border: 1px solid var(--line-2); background: rgba(255,220,180,.04); font: 12.5px/1.45 var(--sans); box-sizing: border-box; }
     .lib .btn.both { color: #1d1003; background: linear-gradient(#ffd978, #f1b440); border-color: transparent; font-weight: 700; }
     .lib .done { color: #3ddc84; font-size: 11.5px; }
+    .lib .miles { margin-top: 12px; } .lib .miles summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+    .lib .linkbtn { background: none; border: 0; padding: 0; color: var(--dim); font: 11.5px var(--sans); cursor: pointer; } .lib .linkbtn:hover { color: var(--text); }
+    .lib .lock-form { margin: 0; grid-template-columns: 1fr 1fr; } .lib .lock-form label:nth-child(3) { grid-column: 1 / -1; }
     .lib-how { margin: 4px 0 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255,220,180,.03); font-size: 12.5px; line-height: 1.55; color: var(--muted); }
     .relay { display: grid; grid-template-columns: 2fr 2fr auto; gap: 8px; margin-top: 10px; }
     .relay input { height: 38px; padding: 0 10px; border-radius: 10px; color: var(--text); border: 1px solid var(--line-2); background: rgba(255,220,180,.04); font: 13px var(--sans); min-width: 0; }
@@ -226,36 +229,21 @@
         <h3><span class="ph">1</span> Avant le lancement <small>faire monter l'attente, un post par jour</small></h3><div class="soc-grid" id="lib-before"></div>
         <h3><span class="ph">2</span> Le lancement <small>le CA, puis le lock</small></h3><div class="soc-grid" id="lib-launch"></div>
         <h3><span class="ph">3</span> Après le lancement <small>faire venir les créateurs de coins</small></h3><div class="soc-grid" id="lib-after"></div>
-        <h3><span class="ph">4</span> Tout seul, sans rien faire <small>le bot Telegram s'en occupe</small></h3>
+        <h3><span class="ph">4</span> Tout seul sur Telegram <small>le bot les poste sans toi ; sur X, c'est ces boutons</small></h3>
         <ul class="lib-auto">
-          <li><b>Chaque nouveau coin</b> lancé sur WICK : son image, son CA, son agent. (Sur X : bouton « Post on X » dans « Latest launches ».)</li>
-          <li><b>L'annonce de $WICK</b> avec le CA, épinglée, dans la minute du lancement.</li>
-          <li><b>Chaque buyback + burn</b> de $WICK, avec ses transactions, et <b>le rapport du jour</b>.</li>
-          <li><b>DEX payé</b> et <b>chaque palier de market cap</b> ($50K, $100K…), avec leur carte (plus bas, dans « Posts &amp; cards »).</li>
+          <li><b>Chaque nouveau coin</b> lancé sur WICK : son image, son CA, son agent (sur X : bouton « Post on X » dans « Latest launches »).</li>
+          <li><b>L'annonce de $WICK</b> avec le CA, épinglée, dans la minute du lancement (#7).</li>
+          <li><b>Chaque buyback + burn</b> de $WICK avec ses transactions, et <b>le rapport du jour</b>.</li>
+          <li><b>DEX payé</b> et <b>chaque palier de market cap</b> : leurs cartes sont juste ici.</li>
         </ul>
+        <div class="soc-grid" id="lib-auto"></div>
+        <details class="miles"><summary>Les paliers de market cap ($50K → $100M) : une carte chacun</summary><div class="soc-grid" id="lib-miles"></div></details>
         <h3>Tu as posté sur X directement ? Relaie-le sur Telegram</h3>
         <form class="relay" id="relay-form">
           <input name="url" type="url" placeholder="Lien du post X : https://x.com/…/status/…" required>
           <input name="note" type="text" placeholder="Un petit texte au-dessus (optionnel)">
           <button class="btn primary" type="submit">Send to Telegram</button>
         </form>
-      </div>
-
-      <div class="card" id="social">
-        <h2>Posts &amp; cards <small id="soc-sum">automatic posts with their card: launch, DEX paid, market cap milestones</small></h2>
-        <dl class="kv" id="soc-status"></dl>
-        <div class="soc-grid" id="soc-cards"></div>
-        <details style="margin-top:12px"><summary class="dim" style="cursor:pointer">Market cap milestone cards</summary><div class="soc-grid" id="soc-miles"></div></details>
-        <h2 style="margin-top:20px">Tokens locked <small>fill in, preview, post: the card is drawn here</small></h2>
-        <form class="lock-form" id="lock-form">
-          <label>Amount locked ($WICK)<input type="number" name="amount" min="1" step="1" placeholder="34029058" required></label>
-          <label>Unlocks on<input type="text" name="until" placeholder="Oct 30, 2027"></label>
-          <label>Locked with<input type="text" name="where" value="Streamflow"></label>
-          <label>Proof link (https)<input type="url" name="link" placeholder="https://app.streamflow.finance/contract/solana/…"></label>
-          <label style="flex-direction:row;align-items:center;gap:8px;margin-top:20px"><input type="checkbox" name="noncancel" checked> Non-cancelable</label>
-          <div class="row" style="align-items:flex-end"><button class="btn" type="submit" id="lock-preview">Preview the card</button></div>
-        </form>
-        <div class="lock-prev" id="lock-prev" hidden></div>
       </div>
 
       <div class="card">
@@ -378,8 +366,8 @@
         `<button class="btn small x" id="tweet"${mint ? '' : ' disabled'}>Post on X</button>`);
       add(c.lock ? 'done' : mint ? 'todo' : '', 'Lock the team tokens',
         c.lock ? `Locked${c.lock.amount ? `: ${num(c.lock.amount)} $${esc(c.ticker)}` : ''}. Shown on the Proof page, and posted.`
-          : 'On Streamflow (app.streamflow.finance → Token Lock), from the dev wallet. Then fill in "Tokens locked" below: one click posts it on Telegram (and X) and shows it on the Proof page.',
-        mint && !c.lock ? '<a class="btn small" href="#lock-form">Fill it in</a>' : '');
+          : 'On Streamflow (app.streamflow.finance → Token Lock), from the dev wallet. Then fill in card #8 "Tokens locked" in the posts below: one click posts it on X and Telegram and shows it on the Proof page.',
+        mint && !c.lock ? '<a class="btn small" href="#post-lock">Fill it in</a>' : '');
       add(c.xPosts ? 'done' : '', 'X posts',
         c.xPosts ? 'Every new coin and every big moment are posted on X by themselves.'
           : 'Not automatic: X charges per post (add X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET in Cloudflare to switch it on). Until then, every coin has a "Post on X" button in Latest launches, text already written.');
@@ -647,98 +635,146 @@
     });
 
 
-    // ------------------------------------------------------------ posts & cards
-    let soc = null, lockBlob = null, lockData = null;
-    const channels = (s) => [s.telegram ? 'Telegram' : null, s.x ? 'X' : null].filter(Boolean);
+    // ------------------------------------------------------------ les posts : un seul endroit
+    // Chaque carte : son image, son texte (modifiable, gardé en brouillon dans ce navigateur), et les
+    // mêmes boutons partout. « Post on X + Telegram » copie l'image, ouvre X avec le texte, et
+    // envoie le même post dans le canal Telegram.
+    let soc = null;
     const xIntent = (text) => `https://x.com/intent/post?text=${encodeURIComponent(text || '')}`;
-    const NAMES = { live: '$WICK is live', dexpaid: 'DEX paid', mcap: 'Market cap', lock: 'Tokens locked' };
-    function socCard({ file, title, hint, kind, mcap, text }) {
-      return `<div class="soc"><img src="/cards/${esc(file)}" alt="" loading="lazy"><div class="b">
-        <b>${esc(title)}</b><small>${esc(hint)}</small>
-        <div class="row">
-          <a class="btn" href="/cards/${esc(file)}" download>Download</a>
-          ${text ? `<button class="btn" data-copy="${esc(text)}">Copy X text</button><a class="btn x" href="${xIntent(text)}" target="_blank" rel="noopener">Open X</a>` : ''}
-          <button class="btn" data-post="${esc(kind)}"${mcap ? ` data-mcap="${mcap}"` : ''}>Post now</button>
-        </div></div></div>`;
-    }
-    function renderSocial() {
-      const s = soc;
-      const ch = channels(s);
-      const done = (k) => s.posts.find((p) => p.key === k);
-      const line = (label, p, auto) => `<dt>${label}</dt><dd>${p ? `${pill(p.status === 'posted' ? 'posted' : p.status, p.status === 'posted' ? 'ok' : 'bad')} ${ago(p.at)}${p.telegram ? ' · Telegram' : ''}${p.x ? ' · X' : ''}${p.xError ? ` <small class="bad">X: ${esc(p.xError)}</small>` : ''}${p.telegramError ? ` <small class="bad">Telegram: ${esc(p.telegramError)}</small>` : ''}` : `<span class="dim">${auto}</span>`}</dd>`;
-      const best = s.posts.find((p) => p.key === 'mcap');
-      $('soc-status').innerHTML = `
-        <dt>Channels</dt><dd>${ch.length ? `<span class="ok">${ch.join(' + ')}</span>` : '<span class="warn">none</span>'}${s.x ? '' : ' <small>· X: add X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET in Cloudflare to post there too (paid per post), or use Copy X text + Open X below</small>'}</dd>
-        <div class="sep"></div>
-        ${line('Launch announcement', done('live') || (data?.checks?.announced ? { status: 'posted', at: data.checks.announced.at, telegram: 1 } : null), 'posted by itself with the LIVE card, within a minute of the launch')}
-        ${line('DEX paid', done('dexpaid'), 'checked every 3 minutes on DEX Screener once $WICK is live')}
-        <dt>Market cap milestones</dt><dd>${best ? `highest posted: <b class="gold">${esc(s.milestones.find((m) => m.value === best.value)?.label || best.value)}</b> ${ago(best.at)}` : `<span class="dim">${esc(s.milestones.map((m) => m.label).join(' · '))}, each posted once</span>`}</dd>`;
-      $('soc-cards').innerHTML = [
-        socCard({ file: 'live.png', title: NAMES.live, hint: 'Posted with the launch announcement (pinned on Telegram).', kind: 'live', text: s.texts.live }),
-        socCard({ file: 'dex-paid.png', title: NAMES.dexpaid, hint: 'Posted by itself when DEX Screener approves the profile.', kind: 'dexpaid', text: s.texts.dexpaid }),
-      ].join('');
-      $('soc-miles').innerHTML = s.milestones.map((m) => socCard({ file: m.file, title: `${m.label} market cap`, hint: 'Posted by itself the first time $WICK crosses it.', kind: 'mcap', mcap: m.value, text: s.texts.mcap[m.value] })).join('');
-    }
-    // ------------------------------------------------------------ la bibliothèque de posts
     const lastPost = (prefix) => soc.posts.filter((p) => p.key.startsWith(prefix) && p.status === 'posted').sort((a, b) => b.at - a.at)[0];
+    const draftKey = (k) => `wick.draft.${k}`;
+    const getDraft = (k) => { try { return localStorage.getItem(draftKey(k)); } catch { return null; } };
+    const setDraft = (k, v) => { try { if (v == null) localStorage.removeItem(draftKey(k)); else localStorage.setItem(draftKey(k), v); } catch { /* pas de brouillon */ } };
+    const withCA = (t) => (soc?.mint ? String(t).replaceAll('[CA]', soc.mint) : String(t));
+    const blobs = {};   // les images dessinées ici (le lock), par carte
     let libN = 0;
-    function libCard({ id, file, label, slot, when, text, both = true, tgDone = null, disabled = '' }) {
-      const last = id ? lastPost(`library.${id}.`) : null;
-      return `<div class="soc" data-lib="${esc(id || '')}" data-file="${esc(file)}"><img src="/cards/${esc(file)}" alt="" loading="lazy"><div class="b">
-        <span class="slot">#${++libN} <i>·</i> ${esc(slot || '')}</span>
+
+    // Une carte. key : son nom (brouillon, état) ; body : ce que le serveur poste sur Telegram.
+    function postCard({ key, file, img, label, slot, when, text, body, done = '', extra = '', locked = '' }) {
+      const draft = getDraft(key);
+      const value = withCA(draft ?? text ?? '');
+      return `<div class="soc" id="post-${esc(key)}" data-key="${esc(key)}" data-file="${esc(file || '')}" data-body="${esc(JSON.stringify(body || {}))}" data-orig="${esc(withCA(text || ''))}">
+        <img src="${esc(img || `/cards/${file}`)}" alt="" loading="lazy"><div class="b">
+        ${slot ? `<span class="slot">#${++libN} <i>·</i> ${esc(slot)}</span>` : ''}
         <b>${esc(label)}</b><span class="when">${when}</span>
-        <textarea spellcheck="false"${disabled ? ' disabled' : ''}>${esc(text || '')}</textarea>
-        ${last ? `<span class="done">✓ Posté ${ago(last.at)}${last.telegram ? ' sur Telegram' : ''}</span>` : tgDone ? `<span class="done">${tgDone}</span>` : ''}
+        ${extra}
+        <textarea spellcheck="false">${esc(value)}</textarea>
+        <span class="row" style="justify-content:space-between"><span class="done">${done}</span>${draft != null ? '<button class="linkbtn" data-act="reset">↺ texte d\'origine</button>' : ''}</span>
         <div class="row">
-          ${disabled ? `<span class="dim small">${disabled}</span>` : both
-            ? '<button class="btn both" data-act="both">Post on X + Telegram</button><button class="btn" data-act="x">X only</button><button class="btn" data-act="tg">Telegram only</button>'
-            : '<button class="btn both" data-act="x">Post on X</button>'}
-          <a class="btn" href="/cards/${esc(file)}" download="wick-${esc(id || file)}">Image</a>
+          ${locked ? `<span class="dim small">${locked}</span>` : `<button class="btn both" data-act="both">Post on X + Telegram</button><button class="btn" data-act="x">X only</button><button class="btn" data-act="tg">Telegram only</button>`}
+          <a class="btn" data-act="img" href="${esc(img || `/cards/${file}`)}" download="wick-${esc(key)}.png">Image</a>
         </div></div></div>`;
     }
-    function renderLibrary() {
-      const s = soc, L = s.library || [];
+    const posted = (p, auto) => (p ? `✓ Posté ${ago(p.at)}${p.telegram ? ' sur Telegram' : ''}${auto ? ' (tout seul)' : ''}` : '');
+
+    function renderPosts() {
+      const s = soc, L = s.library || [], T = s.ticker;
       libN = 0;
-      $('lib-before').innerHTML = L.filter((p) => p.phase === 'before').map((p) => libCard(p)).join('');
-      const live = s.posts.find((p) => p.key === 'live');
+      const lib = (p) => postCard({ key: p.id, file: p.file, label: p.label, slot: p.slot, when: p.when, text: p.text, body: { kind: 'library', id: p.id }, done: posted(lastPost(`library.${p.id}.`)) });
+      $('lib-before').innerHTML = L.filter((p) => p.phase === 'before').map(lib).join('');
+
+      // 2. Le lancement : le CA, puis le lock.
+      const auto = s.posts.find((p) => p.key === 'live') || (data?.checks?.announced ? { at: data.checks.announced.at, telegram: 1 } : null);
+      const lock = lastPost('lock.manual');
       $('lib-launch').innerHTML = [
-        libCard({ file: 'live.png', slot: 'T0, le lancement', label: `$${s.ticker} is live (le CA)`, both: false, text: s.texts.live,
-          when: "Le post le plus important. Sur Telegram, il part <b>tout seul</b> dans la minute du lancement, épinglé. Ici : ton post X, avec le CA, puis épingle-le sur ton profil.",
-          tgDone: live || data?.checks?.announced ? '✓ Déjà posté et épinglé sur Telegram (automatique)' : null,
-          disabled: s.mint ? '' : 'Disponible dès que $WICK est lancé (le CA se remplit tout seul).' }),
-        `<div class="soc"><img src="/cards/lock-example.png" alt="" loading="lazy"><div class="b">
-          <span class="slot">#${++libN} <i>·</i> T0 + 15 min</span>
-          <b>Tokens locked</b><span class="when">(Image d'exemple : la vraie reprend tes chiffres.) Après avoir verrouillé tes $WICK sur Streamflow : remplis le formulaire « Tokens locked » plus bas. Sa carte est dessinée avec tes chiffres, et un clic la poste sur Telegram (et l'affiche sur la page Proof).</span>
-          <div class="row"><a class="btn both" href="#lock-form">Aller au formulaire</a></div></div></div>`,
+        postCard({ key: 'live', file: 'live.png', slot: 'H0 · le lancement', label: `$${T} is live (le CA)`, text: s.texts.live, body: { kind: 'live' },
+          when: `Le post le plus important. <b>Sur Telegram, il part tout seul</b> dans la minute du lancement, épinglé : ici, c'est ton post X (épingle-le sur ton profil). [CA] devient l'adresse de $${esc(T)} dès qu'il est lancé.`,
+          done: auto ? '✓ Posté et épinglé tout seul sur Telegram' : '', locked: s.mint ? '' : 'Les boutons s\'allument au lancement (il faut le CA). Tu peux déjà écrire ton texte.' }),
+        postCard({ key: 'lock', file: '', img: blobs.lock?.url || '/cards/lock-example.png', slot: 'H+15 min', label: 'Tokens locked',
+          when: `Après avoir verrouillé tes $${esc(T)} sur <b>Streamflow</b> : remplis les 3 cases, clique sur <b>Dessiner la carte</b>, puis poste. Ça part sur X et Telegram, et le lock s'affiche sur la page Proof.${blobs.lock ? '' : ' <i>(Image d\'exemple : la vraie reprend tes chiffres.)</i>'}`,
+          text: blobs.lock?.text || `tokens are locked.\n\n[montant] $${T} locked until [date], on Streamflow.\n\nproof: [lien du contrat]`,
+          body: blobs.lock ? { kind: 'lock', lock: blobs.lock.data } : {}, done: posted(lock),
+          locked: blobs.lock ? '' : 'Remplis les cases et dessine la carte : les boutons s\'allument ensuite.',
+          extra: `<form class="lock-form" id="lock-form">
+            <label>Montant locké ($${esc(T)})<input type="number" name="amount" min="1" step="1" placeholder="25000000" required value="${esc(blobs.lock?.data.amount ?? '')}"></label>
+            <label>Débloqué le<input type="text" name="until" placeholder="Apr 6, 2027" value="${esc(blobs.lock?.data.until ?? '')}"></label>
+            <label>Lien du contrat Streamflow<input type="url" name="link" placeholder="https://app.streamflow.finance/contract/solana/…" value="${esc(blobs.lock?.data.link ?? '')}"></label>
+            <div class="row"><button class="btn" type="submit">Dessiner la carte</button></div></form>` }),
       ].join('');
-      $('lib-after').innerHTML = L.filter((p) => p.phase === 'after').map((p) => libCard(p)).join('');
+      $('lib-after').innerHTML = L.filter((p) => p.phase === 'after').map(lib).join('');
+
+      // 4. Tout seul (sur Telegram) : DEX payé, les paliers. Sur X : ces boutons.
+      const dex = s.posts.find((p) => p.key === 'dexpaid');
+      const best = s.posts.find((p) => p.key === 'mcap');
+      $('lib-auto').innerHTML = postCard({ key: 'dexpaid', file: 'dex-paid.png', label: 'DEX payé', text: s.texts.dexpaid, body: { kind: 'dexpaid' },
+          when: 'Part <b>tout seul sur Telegram</b> quand DEX Screener valide ton profil (logo, bannière, liens). Ici : ton post X.',
+          done: posted(dex, true) || posted(lastPost('dexpaid.manual')) });
+      $('lib-miles').innerHTML = s.milestones.map((m) => postCard({ key: `mcap-${m.value}`, file: m.file, label: `${m.label} de market cap`, text: s.texts.mcap[m.value], body: { kind: 'mcap', mcap: m.value },
+          when: `Part <b>tout seul sur Telegram</b> la première fois que $${esc(T)} dépasse ${esc(m.label)}. Ici : ton post X.`,
+          done: best && best.value >= m.value ? '✓ Palier atteint, posté sur Telegram' : posted(lastPost(`mcap.${m.value}.manual`)) })).join('');
     }
-    async function copyImage(file) {
+
+    async function copyImage(src) {
       // L'image dans le presse-papier, pour la coller dans X (Ctrl+V). Pas grave si le navigateur refuse.
       try {
-        await navigator.clipboard.write([new ClipboardItem({ 'image/png': fetch(`/cards/${file}`).then((r) => r.blob()) })]);
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': fetch(src).then((r) => r.blob()) })]);
         return true;
       } catch { return false; }
     }
+    const b64 = async (blob) => {
+      const buf = new Uint8Array(await blob.arrayBuffer());
+      let bin = '';
+      for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+      return btoa(bin);
+    };
+
+    // Les brouillons : chaque texte modifié est gardé dans ce navigateur.
+    document.addEventListener('input', (e) => {
+      const card = e.target.closest('#library .soc');
+      if (card && e.target.matches('textarea')) setDraft(card.dataset.key, e.target.value);
+    });
     document.addEventListener('click', async (e) => {
       const b = e.target.closest('#library [data-act]');
-      if (!b) return;
-      const card = b.closest('.soc'), id = card.dataset.lib, file = card.dataset.file, text = card.querySelector('textarea').value.trim();
-      const act = b.dataset.act;
+      if (!b || b.dataset.act === 'img') return;
+      const card = b.closest('.soc'), key = card.dataset.key, act = b.dataset.act;
+      if (act === 'reset') { setDraft(key, null); card.querySelector('textarea').value = card.dataset.orig; b.remove(); return; }
+      const text = card.querySelector('textarea').value.trim();
+      if (text.includes('[CA]')) { flash('Le CA n\'existe pas encore : ce post sera prêt dès que $WICK sera lancé.', 'bad'); return; }
+      if (/\[(montant|date|lien)/.test(text)) { flash('Remplace d\'abord les [crochets] du texte par tes vrais chiffres.', 'bad'); return; }
+      const src = card.querySelector('img').src;
       let copied = false;
       if (act !== 'tg') {
-        const copying = copyImage(file);
+        const copying = copyImage(src);
         window.open(xIntent(text), '_blank', 'noopener');
         copied = await copying;
       }
-      if (act === 'x') { flash(copied ? 'X est ouvert avec le texte. Fais Ctrl+V pour coller l\'image, puis Post.' : 'X est ouvert avec le texte. Ajoute l\'image (bouton Image), puis Post.', 'ok'); return; }
+      const onX = copied ? 'Sur X : Ctrl+V pour coller l\'image, puis Post.' : 'Sur X : ajoute l\'image (bouton Image), puis Post.';
+      if (act === 'x') { flash(`X est ouvert avec le texte. ${onX}`, 'ok'); return; }
       if (!soc.telegram) { flash('Telegram n\'est pas connecté (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID).', 'bad'); return; }
+      if ((key === 'live' || key === 'dexpaid' || key.startsWith('mcap-')) && card.querySelector('.done').textContent.includes('tout seul')
+        && !confirm('Ce post est déjà parti tout seul sur Telegram. Le reposter quand même ?')) { if (act === 'both') flash(onX, 'ok'); return; }
       flash('Envoi sur Telegram…', 'warn');
       try {
-        const r = await call('/api/admin/post', { kind: 'library', id, text, channels: ['telegram'] });
-        flash(r.telegram ? `Posté sur Telegram.${act === 'both' ? (copied ? ' Sur X : Ctrl+V pour coller l\'image, puis Post.' : ' Sur X : ajoute l\'image (bouton Image), puis Post.') : ''}` : `Telegram a refusé : ${r.telegramError || 'erreur'}`, r.telegram ? 'ok' : 'bad');
-      } catch (err) { flash(err.message, 'bad'); }
+        const body = { ...JSON.parse(card.dataset.body || '{}'), text, channels: ['telegram'] };
+        if (key === 'lock') body.image = await b64(blobs.lock.blob);
+        const r = await call('/api/admin/post', body);
+        flash(r.telegram ? `Posté sur Telegram.${act === 'both' ? ` ${onX}` : ''}` : `Telegram a refusé : ${r.telegramError || 'erreur'}`, r.telegram ? 'ok' : 'bad');
+        if (r.telegram) setDraft(key, null);
+      } catch (err) { flash(err.message === 'not_live' ? 'Le CA n\'existe pas encore : attends le lancement.' : err.message, 'bad'); }
       loadSocial();
+    });
+    // Le lock : la carte dessinée ici, avec les vrais chiffres.
+    document.addEventListener('submit', async (e) => {
+      if (e.target.id !== 'lock-form') return;
+      e.preventDefault();
+      const f = Object.fromEntries(new FormData(e.target));
+      const amount = Number(f.amount);
+      if (!(amount > 0)) return;
+      if (f.link && !/^https:\/\/\S+$/.test(f.link.trim())) { flash('Le lien du contrat doit commencer par https://', 'bad'); return; }
+      const T = soc?.ticker || 'WICK', pct = (amount / (soc?.supply || 1e9)) * 100;
+      const data = { amount, until: f.until.trim(), where: 'Streamflow', link: f.link.trim() || null, cancelable: false };
+      flash('Dessin de la carte…', 'warn');
+      try {
+        const { renderCard } = await import('/build/cardmaker.js');
+        const blob = await renderCard('lock', { ticker: T, ...data, pct });
+        if (blobs.lock?.url) URL.revokeObjectURL(blobs.lock.url);
+        const text = `$${T} team tokens are locked.\n\n${Math.round(amount).toLocaleString('en-US')} $${T} (${+pct.toFixed(2)}% of the supply) locked${data.until ? ` until ${data.until}` : ''}, on Streamflow. non-cancelable.${data.link ? `\n\nverify it: ${data.link}` : ''}`;
+        blobs.lock = { blob, url: URL.createObjectURL(blob), data, text };
+        setDraft('lock', null);
+        renderPosts();
+        flash('Carte dessinée. Vérifie-la, puis poste.', 'ok');
+        $('post-lock')?.scrollIntoView({ block: 'center' });
+      } catch (err) { flash(`Impossible de dessiner la carte : ${err.message}`, 'bad'); }
     });
     $('relay-form').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -749,59 +785,14 @@
         if (r.telegram) { flash('Relayé sur Telegram.', 'ok'); e.target.reset(); } else flash(`Telegram a refusé : ${r.telegramError || 'erreur'}`, 'bad');
       } catch (err) { flash(err.message === 'bad_url' ? 'Ce lien n\'est pas un post X (https://x.com/compte/status/123…).' : err.message, 'bad'); }
     });
-
     async function loadSocial() {
-      try { soc = await call('/api/admin/social'); renderSocial(); renderLibrary(); } catch (err) { $('soc-status').innerHTML = `<dt>Posts</dt><dd class="bad">${esc(err.message)}</dd>`; }
+      try { soc = await call('/api/admin/social'); renderPosts(); } catch (err) { flash(`Posts : ${err.message}`, 'bad'); }
     }
-    async function postCard(body, label) {
-      const ch = channels(soc);
-      if (!ch.length) { flash('No channel set: connect Telegram (or X) in Cloudflare first. You can still download the card and post it yourself.', 'warn'); return; }
-      if (!confirm(`Post "${label}" now on ${ch.join(' and ')}?`)) return;
-      flash('Posting…', 'warn');
-      try {
-        const r = await call('/api/admin/post', body);
-        const ok = [r.telegram ? 'Telegram' : null, r.x ? 'X' : null].filter(Boolean);
-        flash(ok.length ? `Posted on ${ok.join(' and ')}.${r.xError ? ` X failed: ${r.xError}` : ''}${r.telegramError ? ` Telegram failed: ${r.telegramError}` : ''}` : `Not posted. ${r.telegramError || ''} ${r.xError || ''}`, ok.length ? 'ok' : 'bad');
-      } catch (err) { flash(err.message, 'bad'); }
-      loadSocial();
-    }
-    // Copier (le CA, un texte pour X) : un seul écouteur pour toute la page.
+    // Copier (le CA) : un seul écouteur pour toute la page.
     document.addEventListener('click', async (e) => {
       const b = e.target.closest('[data-copy]');
       if (!b) return;
       try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = 'Copied'; } catch { b.textContent = 'Select it'; }
-    });
-    document.addEventListener('click', (e) => {
-      const p = e.target.closest('[data-post]');
-      if (p) postCard({ kind: p.dataset.post, mcap: p.dataset.mcap ? Number(p.dataset.mcap) : undefined }, p.closest('.soc').querySelector('b').textContent);
-    });
-    $('lock-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const f = Object.fromEntries(new FormData(e.target));
-      const amount = Number(f.amount);
-      if (!(amount > 0)) return;
-      lockData = { amount, until: f.until.trim(), where: f.where.trim() || 'Streamflow', link: f.link.trim() || null, cancelable: !f.noncancel };
-      const box = $('lock-prev');
-      box.hidden = false;
-      box.innerHTML = '<p class="dim">Drawing the card…</p>';
-      try {
-        const { renderCard } = await import('/build/cardmaker.js');
-        lockBlob = await renderCard('lock', { ticker: soc?.ticker || 'WICK', ...lockData, pct: (amount / (soc?.supply || 1e9)) * 100 });
-        const url = URL.createObjectURL(lockBlob);
-        const pct = (amount / (soc?.supply || 1e9)) * 100;
-        const text = `tokens are locked.\n\n${Math.round(amount).toLocaleString('en-US')} $${soc?.ticker || 'WICK'} (${+pct.toFixed(2)}% of the supply) locked${lockData.until ? ` until ${lockData.until}` : ''}.${lockData.link ? `\n\n${lockData.link}` : ''}`;
-        box.innerHTML = `<img src="${url}" alt="The lock card">
-          <div><p class="small">Looks right? Post it now, or download it and post it yourself.</p>
-            <div class="row"><button class="btn primary" id="lock-post">${channels(soc).length ? `Post on ${esc(channels(soc).join(' + '))}` : 'Post (no channel set)'}</button>
-              <a class="btn" href="${url}" download="wick-locked.png">Download</a>
-              <button class="btn" data-copy="${esc(text)}">Copy X text</button><a class="btn x" href="${xIntent(text)}" target="_blank" rel="noopener">Open X</a></div></div>`;
-        $('lock-post').addEventListener('click', async () => {
-          const buf = new Uint8Array(await lockBlob.arrayBuffer());
-          let bin = '';
-          for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
-          postCard({ kind: 'lock', lock: lockData, image: btoa(bin) }, NAMES.lock);
-        });
-      } catch (err) { box.innerHTML = `<p class="bad">Could not draw the card: ${esc(err.message)}</p>`; }
     });
 
     if (key) load(); else showLogin();

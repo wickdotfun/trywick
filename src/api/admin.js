@@ -243,7 +243,8 @@ export const adminSocial = guarded(async ({ env }) => {
     // La bibliothèque de posts : la carte, le texte prêt (avec le CA une fois $WICK lancé).
     library: LIBRARY.map((p) => ({ id: p.id, slot: p.slot, phase: p.phase, label: p.label, when: p.when, file: libraryFile(p.id), text: libraryText(p, { ticker, site, mint }) })),
     texts: {
-      live: mint ? announceText(mint, { ticker, site }).replace(/<\/?code>/g, '') : null,
+      // Avant le lancement, [CA] tient la place de l'adresse (l'admin la remplace dès qu'elle existe).
+      live: announceText(mint || '[CA]', { ticker, site }).replace(/<\/?code>/g, ''),
       dexpaid: postText('dexpaid', { mint }, env).x,
       mcap: Object.fromEntries(status.milestones.map((m) => [m.value, postText('mcap', { mint, mcap: m.value }, env).x])),
     },
@@ -278,9 +279,8 @@ export const adminPost = guarded(async ({ request, env }) => {
     // Un post de la bibliothèque, avec son texte (modifiable dans l'admin) : le même sur X et Telegram.
     const p = libraryPost(body.id);
     if (!p) return json({ error: 'bad_post' }, 400);
-    const text = typeof body.text === 'string' && body.text.trim() ? body.text.trim().slice(0, 1000) : libraryText(p, { ticker, site, mint });
-    const caption = mint ? esc(text).replace(mint, `<code>${mint}</code>`) : esc(text);
-    post = { image: await cardBytes(env, libraryFile(p.id)), caption, x: text, mint };
+    const text = libraryText(p, { ticker, site, mint });
+    post = { image: await cardBytes(env, libraryFile(p.id)), caption: esc(text), x: text, mint };
   } else if (kind === 'relay') {
     // Un post X publié à la main : relayé dans le canal Telegram (son lien, avec l'aperçu de X).
     const url = String(body.url || '').trim().replace('twitter.com/', 'x.com/').split('?')[0];
@@ -315,6 +315,14 @@ export const adminPost = guarded(async ({ request, env }) => {
   } else {
     return json({ error: 'bad_kind' }, 400);
   }
+  // Le texte écrit dans l'admin, s'il y en a un : le même sur X et sur Telegram (le CA en <code>).
+  if (typeof body.text === 'string' && body.text.trim()) {
+    const text = body.text.trim().slice(0, 1000);
+    if (text.includes('[CA]')) return json({ error: 'not_live' }, 409);
+    post.x = text;
+    post.caption = esc(text);
+  }
+  if (mint && !post.caption.includes('<code>')) post.caption = post.caption.replace(mint, `<code>${mint}</code>`);
   const tag = `${kind}${kind === 'mcap' ? `.${body.mcap}` : kind === 'library' ? `.${body.id}` : ''}`;
   const out = await publish(e, `${tag}.manual.${Date.now()}`, post, { once: false });
   await setSetting(env.DB, `social.${tag}.manual.${Date.now()}`, { status: out.telegram || out.x ? 'posted' : 'failed', at: Date.now(), ...out });

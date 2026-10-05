@@ -1,6 +1,7 @@
 // « Make it burn » côté site : la forêt des bougies (les coins qui se brûlent eux-mêmes) et la
 // page de chaque coin, avec sa bougie, sa part brûlée et chacun de ses burns.
-import { ago, compact, esc, fmt, icon, pumpUrl, sol, solscan } from './util.js';
+import { bindChats, chatHtml } from './keeper.js';
+import { ago, aiLogo, compact, esc, fmt, icon, pumpUrl, sol, solscan } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 const usd = (n) => (n == null ? '—' : `$${compact(n)}`);
@@ -75,6 +76,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
         <div><strong>${fmt(t.candleBurns || 0)}</strong><span>buybacks and burns</span></div>
         <div><strong>${sol(t.candleSol || 0)}</strong><span>fed to their own candles</span></div>
       </div>
+      ${keepersShowcase()}
       <div class="cd-cols">
         <section class="cd-card">
           <h3>Brightest candles <small>most burned</small></h3>
@@ -104,6 +106,46 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
     const row = body.querySelector('.cd-row'), center = body.querySelector('[data-wick]');
     if (row && center && row.scrollWidth > row.clientWidth) row.scrollLeft = center.offsetLeft - (row.clientWidth - center.offsetWidth) / 2;
     body.querySelector('[data-wick]')?.addEventListener('click', () => go('wick'));
+  }
+
+  // Les Keepers : les six esprits (avec leur logo) et les quatre personnalités.
+  function keepersShowcase() {
+    const k = world.launch?.keepers;
+    if (!k) return '';
+    return `<section class="cd-keepers">
+      <div class="ck-head">
+        <span class="kc-avatar">${icon('keeper')}</span>
+        <div><h3>Every candle has an AI <span class="grad">Keeper</span></h3>
+          <p class="muted">The creator picks its personality and its mind. The Keeper picks the moments to buy the coin back
+          and burn it, and tells the holders why. It never touches the amounts.</p></div>
+      </div>
+      <div class="ck-minds">${k.models.map((m) => `<div class="ck-mind">${aiLogo(m, 22)}<span><b>${esc(m.name)}</b><small>${esc(m.by)}</small></span></div>`).join('')}</div>
+      <div class="ck-styles">${k.styles.map((x) => `<span class="ck-style"><b>${esc(x.label)}</b> ${esc(x.hint)}</span>`).join('')}</div>
+    </section>`;
+  }
+
+  // La carte du Keeper d'un coin : qui il est, ce qu'il a dit, et la conversation avec lui.
+  function keeperCard(m) {
+    const k = m.keeper || m.candle?.keeper;
+    if (!k) return '';
+    const c = m.candle;
+    const idle = c ? `It wakes up once ${esc(m.symbol)}'s fees fill its candle (0.01 SOL), then picks the moment to burn. Never more than 24 hours.`
+      : 'It writes to its holders once a day.';
+    return `<section class="keeper-card">
+      <div class="kc-head">
+        <span class="kc-avatar">${icon('keeper')}${k.logo ? `<i class="kc-mind">${aiLogo(k, 14)}</i>` : ''}</span>
+        <div><b>Keeper of $${esc(m.symbol)}</b><small>${esc(k.label)} · runs on <span class="kc-model">${aiLogo(k, 14)} ${esc(k.model)}</span> (${esc(k.by)})</small></div>
+        <span class="kc-status"><i></i>${c ? 'tending' : 'awake'}</span>
+      </div>
+      ${k.intro ? `<blockquote>“${esc(k.intro)}”</blockquote>` : ''}
+      <p class="kc-thought">${k.thought && k.thought !== k.intro
+        ? `${icon('book')} Latest thought, ${ago(k.thoughtAt)}: <b>“${esc(k.thought)}”</b>` : idle}</p>
+      ${chatHtml({
+        mint: m.mint, symbol: m.symbol,
+        keeper: { name: `Keeper of $${m.symbol}`, label: k.label, model: k.model, by: k.by, logo: k.logo },
+        suggestions: [`What's the story of $${m.symbol}?`, c ? 'When do you burn next?' : 'How is it doing today?', 'Who are you?'],
+      })}
+    </section>`;
   }
 
   // ---------------------------------------------------------- la page d'un coin
@@ -161,17 +203,8 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
             <a class="wbtn" href="https://x.com/intent/post?text=${encodeURIComponent(tweet)}" target="_blank" rel="noopener">Share its candle</a>
             <a class="wbtn" href="https://solscan.io/token/${esc(m.mint)}" target="_blank" rel="noopener">Solscan ↗</a>
           </div>
-          ${c?.keeper ? `<section class="keeper-card">
-            <div class="kc-head">
-              <span class="kc-avatar">${icon('keeper')}</span>
-              <div><b>Keeper of $${esc(m.symbol)}</b><small>${esc(c.keeper.label)} · runs on ${esc(c.keeper.model)} (${esc(c.keeper.by)})</small></div>
-              <span class="kc-status"><i></i>tending</span>
-            </div>
-            ${c.keeper.intro ? `<blockquote>“${esc(c.keeper.intro)}”</blockquote>` : ''}
-            <p class="kc-thought">${c.keeper.thought
-              ? `Latest thought, ${ago(c.keeper.thoughtAt)}: <b>“${esc(c.keeper.thought)}”</b>`
-              : `It wakes up once ${esc(m.symbol)}'s fees fill its candle (0.01 SOL), then picks the moment to burn. Never more than 24 hours.`}</p>
-          </section>` : ''}
+          ${m.description ? `<p class="cn-about">${esc(m.description)}</p>` : ''}
+          ${keeperCard(m)}
           ${m.share ? `<div class="cn-split">
             <small class="eyebrow">Where its creator fees go</small>
             <div class="split-bar">
@@ -201,6 +234,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
         <button class="cta" id="cn-light">Light your own candle</button></div>`;
     $('cn-forest').addEventListener('click', () => go('candles'));
     $('cn-light').addEventListener('click', onStrike);
+    bindChats(body, api.ask);
   }
 
   return { forest, coin, candleHtml };

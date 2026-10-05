@@ -110,11 +110,11 @@ export async function prepare({ request, env }) {
       WHERE mint = ? AND seq IS NULL`)
     .bind(fee?.lamports ?? 0, fee?.to ?? null, fee?.teamWallet ?? null, fee?.team?.lamports ?? 0, shareBps, shareTeamBps,
       holders.length ? fee.selfBps || 0 : 0, launch.mint).run();
-  // Le Keeper de la bougie (seulement avec « Make it burn ») : sa personnalité et son esprit.
-  const burns = holders.length && fee.selfBps > 0;
-  const style = burns ? keeperStyle(fields.keeper_style) : null;
-  await env.DB.prepare('UPDATE matches SET keeper_style = ?, keeper_model = ? WHERE mint = ? AND seq IS NULL')
-    .bind(style, style ? keeperModel(fields.keeper_model)?.id || 'llama' : null, launch.mint).run();
+  // Chaque coin a son Keeper : sa personnalité et son esprit (Stoic sur Llama si rien n'est choisi).
+  // Avec « Make it burn », c'est lui qui choisit les moments de brûler.
+  const style = keeperStyle(fields.keeper_style) || 'stoic';
+  await env.DB.prepare('UPDATE matches SET keeper_style = ?, keeper_model = ?, description = ? WHERE mint = ? AND seq IS NULL')
+    .bind(style, keeperModel(fields.keeper_model)?.id || 'llama', launch.description || null, launch.mint).run();
   return json({
     tx: base64FromBytes(tx),
     feeTx,

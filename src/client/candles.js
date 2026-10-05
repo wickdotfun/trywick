@@ -254,7 +254,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
       }
     });
   }
-  function constitutionHtml(c, m) {
+  function constitutionHtml(c, m, b = null) {
     if (!c) return '<p class="muted small">This coin was launched before agents had a Constitution.</p>';
     const row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
     const no = '<span class="op-no">NO</span>';
@@ -265,6 +265,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
         ${c.character ? row('In its creator\'s words', `<i class="op-quote">“${esc(c.character)}”</i>`) : ''}
         ${c.objective ? row('Objective', `<b>${esc(c.objective.label)}</b> <small>· ${esc(c.objective.hint)}</small>`) : ''}
         ${row('Mind', `<span class="kc-model">${aiLogo(c.mind, 14)} ${esc(c.mind.name)}</span> <small>by ${esc(c.mind.by)}</small>`)}
+        ${b ? row('Its AI budget', `<b>$${b.leftUsd.toFixed(2)}</b> left <small>· ${b.fuelSol ? `${b.fuelSol} SOL fuel + ` : ''}${b.crewSol.toFixed(4)} SOL from its fees · $${b.spentUsd.toFixed(2)} spent on ${b.runs} answers. Empty: it runs on a free mind.</small>`) : ''}
         ${row('Burn allocation', c.burn ? `<b class="gold">${c.burn.pct}%</b> of creator fees <small>· +${c.burn.wickPct}% burns ${tk()}${c.burn.crewPct ? ` · ${c.burn.crewPct}% its crew` : ''} · ${c.burn.teamPct}% team</small>` : 'Off <small>· its creator keeps all creator fees</small>')}
         ${row('Can sell', no)}
         ${row('Can move funds', no)}
@@ -296,7 +297,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
       <div class="op-pane" data-oppane="act">${activity(log)}</div>
       <div class="op-pane" data-oppane="missions" hidden>${missionsHtml(op.missions)}</div>
       <div class="op-pane" data-oppane="kit" hidden>${kitHtml(op.kit, m, op)}</div>
-      <div class="op-pane" data-oppane="const" hidden>${constitutionHtml(op.constitution, m)}</div>
+      <div class="op-pane" data-oppane="const" hidden>${constitutionHtml(op.constitution, m, op.budget)}</div>
       <div class="op-pane" data-oppane="talk" hidden>${chatHtml({
         mint: m.mint, symbol: m.symbol,
         keeper: { name: `Agent of $${m.symbol}`, label: k.label, model: k.model, by: k.by, logo: k.logo },

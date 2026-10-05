@@ -86,12 +86,12 @@ export function createProof({ api, openModal, isOpen, ticker, demo }) {
       <section class="cw-sec">
         <div class="cw-sec-head"><h3>${icon('keeper')} The crews' book</h3><small class="muted">what the 20% paid for</small></div>
         <div class="cw-stats">
-          <div><strong>${sol(c.earnedSol)}</strong><span>earned by ${fmt(c.coins)} crews</span></div>
-          <div><strong>${fmt(c.premiumCalls)}</strong><span>premium mind calls</span></div>
+          <div><strong>${sol(c.earnedSol + (c.fuelSol || 0))}</strong><span>for the agents: fees of ${fmt(c.coins)} coins${c.fuelSol ? ` + ${sol(c.fuelSol)} fuel` : ''}</span></div>
+          <div><strong>${fmt(c.premiumCalls + (c.mindRuns || 0))}</strong><span>paid AI answers</span></div>
           <div><strong>${fmt(c.xPosts)}</strong><span>posts on X</span></div>
           <div><strong>≈ $${c.spentUsd.toLocaleString('en-US')}</strong><span>spent, at list prices</span></div>
         </div>
-        <p class="muted small">Counted for real; the dollar amount is estimated at $${c.rates.premiumUsdPerCall} per premium call and $${c.rates.xUsdPerPost} per X post (no links).</p>
+        <p class="muted small">Counted for real. OpenRouter answers are at their exact price; direct premium calls are estimated at $${c.rates.premiumUsdPerCall} each, and X posts at $${c.rates.xUsdPerPost} each (no links).</p>
       </section>
 
       <section class="cw-sec">

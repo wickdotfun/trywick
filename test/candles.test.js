@@ -150,3 +150,48 @@ test('a launch with Make it burn at 20% locks 40% creator / 30% burn wallet (20%
   assert.equal(prep2.selfBps, 0);
   assert.equal(prep2.shareBps, 4000);
 });
+
+test('a launch with any model and 0.05 SOL of fuel: the fuel goes to the team wallet in the fee transaction', async () => {
+  const { feeTx, prepare } = await import('../src/api/launch.js');
+  const { CONFIG } = await import('../lib/config.js');
+  const { setSetting } = await import('../lib/settings.js');
+  const { Transaction, TransactionMessage, VersionedTransaction, TransactionInstruction, PublicKey, SystemProgram } = await import('@solana/web3.js');
+  const { env } = await world();
+  Object.assign(env, { PINATA_JWT: 'jwt', IP_SALT: 'x', OPENROUTER_API_KEY: 'sk-or' });
+  await setSetting(env.DB, 'or.models', { at: Date.now(), models: [{ id: 'anthropic/claude-sonnet-5.5', name: 'Claude Sonnet 5.5', lab: 'Anthropic', pin: 2e-6, pout: 1e-5, ctx: 1e6, created: 1 }] });
+  const creator = Keypair.generate(), mintKp = Keypair.generate();
+  const blockhash = Keypair.generate().publicKey.toBase58();
+  globalThis.fetch = async (url, init) => {
+    url = String(url);
+    if (url === CONFIG.pinataUploadUrl) return Response.json({ data: { cid: 'bafy' } });
+    if (url === CONFIG.pumpPortalUrl) {
+      const ix = new TransactionInstruction({ programId: new PublicKey(CONFIG.pumpProgram), keys: [{ pubkey: mintKp.publicKey, isSigner: true, isWritable: true }], data: Buffer.from([1]) });
+      return new Response(new VersionedTransaction(new TransactionMessage({ payerKey: creator.publicKey, recentBlockhash: blockhash, instructions: [ix] }).compileToV0Message()).serialize());
+    }
+    const { method } = JSON.parse(init.body);
+    if (method === 'getLatestBlockhash') return Response.json({ jsonrpc: '2.0', id: 1, result: { value: { blockhash } } });
+    if (method === 'simulateTransaction') return Response.json({ jsonrpc: '2.0', id: 1, result: { value: { err: null, logs: [] } } });
+    throw new Error(`unexpected ${method}`);
+  };
+  const launch = async (extra) => {
+    const form = new FormData();
+    const mint = extra.mint || mintKp.publicKey.toBase58();
+    for (const [k, v] of Object.entries({ name: 'Moth', symbol: 'MOTH', creator: creator.publicKey.toBase58(), mint, share: '1', devBuy: '0', ...extra })) form.append(k, v);
+    form.append('image', new File([new Uint8Array(100)], 'm.png', { type: 'image/png' }));
+    return prepare({ request: new Request('http://x/api/launch/prepare', { method: 'POST', body: form }), env });
+  };
+  assert.equal((await launch({ mind_or: 'nobody/nothing', fuel: '0', mint: Keypair.generate().publicKey.toBase58() })).status, 400, 'a model that is not in the catalog');
+  assert.equal((await launch({ mind_or: 'anthropic/claude-sonnet-5.5', fuel: '7', mint: Keypair.generate().publicKey.toBase58() })).status, 400, 'a fuel that is not offered');
+  const prep = await (await launch({ mind_or: 'anthropic/claude-sonnet-5.5', fuel: '0.05' })).json();
+  assert.equal(prep.fuelSol, 0.05);
+  const row = await env.DB.prepare('SELECT mind_or, fuel_lamports, team_lamports, team_to FROM matches WHERE mint = ?').bind(mintKp.publicKey.toBase58()).first();
+  assert.equal(row.mind_or, 'anthropic/claude-sonnet-5.5');
+  assert.equal(row.fuel_lamports, 50_000_000);
+  await env.DB.prepare("UPDATE matches SET seq = 998, lit_at = 1, fee_state = 'awaiting' WHERE mint = ?").bind(mintKp.publicKey.toBase58()).run();
+  const fee = await (await feeTx({ request: new Request('http://x', { method: 'POST', body: JSON.stringify({ mint: mintKp.publicKey.toBase58() }) }), env })).json();
+  assert.equal(fee.fuelSol, 0.05);
+  const transfers = Transaction.from(Buffer.from(fee.feeTx, 'base64')).instructions
+    .filter((ix) => ix.programId.equals(SystemProgram.programId))
+    .map((ix) => ({ to: ix.keys[1].pubkey.toBase58(), lamports: Number(Buffer.from(ix.data).readBigUInt64LE(4)) }));
+  assert.deepEqual(transfers.find((t) => t.to === row.team_to), { to: row.team_to, lamports: row.team_lamports + 50_000_000 });
+});

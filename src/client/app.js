@@ -2,6 +2,7 @@
 import { createCandles } from './candles.js';
 import { createCrew } from './crew.js';
 import { createProof } from './proof.js';
+import { asMind, createModels, filterModels, labCounts, loadModels, runPrice, runsFor } from './models.js';
 import { createDemo } from './demo.js';
 import { createPages } from './pages.js';
 import { createScene, headColor } from './scene.js';
@@ -236,10 +237,17 @@ function renderHome() {
     live.innerHTML = coins.length ? coins.map(agentCard).join('')
       : `<div class="ag-empty"><b>No agent yet.</b><span>Launch the first coin: its agent shows up here, live.</span><button class="cta small-cta" data-launch>Launch a coin</button></div>`;
   }
+  // Les esprits : les labos d'OpenRouter (et leur nombre de modèles), sinon les esprits gratuits.
   const minds = $('h-minds');
-  if (minds && world.launch?.keepers && !minds.childElementCount) {
-    minds.innerHTML = world.launch.keepers.models
-      .map((m) => `<span class="h-mind${m.premium && !m.available ? ' soon' : ''}">${aiLogo(m, 22)}<b>${esc(m.by)}</b><small>${m.premium && !m.available ? 'soon' : esc(m.name)}</small></span>`).join('');
+  if (minds && world.launch?.keepers && !minds.dataset.done) {
+    minds.dataset.done = '1';
+    minds.innerHTML = world.launch.keepers.models.map((m) => `<span class="h-mind">${aiLogo(m, 22)}<b>${esc(m.by)}</b><small>${esc(m.name)} · free</small></span>`).join('');
+    loadModels().then((d) => {
+      if (!d.models.length) return;
+      const labs = labCounts(d.models).filter((l) => l.logo).slice(0, 10);
+      minds.innerHTML = labs.map((l) => `<a class="h-mind" href="#models" data-go="models">${aiLogo({ logo: l.logo, by: l.name }, 22)}<b>${esc(l.name)}</b><small>${l.n} model${l.n === 1 ? "" : "s"}</small></a>`).join('');
+      $('h-minds-sub').textContent = `${d.models.length} models from every big AI lab, paid by your coin's own fees. Or a free one.`;
+    }).catch(() => {});
   }
   renderHeroAgent();
 }
@@ -568,6 +576,8 @@ const pages = createPages({
 const crewPage = createCrew({ api, openModal, isOpen, world, ticker, avatar, onStrike: () => launchForm() });
 // La page Proof : les wallets, les règles, chaque SOL et chaque burn.
 const proofPage = createProof({ api, openModal, isOpen, ticker, demo: DEMO });
+// Les modèles d'OpenRouter : « Launch with it » ouvre le lancement avec ce modèle choisi.
+const modelsPage = createModels({ openModal, isOpen, onLaunch: (id) => { draft.keeper.tab = 'any'; draft.keeper.or = id; draft.step = 1; launchForm(); } });
 const candlesPage = createCandles({
   api, openModal, world, ticker, avatar, holderTag, demo: DEMO,
   onStrike: () => launchForm(),
@@ -586,6 +596,7 @@ const ROUTES = {
   how: () => pages.how(),
   crew: () => crewPage.open(() => launchForm()),
   proof: () => proofPage.open(),
+  models: () => modelsPage.open(),
   strike: () => launchForm(),
 };
 const isRoute = (page) => Boolean(ROUTES[page]) || /^coin\/[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(page || '');
@@ -605,6 +616,9 @@ function noFunds(err, what) {
   return `Not enough SOL in your wallet. ${what} needs about ${d.needSol} SOL (fees included), your wallet has ${d.haveSol ?? 0} SOL. Nothing was sent.`;
 }
 const ERRORS = {
+  pick_model: 'Pick its model in the list, or switch to Free minds.',
+  bad_model: 'That model is not available anymore. Pick another one.',
+  bad_fuel: 'Pick one of the fuel amounts.',
   bad_name: 'Give your coin a name (32 characters max).',
   bad_symbol: 'Ticker: letters and numbers only, 10 max.',
   bad_description: 'Description: 500 characters max.',
@@ -635,7 +649,8 @@ const ERRORS = {
 
 let busy = false;
 // burn : « Make it burn », la part (en %) des creator fees qui rachète et brûle le coin lui-même.
-const DRAFT = () => ({ fields: {}, image: null, preview: null, burn: 20, keeper: { style: 'analyst', model: 'gpt-oss', goal: null, prompt: '' }, idea: '', spark: null, step: 0 });
+// keeper.tab : « free » (les esprits gratuits) ou « any » (un modèle d'OpenRouter : keeper.or, avec du fuel).
+const DRAFT = () => ({ fields: {}, image: null, preview: null, burn: 20, fuel: 0.02, keeper: { style: 'analyst', model: 'gpt-oss', goal: null, prompt: '', tab: 'free', or: null }, idea: '', spark: null, step: 0 });
 let draft = DRAFT();
 
 
@@ -663,8 +678,9 @@ function costLine(burnPct) {
   const burn = withShare ? l.sharedBurnSol : l?.burnSol;
   const team = withShare ? l.sharedTeamSol : l?.teamSol;
   const split = team ? `${burn} SOL buys $${ticker()} and burns it, ${team} SOL funds the WICK team` : `buys $${ticker()} and burns it`;
+  const fuel = fuelSol() ? ` Plus <b>${fuelSol()} SOL of fuel</b> for its agent (it pays its AI).` : '';
   return `${fee
-    ? `<b>${fee} SOL WICK Ignition Fee</b>: ${split}. Plus ≈ 0.02 SOL of pump.fun creation and network costs, and your dev buy.`
+    ? `<b>${fee} SOL WICK Ignition Fee</b>: ${split}.${fuel} Plus ≈ 0.02 SOL of pump.fun creation and network costs, and your dev buy.`
     : '≈ 0.02 SOL of pump.fun creation and network costs, plus your dev buy.'} Your wallet signs, your coin${withShare ? `, ${(l.split?.creatorBps ?? 10_000 - l.shareBps) / 100 - burnPct}% of your creator fees` : ', your pump.fun creator fees'}.`;
 }
 
@@ -703,11 +719,55 @@ function identityStep(f) {
   </section>`;
 }
 
+// Le modèle choisi sur OpenRouter (le catalogue, chargé une fois), et ce que paie son fuel.
+let orModels = null;
+const orOn = () => Boolean(world.launch?.openrouter);
+const usingOr = () => orOn() && draft.keeper.tab === 'any' && draft.keeper.or;
+const fuelOn = () => Boolean(world.launch?.feeSol || world.launch?.sharedFeeSol);
+const fuelSol = () => (usingOr() && fuelOn() ? draft.fuel : 0);
+const orPick = () => orModels?.models.find((m) => m.id === draft.keeper.or) || null;
+function orList() {
+  if (!orModels) return '<p class="muted small">Loading the models…</p>';
+  const list = filterModels(orModels.models, { q: draft.keeper.orQ || '', lab: draft.keeper.orLab || '', sort: draft.keeper.orSort || 'newest' }).slice(0, 60);
+  return list.length ? list.map((m) => `<button type="button" class="or-row${draft.keeper.or === m.id ? ' on' : ''}" data-or="${esc(m.id)}" aria-pressed="${draft.keeper.or === m.id}">
+      ${aiLogo(asMind(m), 20)}<span><b>${esc(m.name)}</b><small>${esc(m.lab)}</small></span><em class="mono">${runPrice(m.run)}<small>a run</small></em></button>`).join('')
+    : '<p class="muted small">No model matches.</p>';
+}
+function fuelBox() {
+  const m = orPick();
+  const opts = world.launch?.openrouter?.fuelOptions || [0, 0.02, 0.05, 0.1];
+  if (!m) return '<p class="muted small">Pick a model above.</p>';
+  // Le fuel part avec la fee de lancement : il n'existe qu'une fois $WICK lancé.
+  if (!fuelOn()) {
+    return `<div class="or-pick">${aiLogo(asMind(m), 26)}<span><b>${esc(m.name)}</b><small>${esc(m.lab)} · about ${runPrice(m.run)} an answer</small></span></div>
+      <small class="muted">It starts on a free mind, and switches to this model as soon as your coin's fees pay for it. Fuel opens with the $${ticker()} launch.</small>`;
+  }
+  const runs = (f) => runsFor(f, m, orModels?.solUsd);
+  return `<div class="or-pick">${aiLogo(asMind(m), 26)}<span><b>${esc(m.name)}</b><small>${esc(m.lab)} · about ${runPrice(m.run)} an answer</small></span></div>
+    <div class="or-fuel"><b>Its fuel</b> <small>SOL you add now, paid with the launch fee: its first answers. Then 20% of your coin's creator fees keep it running.</small>
+      <div class="burn-pills" role="group" aria-label="Fuel">${opts.map((f) => `<button type="button" class="pill${draft.fuel === f ? ' on' : ''}" data-fuel="${f}" aria-pressed="${draft.fuel === f}">${f ? `${f} SOL` : 'None'}</button>`).join('')}</div>
+      <small class="muted">${draft.fuel && runs(draft.fuel) != null ? `≈ ${runs(draft.fuel).toLocaleString('en-US')} answers with ${draft.fuel} SOL.` : draft.fuel ? '' : 'No fuel: it starts on a free mind, and switches to this model once its fees come in.'} When its budget is empty, it keeps going on a free mind.</small></div>`;
+}
+
 function mindStep(k) {
   const card = (m) => `<button type="button" class="k-mind${m.premium ? ' premium' : ''}${draft.keeper.model === m.id ? ' on' : ''}" data-kmodel="${esc(m.id)}" aria-pressed="${draft.keeper.model === m.id}"${m.premium && !m.available ? ' disabled' : ''}><i>${aiLogo(m, 22)}</i><span><b>${esc(m.by)}</b><small>${esc(m.name)}${m.premium && !m.available ? ' · soon' : ''}</small></span></button>`;
+  const any = orOn() && draft.keeper.tab === 'any';
+  const labs = orModels ? labCounts(orModels.models).slice(0, 6) : [];
   return `<div class="ag-block"><h4>Its mind <small>the AI it thinks with</small></h4>
-    <div class="k-minds big" role="group" aria-label="The mind">${k.models.map(card).join('')}</div>
-    <small class="muted k-note">${icon('sparkle')} Its agent runs on its own fees: nothing to pay up front.</small>
+    ${orOn() ? `<div class="or-tabs" role="tablist"><button type="button" role="tab" class="${any ? '' : 'on'}" data-mtab="free" aria-selected="${!any}">Free minds <small>${k.models.length} open models</small></button>
+      <button type="button" role="tab" class="${any ? 'on' : ''}" data-mtab="any" aria-selected="${any}">Any model <small>${orModels ? orModels.models.length : '280+'} on OpenRouter</small></button></div>` : ''}
+    <div${any ? ' hidden' : ''}>
+      <div class="k-minds big" role="group" aria-label="The mind">${k.models.map(card).join('')}</div>
+      <small class="muted k-note">${icon('sparkle')} Free: nothing to pay, ever.</small>
+    </div>
+    ${orOn() ? `<div class="or-box"${any ? '' : ' hidden'}>
+      <div class="or-tools"><input type="search" id="lf-or-q" placeholder="Search: claude, gpt, gemini, grok, deepseek…" value="${esc(draft.keeper.orQ || '')}" autocomplete="off">
+        <div class="md-labs small"><button type="button" class="pill${draft.keeper.orLab ? '' : ' on'}" data-orlab="">All</button>${labs.map((l) => `<button type="button" class="pill${draft.keeper.orLab === l.lab ? ' on' : ''}" data-orlab="${esc(l.lab)}">${esc(l.name)}</button>`).join('')}
+          <button type="button" class="pill${draft.keeper.orSort === 'cheapest' ? ' on' : ''}" data-orsort="cheapest">Cheapest first</button></div></div>
+      <div class="or-list" id="lf-or-list">${orList()}</div>
+      <div id="lf-or-fuel">${fuelBox()}</div>
+      <a class="linkish small" href="#models">See every model and its price →</a>
+    </div>` : ''}
   </div>`;
 }
 
@@ -749,7 +809,7 @@ function fireStep(max, f) {
     <div class="lf-summary">
       ${draft.preview ? `<img src="${draft.preview}" alt="">` : '<span class="lf-sum-ph">＋</span>'}
       <div><b>${esc(f.name || 'Your coin')} <span class="mono gold">${f.symbol ? `$${esc(String(f.symbol).toUpperCase())}` : ''}</span></b>
-        <small>Agent: ${esc(style?.label || '')} · ${aiLogo(mind, 12)} ${esc(mind?.name || '')} · ${esc(goal?.label || '')}</small></div>
+        <small>Agent: ${esc(style?.label || '')} · ${usingOr() && orPick() ? `${aiLogo(asMind(orPick()), 12)} ${esc(orPick().name)}${fuelSol() ? ` · ${fuelSol()} SOL fuel` : ''}` : `${aiLogo(mind, 12)} ${esc(mind?.name || '')}`} · ${esc(goal?.label || '')}</small></div>
       <button type="button" class="linkish" data-goto="0">Edit</button>
     </div>
     <label><span>Dev buy <em>· optional, buy your own coin at launch</em></span>
@@ -797,6 +857,7 @@ function launchForm(error = '') {
       <input type="hidden" name="burn" value="${burning()}"><input type="hidden" name="share" value="${burnOptions().length ? '1' : ''}">
       <input type="hidden" name="keeper_style" value="${esc(draft.keeper.style)}"><input type="hidden" name="keeper_model" value="${esc(draft.keeper.model)}">
       <input type="hidden" name="keeper_goal" value="${esc(draft.keeper.goal)}">
+      <input type="hidden" name="mind_or" value="${esc(usingOr() ? draft.keeper.or : '')}"><input type="hidden" name="fuel" value="${fuelSol()}">
       <p class="error" id="lf-error"${error ? '' : ' hidden'}>${esc(error)}</p>
       <div class="lf-nav">
         <button type="button" class="wbtn" id="lf-back"${draft.step ? '' : ' hidden'}>Back</button>
@@ -876,7 +937,38 @@ function launchForm(error = '') {
     $('lf-legend').textContent = split.legend;
     $('lf-cost').innerHTML = costLine(pct);
   }));
+  bindOr(form);
   form.addEventListener('submit', (e) => { e.preventDefault(); submitLaunch(form); });
+}
+
+// L'onglet « Any model » : le catalogue (chargé une fois), la recherche, le choix, le fuel.
+function bindOr(form) {
+  if (!orOn()) return;
+  const refresh = () => {
+    if ($('lf-or-list')) $('lf-or-list').innerHTML = orList();
+    if ($('lf-or-fuel')) $('lf-or-fuel').innerHTML = fuelBox();
+    form.mind_or.value = usingOr() ? draft.keeper.or : '';
+    form.fuel.value = String(fuelSol());
+  };
+  // Chargé en arrière-plan ; l'étape de l'agent se redessine seulement si elle est à l'écran.
+  if (!orModels) loadModels().then((d) => { orModels = d; if (form.isConnected && draft.step === 1) launchForm(); }).catch(() => {});
+  form.querySelectorAll('[data-mtab]').forEach((b) => b.addEventListener('click', () => {
+    draft.fields = Object.fromEntries(new FormData(form));
+    draft.keeper.tab = b.dataset.mtab;
+    launchForm();
+  }));
+  $('lf-or-q')?.addEventListener('input', (e) => { draft.keeper.orQ = e.target.value; refresh(); });
+  form.querySelector('.or-box')?.addEventListener('click', (e) => {
+    const row = e.target.closest('[data-or]');
+    const lab = e.target.closest('[data-orlab]');
+    const sort = e.target.closest('[data-orsort]');
+    const fuel = e.target.closest('[data-fuel]');
+    if (row) draft.keeper.or = row.dataset.or;
+    if (lab) { draft.keeper.orLab = lab.dataset.orlab; form.querySelectorAll('[data-orlab]').forEach((x) => x.classList.toggle('on', x === lab)); }
+    if (sort) { draft.keeper.orSort = draft.keeper.orSort === 'cheapest' ? 'newest' : 'cheapest'; sort.classList.toggle('on', draft.keeper.orSort === 'cheapest'); }
+    if (fuel) draft.fuel = Number(fuel.dataset.fuel);
+    if (row || lab || sort || fuel) refresh();
+  });
 }
 
 function showFormError(msg) {
@@ -911,6 +1003,7 @@ function stepProblem(step, fields) {
     if (!draft.image) return ERRORS.no_image;
   }
   if (step === 1 && draft.keeper.style === 'custom' && (draft.keeper.prompt || '').trim().length < 8) return ERRORS.bad_prompt;
+  if (step === 1 && orOn() && draft.keeper.tab === 'any' && !draft.keeper.or) return ERRORS.pick_model;
   return null;
 }
 
@@ -937,7 +1030,7 @@ function progress(symbol) {
     ['sign', fee ? 'Approve 1/2 in your wallet: create your coin' : 'Approve in your wallet: create your coin'],
     ['send', 'Sending to Solana'],
     ['confirm', 'Creating your coin on pump.fun'],
-    ...(fee ? [['sign2', `Approve 2/2: the Ignition Fee and the fee split${burning() ? ', with your candle' : ''}`], ['fee', 'Lighting your match']] : []),
+    ...(fee ? [['sign2', `Approve 2/2: the Ignition Fee and the fee split${burning() ? ', with your candle' : ''}${fuelSol() ? `, and ${fuelSol()} SOL of fuel for its agent` : ''}`], ['fee', 'Lighting your match']] : []),
   ];
   openModal(`
     <h2>Launching <span class="grad">$${esc(symbol)}</span></h2>

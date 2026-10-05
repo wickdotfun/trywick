@@ -170,13 +170,14 @@
         <div class="guide-grid">
           <div>
             <h3>WICK, en 3 lignes</h3>
-            <p>Un launchpad Solana : n'importe qui lance son coin sur pump.fun depuis trywick.fun (image, nom, ticker), et ce coin reçoit <b>son agent IA</b> (son caractère, son cerveau, son objectif). L'agent répond aux holders, tient un journal public, et une part des fees rachète le coin et le brûle.</p>
+            <p>Un launchpad Solana : n'importe qui lance son coin sur pump.fun depuis trywick.fun (image, nom, ticker), et ce coin reçoit <b>son agent IA</b> (son caractère, son objectif, et son cerveau : <b>n'importe quel modèle d'OpenRouter</b>, des centaines, ou un gratuit). L'agent répond aux holders, tient un journal public, et une part des fees rachète le coin et le brûle.</p>
             <p>Chaque lancement <b>achète $WICK et le brûle</b>. $WICK, c'est ton token : plus le site sert, plus sa supply diminue.</p>
             <h3>Où va l'argent</h3>
             <ul>
               <li><b>Ignition Fee</b>, 0,01 SOL par lancement : 50 % achète et brûle $WICK, 50 % pour l'équipe (ton dev wallet).</li>
               <li><b>Creator fees de chaque coin</b>, partagées sur pump.fun, verrouillées on-chain : 60 % le créateur · 20 % son agent (payé via ton wallet d'équipe) · 10 % brûlent $WICK · 10 % l'équipe.</li>
               <li><b>Les creator fees de $WICK</b> : 100 % à toi (le dev wallet), comme tout créateur pump.fun.</li>
+              <li><b>Le fuel de l'agent</b> (au choix du créateur, 0,02 à 0,1 SOL) et ses 20 % arrivent sur ton wallet d'équipe : ils paient son IA. Tu les convertis en crédits OpenRouter (openrouter.ai → Credits). Chaque réponse est retirée de son budget au prix exact ; budget vide = il passe sur une IA gratuite.</li>
             </ul>
             <h3>Les deux wallets</h3>
             <ul>
@@ -188,6 +189,7 @@
             <h3>Le soir du lancement, dans l'ordre</h3>
             <ol>
               <li><b>Test everything</b> (plus bas) : pas de rouge. L'orange n'empêche rien.</li>
+              <li><b>OpenRouter</b> : crée une clé sur openrouter.ai (Keys), mets quelques $ de crédits (Credits), puis ajoute <b>OPENROUTER_API_KEY</b> (Secret) dans Cloudflare. C'est ce qui ouvre « Any model » au lancement.</li>
               <li>Ouvre Phantom sur le <b>dev wallet</b> <span class="mono" id="g-dev2"></span>. Garde au moins <b>0,05 SOL</b> à côté du dev buy (frais + le lock).</li>
               <li>Sur <b>pump.fun</b> → Create coin : nom <b>WICK</b>, ticker exactement <b id="g-tk">WICK</b>, ton logo, ta description, tes liens (X, Telegram, trywick.fun). Choisis ton dev buy, puis lance.</li>
               <li><b>Dans la minute</b>, tout seul : le site détecte $WICK et passe en live, l'annonce part sur Telegram avec le CA et elle est épinglée. Regarde « Launch day » juste en dessous.</li>
@@ -368,6 +370,9 @@
         c.lock ? `Locked${c.lock.amount ? `: ${num(c.lock.amount)} $${esc(c.ticker)}` : ''}. Shown on the Proof page, and posted.`
           : 'On Streamflow (app.streamflow.finance → Token Lock), from the dev wallet. Then fill in card #8 "Tokens locked" in the posts below: one click posts it on X and Telegram and shows it on the Proof page.',
         mint && !c.lock ? '<a class="btn small" href="#post-lock">Fill it in</a>' : '');
+      add(c.openrouter ? 'done' : 'todo', 'Any model for the agents (OpenRouter)',
+        c.openrouter ? 'OPENROUTER_API_KEY is set: creators can pick any model and add fuel at launch. Check the credits in Test everything, and top them up with the SOL the agents receive.'
+          : 'Optional but what makes WICK special: create a key on openrouter.ai (Keys), put a few $ of credits (Credits), and add OPENROUTER_API_KEY (Secret) in Cloudflare. Without it, agents use the free minds.');
       add(c.xPosts ? 'done' : '', 'X posts',
         c.xPosts ? 'Every new coin and every big moment are posted on X by themselves.'
           : 'Not automatic: X charges per post (add X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET in Cloudflare to switch it on). Until then, every coin has a "Post on X" button in Latest launches, text already written.');

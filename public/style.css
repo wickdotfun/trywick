@@ -1449,3 +1449,51 @@ button.cdl:focus-visible { outline: 2px solid var(--gold); outline-offset: 6px; 
 .kit-x .cta { display: inline-flex; align-items: center; gap: 8px; }
 .kit-x small.muted { display: block; margin-top: 6px; font-size: 11.5px; line-height: 1.4; }
 .k-minds.big.premium { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* ======================================================================
+   Proof (#proof) : les wallets, les règles, chaque SOL, chaque burn
+   ====================================================================== */
+.pf-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.pf-links .wbtn { display: inline-flex; align-items: center; gap: 7px; }
+.pf-links .ico { width: 15px; height: 15px; }
+.pf-lock { margin-top: 16px; display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 16px; border: 1px solid rgba(61, 220, 132, .45);
+  background: linear-gradient(90deg, rgba(61, 220, 132, .1), rgba(20, 13, 9, .6)); }
+.pf-lock > .ico { width: 26px; height: 26px; color: #3ddc84; flex: none; }
+.pf-lock > div { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.pf-lock b { font-size: 15px; }
+.pf-lock small { color: var(--muted); font-size: 12px; }
+.pf-wallets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.pf-wallet { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 16px; border: 1px solid var(--gold-line); background: rgba(20, 13, 9, .7); min-width: 0; }
+.pf-w-head { display: flex; align-items: center; gap: 10px; }
+.pf-w-head > div { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.pf-w-head b { font-size: 15px; }
+.pf-w-head a { font-size: 12px; color: var(--gold); }
+.pf-w-ico { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: var(--gold-metal); color: #1d1003; flex: none; }
+.pf-w-ico .ico { width: 20px; height: 20px; }
+.pf-copy { flex: none; height: 30px; font-size: 12px; }
+.pf-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; line-height: 1.4; }
+.pf-list li { display: flex; gap: 8px; align-items: flex-start; color: #e9dccb; }
+.pf-list li .ico { width: 14px; height: 14px; flex: none; margin-top: 2px; color: #3ddc84; }
+.pf-list li.no .ico { color: var(--gold); }
+.pf-rules { display: grid; grid-template-columns: 1fr 1.6fr; gap: 14px; }
+.pf-rules > div { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.pf-rules small.muted { font-size: 11.5px; line-height: 1.4; }
+.pf-flows { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pf-flow { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--line-2); background: rgba(20, 13, 9, .6); }
+.pf-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 7px 0; border-top: 1px solid var(--line); }
+.pf-flow .k-label + .pf-row { border-top: 0; }
+.pf-row span { font-size: 13px; }
+.pf-row b { font: 600 13.5px var(--mono); color: var(--gold); text-align: right; }
+.pf-row small { grid-column: 1 / -1; font-size: 11px; color: var(--muted); }
+.pf-table { border-radius: 16px; border: 1px solid var(--line-2); overflow-x: auto; }
+.pf-table table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.pf-table th { text-align: left; font: 500 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--dim); padding: 10px 12px; background: rgba(20, 13, 9, .8); }
+.pf-table td { padding: 9px 12px; border-top: 1px solid var(--line); white-space: nowrap; }
+.pf-table .num { text-align: right; }
+.pf-table td small { color: var(--muted); }
+.pf-table a { color: var(--gold); }
+.pf-tx { display: flex; gap: 10px; }
+@media (max-width: 760px) {
+  .pf-wallets, .pf-rules, .pf-flows { grid-template-columns: 1fr; }
+  .pf-lock { flex-wrap: wrap; }
+}

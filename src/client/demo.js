@@ -535,6 +535,41 @@ export function createDemo() {
         stats: { coins: all.length, actions: all.length * 6 + coinBurns.length, burns: coinBurns.length, posts: all.length * 2 },
       };
     },
+    // La page Proof de la démo : les vrais wallets et les vraies règles, les chiffres de la démo.
+    async proof() {
+      await new Promise((r) => setTimeout(r, 300));
+      const wickSol = burns.reduce((n, b) => n + b.sol, 0);
+      const coinSol = coinBurns.reduce((n, b) => n + b.sol, 0);
+      const ignition = all.reduce((n, m) => n + (m.fee || 0), 0);
+      const receipts = [
+        ...burns.map((b) => ({ kind: b.kind, ref: b.ref, sol: b.sol, burned: b.burned, at: b.at, sig: null, buySig: null, symbol: b.symbol || null })),
+        ...coinBurns.map((b) => ({ kind: 'coin', sol: b.sol, burned: b.burned, at: b.at, sig: null, buySig: null, symbol: b.symbol, mint: b.mint })),
+      ].sort((a, z) => z.at - a.at);
+      return {
+        token: { mint: null, ticker: 'WICK' },
+        wallets: [
+          { role: 'burn', address: CONFIG.buyback.wallet, label: 'Burn wallet',
+            does: ['Receives the burn half of every Ignition Fee and the burn share of every coin\'s creator fees', 'Only buys $WICK (and coins that burn themselves) and burns them, through the code in this repository'],
+            never: ['Never sells', 'Spends SOL only on buybacks and network fees'] },
+          { role: 'team', address: CONFIG.launch.deployer, label: 'Team wallet',
+            does: ['Launched $WICK', 'Receives the team half of every Ignition Fee', 'Receives the team and crew shares of every coin\'s creator fees: the crew share pays for premium minds and X posts'],
+            never: ['Its key is never on the site'] },
+        ],
+        rules: {
+          ignition: { burnPct: 50, teamPct: 50 }, split: { creatorPct: 60, crewPct: 20, burnPct: 10, teamPct: 10 }, selfBurnPcts: [10, 20, 30, 50],
+          wickCreatorFees: 'team', locked: 'Each coin\'s split is set with pump.fun fee sharing at launch and locked on-chain: nobody can change it.',
+        },
+        flows: {
+          launches: seq, ignitionSol: ignition, ignitionBurnSol: ignition / 2, ignitionTeamSol: ignition / 2, sharedCoins: all.filter((m) => m.share).length * 3,
+          shareBurnSol: 0.42, shareSelfSol: coinSol, shareCrewSol: 0.84, shareTeamSol: 0.42,
+          wickBurned: burned, wickBurnSol: wickSol, wickBurns: burns.length, coinBurnSol: coinSol, coinBurns: coinBurns.length,
+        },
+        crew: { earnedSol: 0.84, coins: all.filter((m) => m.share).length, premiumCalls: 312, xPosts: 57, spentUsd: 2.1, rates: { premiumUsdPerCall: 0.004, xUsdPerPost: 0.015 } },
+        lock: null,   // jamais de faux lock, même en démo : il n'apparaît que réglé pour de vrai
+        receipts: receipts.slice(0, 30),
+        code: { repo: 'https://github.com/wickdotfun/trywick' },
+      };
+    },
     async coin(mint) {
       const m = all.find((x) => x.mint === mint);
       if (!m) throw new Error('unknown_mint');

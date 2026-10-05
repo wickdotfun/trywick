@@ -3,6 +3,7 @@
 import { adminPause, adminPost, adminRun, adminSocial, adminStatus, recordRun } from './api/admin.js';
 import { candles, coin } from './api/candles.js';
 import { crew } from './api/crew.js';
+import { proof, proofCsv } from './api/proof.js';
 import { xCallback, xStart, xUnlink } from './api/x.js';
 import { launches, profile } from './api/explore.js';
 import { prepare, status, submit } from './api/launch.js';
@@ -37,6 +38,8 @@ const ROUTES = {
   'GET /api/candles': candles,
   'GET /api/coin': coin,
   'GET /api/crew': crew,
+  'GET /api/proof': proof,
+  'GET /api/proof/burns.csv': proofCsv,
   'POST /api/x/start': xStart,
   'GET /api/x/callback': xCallback,
   'POST /api/x/unlink': xUnlink,

@@ -237,6 +237,18 @@ reserved before it is posted: never twice. A post that reached no channel is tri
 The cards are drawn ahead of time with `npm run cards` (resvg + the Geist fonts in `public/fonts/`): drawing them in
 the Worker would cost too much CPU on the free plan. Change the template in `lib/cards.js`, then run it again.
 
+## Proof
+
+`/#proof` (`GET /api/proof`, `lib/proof.js`): what anyone can check for themselves. The two wallets (burn, team), what
+each one does and never does, with their Solscan links; the fee rules (Ignition Fee 50/50, every coin's 60/20/10/10
+split); where every SOL went (Ignition Fees and shared creator fees in, $WICK burns, coin burns, crews and team out);
+the crews' book (what the 20% earned, and what it paid for: premium mind calls and X posts, counted, with their dollar
+cost estimated at list prices in `config.proof`); and every burn with its buy and burn transactions.
+`GET /api/proof/burns.csv` downloads all of them.
+
+The team's $WICK lock shows only once it exists: set `TEAM_LOCK_URL` (the Streamflow contract), `TEAM_LOCK_AMOUNT` and
+`TEAM_LOCK_UNTIL` (an ISO date) in Cloudflare. Nothing is shown before, not even in the demo.
+
 ## Creator fee sharing
 
 pump.fun lets a coin's creator split its creator fees between up to 10 wallets, once and for all
@@ -313,6 +325,7 @@ small JSON API, backed by a [D1](https://developers.cloudflare.com/d1/) database
 | Coins that burn themselves (Candles page, coin pages) | `lib/candles.js`, `src/client/candles.js` |
 | The crew page, the Scout (trending narratives with sources) | `lib/crew.js`, `lib/scout.js`, `src/client/crew.js` |
 | Premium minds (Claude, GPT, Gemini, Grok) | `lib/minds.js` |
+| Proof page (wallets, rules, flows, crews' book, every burn, CSV) | `lib/proof.js`, `src/api/proof.js`, `src/client/proof.js` |
 | Each coin's X account, run by its Operator | `lib/xoperator.js`, `lib/xproof.js`, `src/api/x.js` |
 | Operators (the AI agent of each coin): burns, voices, journal | `lib/keepers.js` |
 | Spark (the AI creates the coin), its logo, questions to a Operator | `lib/spark.js`, `src/api/spark.js`, `src/client/keeper.js` |
@@ -378,6 +391,7 @@ Locally, `CYCLE_MINUTES=1` in `.dev.vars` makes the breath (buyback countdown) 1
    | `SHARE_BURN_BPS`, `SHARE_TEAM_BPS`, `SHARE_CREW_BPS` | burn, team and crew parts of shared creator fees, in basis points (default `1000` + `1000` + `2000`: 60/20/10/10) |
    | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY` | secrets, optional: turn on each premium mind |
    | `PREMIUM_CLAUDE_MODEL`, `PREMIUM_GPT_MODEL`, `PREMIUM_GEMINI_MODEL`, `PREMIUM_GROK_MODEL` | optional: another model of the same provider |
+   | `TEAM_LOCK_URL`, `TEAM_LOCK_AMOUNT`, `TEAM_LOCK_UNTIL` | optional: the team's $WICK lock, shown on the Proof page once it exists |
    | `X_CLIENT_ID`, `X_CLIENT_SECRET` | secrets, optional: an X app with OAuth 2.0, so each coin's Operator can run its X account |
    | `HOLDER_MIN` | minimum $WICK held for a golden flame (default: any amount) |
    | `TELEGRAM_BOT_TOKEN` (secret), `TELEGRAM_CHAT_ID` | the bot (from @BotFather) and the channel (`@yourchannel` or its numeric id); the bot must be an admin of the channel |

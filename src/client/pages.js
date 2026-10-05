@@ -153,7 +153,8 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
     openModal(`
       <h2>${tk()} dashboard</h2>
       <p class="muted small">Real data only: WICK's own burns and fee distributions (each with its transaction), the ${tk()}
-        supply read on Solana, and DexScreener for volumes.${live ? '' : ` Most of it starts once ${tk()} is live.`}</p>
+        supply read on Solana, and DexScreener for volumes.${live ? '' : ` Most of it starts once ${tk()} is live.`}
+        <a class="linkish" href="#proof">Every wallet and every burn: Proof →</a></p>
       <div class="tiles">
         <div><strong class="gold">${compact(t.burned || 0)}</strong><span>${tk()} burned</span></div>
         <div><strong>${t.supplyPct != null ? pct(t.supplyPct) : '—'}</strong><span>of the supply burned</span></div>
@@ -413,7 +414,7 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
 
   // Sur téléphone : toutes les pages dans un menu.
   function menu(go) {
-    const items = [['crew', icon('keeper'), 'The crew'], ['candles', icon('candle'), 'Candles'], ['explore', icon('compass'), 'Explore'], ['wick', icon('candle'), tk()], ['dashboard', icon('dashboard'), 'Dashboard'],
+    const items = [['crew', icon('keeper'), 'The crew'], ['candles', icon('candle'), 'Candles'], ['explore', icon('compass'), 'Explore'], ['wick', icon('candle'), tk()], ['dashboard', icon('dashboard'), 'Dashboard'], ['proof', icon('lock'), 'Proof'],
       ['leaderboard', icon('trophy'), 'Leaderboard'], ['hall', icon('pillar'), 'Hall of Flames'], ['flames', icon('user'), 'Your flames'],
       ['how', icon('help'), 'How it works']];
     openModal(`<h2>WICK</h2><div class="wallets">${items.map(([k, ico, label]) => `<button class="wbtn menu-item" data-menu="${k}">${ico}${label}</button>`).join('')}</div>`, 'm-menu');

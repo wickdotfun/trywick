@@ -1,6 +1,6 @@
 // Point d'entrée du Worker Cloudflare. Les fichiers de public/ (le site) sont
 // servis directement ; tout le reste arrive ici, et seules les routes /api existent.
-import { adminPause, adminRun, adminStatus, recordRun } from './api/admin.js';
+import { adminPause, adminPost, adminRun, adminSocial, adminStatus, recordRun } from './api/admin.js';
 import { candles, coin } from './api/candles.js';
 import { launches, profile } from './api/explore.js';
 import { prepare, status, submit } from './api/launch.js';
@@ -16,6 +16,7 @@ import { refreshMarkets } from '../lib/markets.js';
 import { runAnnounce, withLaunch } from '../lib/announce.js';
 import { runJournal, runKeepers, runVoices } from '../lib/keepers.js';
 import { queueSelfBurn, runShares } from '../lib/sharing.js';
+import { runSocial } from '../lib/social.js';
 import { runTelegram } from '../lib/telegram.js';
 import { sweep } from '../lib/matches.js';
 import { ensureSchema } from '../lib/schema.js';
@@ -41,6 +42,8 @@ const ROUTES = {
   'GET /api/admin/status': adminStatus,
   'POST /api/admin/pause': adminPause,
   'POST /api/admin/run': adminRun,
+  'GET /api/admin/social': adminSocial,
+  'POST /api/admin/post': adminPost,
 };
 
 export default {
@@ -98,6 +101,8 @@ export default {
       // Les voix des Keepers, puis la page de journal du jour (une à la fois).
       runVoices(env, Date.now()).then(() => runJournal(env, Date.now())),
       runTelegram(env, Date.now()),
+      // Les grands moments de $WICK (DEX payé, paliers de market cap), avec leur carte.
+      runSocial(env, Date.now()),
     ];
     for (const r of await Promise.allSettled(steps)) {
       if (r.status === 'rejected') console.error('cron', r.reason?.message ?? r.reason);

@@ -139,6 +139,24 @@ inside its free daily quota. Logos: `public/brand/ai/` ([@lobehub/icons](https:/
   `ai_uses`). If the chosen model fails, Llama answers. Without AI (no binding, budget spent), Spark and questions say so,
   burns happen as without a Keeper with a written line, and no journal line is made up. The admin page shows today's use.
 
+## Posts & cards
+
+The big moments of $WICK are posted by themselves, each with its card (`lib/cards.js`, `lib/social.js`):
+
+| Moment | When | Card |
+|---|---|---|
+| Launch | the Telegram announcement (pinned), within a minute of the launch | `public/cards/live.png` |
+| DEX paid | DEX Screener approves the $WICK profile (checked every 3 minutes) | `public/cards/dex-paid.png` |
+| Market cap milestones | the first time $WICK crosses $50K, $100K, $250K… $100M (the highest crossed, once each) | `public/cards/mcap-*.png` |
+| Tokens locked | from the admin page: amount, unlock date, proof link; the card is drawn in the browser | drawn on demand |
+
+Posts go to the Telegram channel, and to X when its four keys are set (`lib/x.js`, OAuth 1.0a; the X API is paid
+per post). Without X keys, the admin page gives each card (Download), its text (Copy X text) and Open X. Each moment is
+reserved before it is posted: never twice. A post that reached no channel is tried again on the next pass.
+
+The cards are drawn ahead of time with `npm run cards` (resvg + the Geist fonts in `public/fonts/`): drawing them in
+the Worker would cost too much CPU on the free plan. Change the template in `lib/cards.js`, then run it again.
+
 ## Creator fee sharing
 
 pump.fun lets a coin's creator split its creator fees between up to 10 wallets, once and for all
@@ -217,6 +235,7 @@ small JSON API, backed by a [D1](https://developers.cloudflare.com/d1/) database
 | Living matches (DexScreener market caps) | `lib/markets.js` |
 | Pyromaniacs leaderboard | `lib/leaderboard.js`, `src/api/leaderboard.js` |
 | Telegram bot | `lib/telegram.js` |
+| Posts & cards (launch, DEX paid, milestones, lock), X | `lib/social.js`, `lib/cards.js`, `lib/x.js`, `scripts/cards.mjs`, `src/client/cardmaker.js` |
 | Admin page (status, pause, run) | `public/admin.html`, `src/api/admin.js`, `lib/settings.js` |
 
 The database tables (`matches`, `cycles`, `burns`, `hall`, `settings`) are created on the first request. Tables from the previous version of
@@ -280,6 +299,7 @@ Locally, `CYCLE_MINUTES=1` in `.dev.vars` makes the breath (buyback countdown) 1
    | `TELEGRAM_DAILY_HOUR` | hour (UTC) of the daily report in the channel (default `18`, `off` to turn it off) |
    | `TOKEN_TICKER` | defaults to `WICK` |
    | `X_URL` | the X link in the header |
+   | `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_SECRET` (secrets, optional) | post the cards on X too (an X developer app with read and write access, and the access token of the project's account). The X API is paid per post |
 
 ---
 

@@ -208,7 +208,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
         ${c.character ? row('In its creator\'s words', `<i class="op-quote">“${esc(c.character)}”</i>`) : ''}
         ${c.objective ? row('Objective', `<b>${esc(c.objective.label)}</b> <small>· ${esc(c.objective.hint)}</small>`) : ''}
         ${row('Mind', `<span class="kc-model">${aiLogo(c.mind, 14)} ${esc(c.mind.name)}</span> <small>by ${esc(c.mind.by)}</small>`)}
-        ${row('Burn allocation', c.burn ? `<b class="gold">${c.burn.pct}%</b> of creator fees <small>· +${c.burn.wickPct}% burns ${tk()} · ${c.burn.teamPct}% team</small>` : 'Off <small>· its creator keeps all creator fees</small>')}
+        ${row('Burn allocation', c.burn ? `<b class="gold">${c.burn.pct}%</b> of creator fees <small>· +${c.burn.wickPct}% burns ${tk()}${c.burn.crewPct ? ` · ${c.burn.crewPct}% its crew` : ''} · ${c.burn.teamPct}% team</small>` : 'Off <small>· its creator keeps all creator fees</small>')}
         ${row('Can sell', no)}
         ${row('Can move funds', no)}
         ${c.proof ? row('Proof', `<a href="${solscan(esc(c.proof))}" target="_blank" rel="noopener">Fee split on Solscan ↗</a>`) : ''}
@@ -270,6 +270,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
     const c = m.candle;
     const wickBps = m.share?.bps ?? 0;
     const teamBps = m.share?.teamBps ?? 0;
+    const crewBps = m.share?.crewBps ?? 0;
     const selfBps = c?.bps ?? 0;
     const creatorBps = 10_000 - wickBps - selfBps;
     const tweet = c
@@ -316,10 +317,11 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
             <div class="split-bar">
               <span style="width:${creatorBps / 100}%">Creator ${creatorBps / 100}%</span>
               ${selfBps ? `<span class="self" style="width:${selfBps / 100}%">${selfBps >= 1500 ? (selfBps >= 2000 && m.symbol.length <= 5 ? `Burns $${esc(m.symbol)} ` : 'Burns ') : ''}${selfBps / 100}%</span>` : ''}
-              ${wickBps - teamBps > 0 ? `<span class="wick" style="width:${(wickBps - teamBps) / 100}%"></span>` : ''}
+              ${crewBps ? `<span class="crew" style="width:${crewBps / 100}%">Crew ${crewBps / 100}%</span>` : ''}
+              ${wickBps - teamBps - crewBps > 0 ? `<span class="wick" style="width:${(wickBps - teamBps - crewBps) / 100}%"></span>` : ''}
               ${teamBps ? `<span class="team" style="width:${teamBps / 100}%"></span>` : ''}
             </div>
-            <small class="muted">${selfBps ? `${selfBps / 100}% buys $${esc(m.symbol)} back and burns it · ` : ''}${(wickBps - teamBps) / 100}% burns ${tk()} · ${teamBps / 100}% WICK team. Set at launch, locked on pump.fun.</small>
+            <small class="muted">${selfBps ? `${selfBps / 100}% buys $${esc(m.symbol)} back and burns it · ` : ''}${crewBps ? `${crewBps / 100}% its crew (its AI, its posts) · ` : ''}${(wickBps - teamBps - crewBps) / 100}% burns ${tk()} · ${teamBps / 100}% WICK team. Set at launch, locked on pump.fun.</small>
           </div>` : ''}
           <section class="cd-card">
             <h3>Every burn <small>on-chain</small></h3>

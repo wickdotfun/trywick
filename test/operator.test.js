@@ -27,7 +27,7 @@ test('the Constitution: what was set at launch, locked, with its on-chain proof'
   const c = constitution(row);
   assert.equal(c.personality, 'Pyromaniac');
   assert.deepEqual(c.mind, { name: 'Qwen3 30B', by: 'Qwen', logo: '/brand/ai/qwen.svg' });
-  assert.deepEqual(c.burn, { pct: 30, wickPct: 5, teamPct: 5 });
+  assert.deepEqual(c.burn, { pct: 30, wickPct: 5, teamPct: 5, crewPct: 0 });
   assert.equal(c.proof, 'FEESIG');
   assert.deepEqual([c.canSell, c.canMoveFunds, c.locked], [false, false, true]);
   assert.ok(c.rules.some((r) => /only buy back \$MOTH and burn it/.test(r)));

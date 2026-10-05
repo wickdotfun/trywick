@@ -953,6 +953,7 @@ button.cdl:focus-visible { outline: 2px solid var(--gold); outline-offset: 6px; 
 .split-bar .self { background: linear-gradient(180deg, #ffb347, #e8650e); color: #1d1003; }
 .split-bar .wick { background: linear-gradient(180deg, #fff1c4, #c98a24); }
 .split-bar .team { background: #6b5440; }
+.split-bar .crew { background: linear-gradient(180deg, #ffd88a, #e8a33a); color: #1d1003; }
 
 /* Make it burn, dans le formulaire de lancement */
 .burn-opt { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 16px; border: 1px solid rgba(255, 206, 112, .35);
@@ -1311,3 +1312,120 @@ button.cdl:focus-visible { outline: 2px solid var(--gold); outline-offset: 6px; 
   .k-goals { grid-template-columns: 1fr; }
 }
 .op-quote { color: #f3e4c8; }
+
+/* ======================================================================
+   The crew (#crew) : Scout, Chandler, Igniter, Operator
+   ====================================================================== */
+.modal.m-crew.m-wide { width: min(1040px, calc(100% - 24px)); }
+.cw-hero { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 6px 0 4px; }
+.cw-hero h2 { margin: 0; font-size: clamp(28px, 4.4vw, 42px); line-height: 1.05; letter-spacing: -.02em; }
+.cw-hero .lead { margin: 0; max-width: 680px; font-size: 14.5px; line-height: 1.55; }
+.cw-hero .lead b { color: var(--text); }
+.cw-hero .cta { margin-top: 4px; display: inline-flex; align-items: center; gap: 8px; }
+.cw-hero .cta .ico, .cw-build .cta .ico { width: 17px; height: 17px; }
+.cw-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; width: 100%; margin: 6px 0 4px; }
+.cw-stats div { padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line-2); background: rgba(20, 13, 9, .6); display: flex; flex-direction: column; gap: 2px; }
+.cw-stats strong { font: 700 20px/1.1 var(--mono); color: var(--gold); }
+.cw-stats span { font-size: 11.5px; color: var(--muted); }
+
+.cw-agents { list-style: none; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; counter-reset: none; }
+.cw-agent { position: relative; display: flex; flex-direction: column; gap: 5px; padding: 14px; border-radius: 16px; border: 1px solid var(--gold-line); min-width: 0;
+  background: radial-gradient(260px 140px at 0% 0%, rgba(255, 190, 80, .12), rgba(255, 190, 80, 0) 70%), rgba(20, 13, 9, .65); }
+.cw-agent + .cw-agent::before { content: ''; position: absolute; left: -10px; top: 34px; width: 10px; height: 1px; background: var(--gold-line); }
+.cw-step { position: absolute; top: 12px; right: 12px; font: 600 10px/1 var(--mono); color: var(--dim); letter-spacing: .1em; }
+.cw-ico { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--gold-metal); color: #1d1003; box-shadow: 0 0 22px rgba(255, 180, 60, .3); margin-bottom: 4px; }
+.cw-ico .ico { width: 22px; height: 22px; }
+.cw-agent > b { font-size: 17px; }
+.cw-agent > em { font-style: normal; font: 500 10.5px/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--gold); }
+.cw-agent p { margin: 2px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--muted); flex: 1; }
+.cw-now { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 6px; padding: 7px 9px; border-radius: 10px; background: rgba(255, 220, 180, .04);
+  border: 1px solid var(--line); font-size: 12px; min-height: 34px; }
+.cw-now > i { width: 6px; height: 6px; border-radius: 50%; background: #3ddc84; box-shadow: 0 0 8px #3ddc84; animation: pulse 2s infinite; flex: none; }
+.cw-now small { color: var(--muted); }
+.cw-now a { color: var(--gold); font-size: 11.5px; }
+.cw-now .av { flex: none; }
+
+.cw-sec { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
+.cw-sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.cw-sec-head h3 { margin: 0; font-size: 17px; display: inline-flex; align-items: center; gap: 8px; }
+.cw-sec-head h3 .ico { width: 18px; height: 18px; color: var(--gold); }
+.cw-sec-head small { font-size: 11.5px; }
+
+.cw-narrs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.cw-narr { display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 16px; border: 1px solid var(--line-2); background: rgba(20, 13, 9, .7); min-width: 0; }
+.cw-narr > b { font-size: 15px; }
+.cw-narr p { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.cw-idea { display: flex; gap: 8px; align-items: flex-start; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--gold-line); background: rgba(255, 206, 112, .05); font-size: 12.5px; color: #f3e4c8; line-height: 1.4; }
+.cw-idea .ico { width: 15px; height: 15px; color: var(--gold); flex: none; margin-top: 1px; }
+.cw-srcs { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.cw-srcs > small { font: 500 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--dim); margin-right: 2px; }
+.cw-src { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--line-2); font-size: 11px; color: var(--text); text-decoration: none; }
+.cw-src:hover { border-color: var(--gold); }
+.cw-src span { color: var(--muted); font-family: var(--mono); }
+.cw-src small, .cw-mc small { font-family: var(--mono); font-size: 10.5px; }
+.cw-narr .cw-use { margin-top: auto; justify-content: center; font-size: 12.5px; }
+.up { color: #3ddc84; }
+.down { color: #ff7b6b; }
+
+.cw-live { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-radius: 16px; border: 1px solid var(--line-2); overflow: hidden; }
+.cw-live li { display: grid; grid-template-columns: 190px 1fr auto; gap: 12px; align-items: center; padding: 9px 12px; background: rgba(20, 13, 9, .6); }
+.cw-live li + li { border-top: 1px solid var(--line); }
+.cw-coin { display: flex; align-items: center; gap: 9px; min-width: 0; color: inherit; text-decoration: none; }
+.cw-coin > span:not(.av) { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.cw-coin > span b { font-size: 13px; }
+.cw-coin small { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cw-coin small .ai-logo { width: 11px; height: 11px; }
+.cw-act { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cw-act b { font-size: 12.5px; font-weight: 600; }
+.cw-act small { font-size: 12px; color: var(--muted); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cw-when { display: flex; gap: 8px; align-items: center; font: 500 11px var(--mono); color: var(--dim); white-space: nowrap; }
+.cw-when a { color: var(--gold); }
+
+.cw-two { display: grid; grid-template-columns: 1.15fr 1fr; gap: 16px; }
+.cw-fresh { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.cw-card { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 3px; padding: 12px 8px; border-radius: 14px;
+  border: 1px solid var(--line-2); background: rgba(20, 13, 9, .7); color: inherit; text-decoration: none; min-width: 0; transition: border-color .15s; }
+.cw-card:hover { border-color: var(--gold); }
+.cw-card .av { margin-bottom: 4px; }
+.cw-card > b { font-size: 13px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.cw-card > small { font-size: 11px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cw-mind { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--dim); max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cw-mind .ai-logo { width: 11px; height: 11px; }
+.cw-card .tag { position: absolute; top: 6px; right: 6px; font-size: 9px; }
+.cw-top { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.cw-top li { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--line-2); background: rgba(20, 13, 9, .6); }
+.cw-rank { font: 700 12px/1 var(--mono); color: var(--gold); text-align: center; }
+.cw-mc { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; font-family: var(--mono); font-size: 13px; }
+
+.cw-split { height: 38px; line-height: 38px; font-size: 12px; }
+.cw-split .wick { color: #3a2208; }
+.cw-fees { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; font-size: 13px; }
+.cw-fees li b { color: var(--gold); font-family: var(--mono); }
+.cw-fees li span { color: var(--muted); }
+.cw-build .k-label { margin-top: 4px; }
+.cw-rules { margin-top: 4px; }
+.cw-build .cta { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; margin-top: 6px; }
+
+.sp-picks { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.sp-picks > small { display: inline-flex; align-items: center; gap: 5px; font: 500 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--gold); margin-right: 2px; }
+.sp-picks > small em { font-style: normal; color: var(--dim); text-transform: none; letter-spacing: 0; }
+.sp-picks > small .ico { width: 13px; height: 13px; }
+.sp-pick { padding: 6px 11px; border-radius: 999px; border: 1px solid var(--gold-line); background: rgba(255, 206, 112, .06); color: #f3e4c8; font-size: 12px; cursor: pointer; }
+.sp-pick:hover { border-color: var(--gold); background: rgba(255, 206, 112, .12); }
+.sp-picks .linkish { font-size: 11.5px; margin-left: 2px; }
+.how-crew { margin: -4px 0 8px; }
+
+@media (max-width: 900px) {
+  .cw-agents { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cw-agent + .cw-agent::before { display: none; }
+  .cw-narrs { grid-template-columns: 1fr; }
+  .cw-two { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .cw-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cw-agents { grid-template-columns: 1fr; }
+  .cw-live li { grid-template-columns: 1fr auto; }
+  .cw-live .cw-act { grid-column: 1 / -1; grid-row: 2; }
+  .cw-fresh { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cw-fees { grid-template-columns: 1fr; }
+}

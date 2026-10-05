@@ -125,7 +125,7 @@ export function createDemo() {
       devBuy: Math.random() < 0.5 ? 0 : Math.round(Math.random() * 20) / 10, at,
       holder: Math.random() < 0.18, mcap, change: mcap ? Math.round((Math.random() - 0.35) * 160) : null, burned: null,
       volume: mcap ? Math.round(mcap * (0.2 + Math.random() * 1.5)) : null, sig: null, fee: null,
-      share: Math.random() < 0.65 ? { bps: 1000, teamBps: 500, live: true } : null,
+      share: Math.random() < 0.65 ? { bps: 4000, teamBps: 1000, crewBps: 2000, live: true } : null,
       candle: null,
       ...extra,
     };
@@ -283,7 +283,7 @@ export function createDemo() {
       constitution: {
         personality: k.label, mind: { name: k.model, by: k.by, logo: k.logo }, character: k.prompt || null,
         objective: CONFIG.keepers.goals[k.goal] ? { label: CONFIG.keepers.goals[k.goal].label, hint: CONFIG.keepers.goals[k.goal].hint } : null,
-        burn: m.candle ? { pct: m.candle.bps / 100, wickPct: 5, teamPct: 5 } : null, proof: null,
+        burn: m.candle ? { pct: m.candle.bps / 100, wickPct: 10, teamPct: 10, crewPct: m.share?.crewBps ? 20 : 0 } : null, proof: null,
         rules: m.candle
           ? ['Decides at most once every 1 hour', 'Burns at least every 24 hours when there is something to burn', 'Burns at once past 0.25 SOL', `Can only buy back $${m.symbol} and burn it`]
           : ['Talks to holders, writes its journal', 'Holds no funds'],
@@ -334,7 +334,7 @@ export function createDemo() {
         launch: {
           maxDevBuy: 5, feeSol: FEE, burnSol: FEE / 2, teamSol: FEE / 2,
           sharedFeeSol: SHARED_FEE, sharedBurnSol: SHARED_FEE / 2, sharedTeamSol: SHARED_FEE / 2,
-          shareBps: 1000, split: { creatorBps: 9000, burnBps: 500, teamBps: 500 }, selfOptions: [1000, 2000, 3000, 5000],
+          shareBps: 4000, split: { creatorBps: 6000, burnBps: 1000, teamBps: 1000, crewBps: 2000 }, selfOptions: [1000, 2000, 3000, 5000],
           keepers: {
             styles: KEEPER_STYLES.map(([id, label, hint]) => ({ id, label, hint })),
             models: KEEPER_MODELS.map(([id, name, by, f]) => ({ id, name, by, logo: logoOf(f) })),
@@ -429,7 +429,7 @@ export function createDemo() {
       const m = make(Date.now(), {
         name: fields.name, symbol: fields.symbol, creator: 'YouDemo1111111111111111111111111111111111111',
         image: image ? URL.createObjectURL(image) : null, devBuy: Number(fields.devBuy) || 0, mcap: null, change: null, holder: false,
-        share: fields.share === '1' ? { bps: 1000, teamBps: 500, live: true } : null,
+        share: fields.share === '1' ? { bps: 4000, teamBps: 1000, crewBps: 2000, live: true } : null,
         candle: null,
         keeper: makeKeeper({ symbol: fields.symbol }, fields.keeper_style, fields.keeper_model, fields.keeper_goal, fields.keeper_prompt),
         description: fields.description || null,
@@ -501,6 +501,36 @@ export function createDemo() {
     async candles() {
       const forest = all.filter((m) => m.candle).sort((a, b) => b.candle.burned - a.candle.burned || (b.mcap || 0) - (a.mcap || 0));
       return { forest: forest.slice(0, 40).map(pub), burns: coinBurns.slice(0, 30).map((b) => ({ ...b })), totals: candleTotals() };
+    },
+    // Le crew : des narratifs d'exemple (le vrai Scout lit DEX Screener), et ce que font les Operators.
+    async crew() {
+      await new Promise((r) => setTimeout(r, 300));
+      const now = Date.now();
+      const crewCoin = (m) => ({
+        mint: m.mint, symbol: m.symbol, name: m.name, image: m.image, mcap: m.mcap, holder: m.holder,
+        character: m.keeper.label, goal: CONFIG.keepers.goals[m.keeper.goal]?.label || null,
+        mind: { name: m.keeper.model, by: m.keeper.by, logo: m.keeper.logo },
+      });
+      const live = all.slice(-24).flatMap((m) => operatorOf(m, coinBurns.filter((b) => b.mint === m.mint)).log
+        .filter((e) => !['launched', 'sealed'].includes(e.kind) && e.at <= now).map((e) => ({ ...e, coin: crewCoin(m) })))
+        .sort((a, b) => b.at - a.at).slice(0, 16);
+      const src = (symbol, name, mcap, change) => ({ mint: key(), symbol, name, mcap, change, vol: mcap * 2, url: 'https://dexscreener.com/solana' });
+      const sources = [src('CFROG', 'Casino Frog', 4_200_000, 38), src('BLKJK', 'Blackjack Cat', 870_000, 112), src('NPCX', 'NPC Uprising', 2_300_000, -12),
+        src('MAINC', 'Main Character', 640_000, 74), src('OWL', 'Night Shift Owl', 1_100_000, 21)];
+      return {
+        scout: {
+          at: now - 11 * 60_000, ai: true, seen: 27, sources,
+          narratives: [
+            { title: 'Animals run the casino', angle: 'Gambling animals lead today: frogs and cats dealing cards top the volume.', idea: 'A sleepy hamster who runs the night shift at a Solana casino', sources: ['CFROG', 'BLKJK'] },
+            { title: 'NPCs wake up', angle: 'Background characters becoming main characters keep trending.', idea: 'The NPC who sells candles in every RPG finally gets his own coin', sources: ['NPCX', 'MAINC'] },
+            { title: 'Night owls', angle: 'Late-night themes are climbing as US traders log off.', idea: 'An owl that only trades while everyone sleeps, and burns at dawn', sources: ['OWL'] },
+          ],
+        },
+        live,
+        fresh: all.slice(-8).reverse().map((m) => ({ ...crewCoin(m), about: m.description, at: m.at, sig: null, burns: m.candle ? m.candle.bps / 100 : 0 })),
+        top: all.filter((m) => m.mcap).sort((a, b) => b.mcap - a.mcap).slice(0, 6).map((m) => ({ ...crewCoin(m), change: m.change, burns: m.candle?.burns || 0 })),
+        stats: { coins: all.length, actions: all.length * 6 + coinBurns.length, burns: coinBurns.length, posts: all.length * 2 },
+      };
     },
     async coin(mint) {
       const m = all.find((x) => x.mint === mint);

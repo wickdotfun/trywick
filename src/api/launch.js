@@ -110,9 +110,9 @@ export async function prepare({ request, env }) {
   }
   // Un nouvel essai repart de zéro : une ancienne transaction de fee gardée ne partira jamais.
   await env.DB.prepare(`UPDATE matches SET fee_lamports = ?, fee_to = ?, team_to = ?, team_lamports = ?, share_bps = ?,
-      share_team_bps = ?, self_bps = ?, share_msg = NULL, share_tx = NULL, fee_sig = NULL, fee_state = NULL, share_state = NULL
+      share_team_bps = ?, share_crew_bps = ?, self_bps = ?, share_msg = NULL, share_tx = NULL, fee_sig = NULL, fee_state = NULL, share_state = NULL
       WHERE mint = ? AND seq IS NULL`)
-    .bind(fee?.lamports ?? 0, fee?.to ?? null, fee?.teamWallet ?? null, fee?.team?.lamports ?? 0, shareBps, shareTeamBps,
+    .bind(fee?.lamports ?? 0, fee?.to ?? null, fee?.teamWallet ?? null, fee?.team?.lamports ?? 0, shareBps, shareTeamBps, holders.length ? fee.crewBps || 0 : 0,
       holders.length ? fee.selfBps || 0 : 0, launch.mint).run();
   // Chaque coin a son Keeper : sa personnalité et son esprit (Stoic sur Llama si rien n'est choisi).
   // Avec « Make it burn », c'est lui qui choisit les moments de brûler.

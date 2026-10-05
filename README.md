@@ -13,12 +13,16 @@ Launch a coin → it burns itself → it feeds $WICK → burn $WICK.
 - **Every launch burns $WICK.** The **WICK Ignition Fee** (0.02 SOL, WICK's own fee, not a pump.fun fee), signed
   together with the launch: **50% burns $WICK, 50% funds the team**. Both transfers are in the same transaction; the
   burn half buys $WICK and burns it within a minute.
-- **Make it burn (optional).** At launch, the creator picks **10, 20, 30 or 50% of the coin's pump.fun creator fees**
-  to buy the coin itself back and burn it, forever: the coin becomes a **candle**, with its own page (`/#coin/<mint>`),
-  every burn on Solscan, and its place in the forest (`/#candles`). On top of that, 5% burns $WICK and 5% funds the
-  team; the rest is the creator's. The Ignition Fee drops to **0.01 SOL** (also 50/50). The split is set with pump.fun's
-  own fee sharing and locked on-chain: nobody can change it, not even WICK. See "Make it burn" below.
-  (Without a candle, a creator can still share 10%: 90% creator · 5% burn · 5% team.)
+- **Every coin gets a crew.** Four AI agents: the **Scout** finds the narrative (what is trending on Solana, with its
+  sources), the **Chandler** makes the coin (name, ticker, logo, lore, launch kit), the **Igniter** launches it on
+  pump.fun (the creator's wallet signs every launch), and its **Operator** works it after the launch. See "The crew" below.
+- **The fee split.** Every coin shares its pump.fun creator fees: **60% creator · 20% its crew · 10% burns $WICK ·
+  10% team**. The crew's 20% pays for its AI and its posts (received by the team wallet, which runs the crew). The
+  Ignition Fee is **0.01 SOL** (50/50). The split is set with pump.fun's own fee sharing and locked on-chain: nobody can
+  change it, not even WICK.
+- **Make it burn (optional).** The creator takes **10, 20, 30 or 50%** from their share to buy the coin itself back and
+  burn it, forever: the coin becomes a **candle**, with its own page (`/#coin/<mint>`), every burn on Solscan, and its
+  place in the forest (`/#candles`). See "Make it burn" below.
 - **The breath: a buyback every 30 minutes at most.** Everything waiting in the burn wallet buys back and burns
   $WICK. Every launch brings the next buyback 1 minute closer. The countdown is on screen.
 - **$WICK's own creator fees** are not part of the burn: they go to the dev wallet that launched $WICK, like any
@@ -101,7 +105,7 @@ bought ("no buyback yet"), and launching costs nothing extra.
 A coin's candle is fed by its own creator fees (`lib/candles.js`, `lib/sharing.js`, `lib/buyback.js`):
 
 1. **Launch**: the creator picks the share (`burn` = 10, 20, 30 or 50). The locked split gives the burn wallet that
-   share plus the 5% for $WICK (one shareholder), the team wallet 5%, the creator the rest.
+   share plus the 10% for $WICK (one shareholder), the team wallet 30% (10% team + 20% crew), the creator the rest.
 2. **Distribution** (cron, every 6 hours at most per coin): what the burn wallet receives from a coin is split. The
    coin's part (its share over the burn wallet's whole share) is set aside for that coin (`matches.self_pending`); the
    rest joins the $WICK pot.
@@ -114,6 +118,25 @@ A coin's candle is fed by its own creator fees (`lib/candles.js`, `lib/sharing.j
 
 `GET /api/candles` returns the forest (coins that burn themselves, most burned first), their latest burns and totals;
 `GET /api/coin?mint=…` returns one coin, its candle and every burn.
+
+## The crew
+
+> **Every coin gets a crew.** Scout finds the narrative, Chandler makes the coin, Igniter launches it (you sign),
+> its Operator works it. You approve every launch. The crew does the rest. Page: `/#crew` (`GET /api/crew`, `lib/crew.js`).
+
+**Scout** (`lib/scout.js`, cron, every 30 minutes): reads DEX Screener's top boosted tokens and latest token profiles
+(free API), keeps the Solana ones with a real market (≥ $20K market cap), and asks the AI for 3 narratives: a title, an
+angle, an original coin idea, and **1 to 3 sources** taken only from the tokens it saw (anything else is dropped).
+Without the AI, it shows what is running, as is. Its picks show in the launch (one click sparks the coin on that
+narrative) and on the crew page, each source with its DEX Screener link. Stored in `settings` (`scout`).
+
+**Chandler**: Spark and the launch kit (below). **Igniter**: the launch and the fee split, signed by the creator's
+wallet. **Operator**: everything after the launch (below).
+
+**The launch, in five steps**: Identity (Scout's picks, Spark, Surprise me, or by hand) → Mind (the model) → Character
+(Stoic, Degen, Poet, Pyromaniac, Analyst, Builder, Guardian, or Custom: the creator writes it, 280 characters, filtered)
+→ Objective (Deflation, Survive, Open book, Meme engine: it shapes the Operator's persona and adds a mission) → Fire
+(dev buy, Make it burn, the split, then the wallet signs). Character and objective are locked in the Constitution.
 
 ## Operators
 
@@ -199,11 +222,11 @@ the Worker would cost too much CPU on the free plan. Change the template in `lib
 
 pump.fun lets a coin's creator split its creator fees between up to 10 wallets, once and for all
 ([pump.fun docs](https://github.com/pump-fun/pump-public-docs/blob/main/docs/instructions/CREATOR_FEE_SHARING.md)).
-WICK uses it, as an option chosen by the creator at launch (`lib/sharing.js`):
+WICK uses it for every coin launched once $WICK is live (`lib/sharing.js`):
 
 1. **Prepare**: with sharing, the Worker builds a second transaction, paid and signed by the creator, that holds the
    reduced Ignition Fee (burn half and team half), `create_fee_sharing_config` and `update_fee_shares_v2` (creator
-   90%, burn wallet 5%, team wallet 5%; this last instruction locks the split forever). The wallet signs it right
+   60%, burn wallet 10%, team wallet 30%: 10% team + 20% the coin's crew; this last instruction locks the split forever). The wallet signs it right
    after the launch (a second approval).
 2. **Submit**: the launch is sent; the sharing transaction is checked (byte for byte the one prepared) and **held**: it
    can only work once the coin exists.
@@ -234,12 +257,13 @@ buy and burn transactions, and the last cron step and error. It has two buttons:
 **Two wallets.**
 
 - **The burn wallet** (`5siQ…M69Z`, `buyback.wallet` in `lib/config.js`) is a dedicated Solana wallet whose private
-  key is stored as the `BUYBACK_SECRET_KEY` secret. It receives the burn half of the Ignition Fees and the 5% burn
+  key is stored as the `BUYBACK_SECRET_KEY` secret. It receives the burn half of the Ignition Fees and the 10% burn
   share of shared creator fees, and only ever buys and burns $WICK: everything it holds above the reserve is spent
   on buybacks, so never use it for anything else. The Worker refuses any other key (`wrong_burn_wallet`), and
   always refuses the dev wallet's (`dev_wallet_key`).
 - **The dev wallet** (`7ZMM…eLANN`, `launch.deployer`) launches $WICK and receives the team half of the Ignition
-  Fees, the 5% team share of shared creator fees, and 100% of $WICK's own creator fees. The site never holds its key.
+  Fees, the 30% team share of shared creator fees (10% team + 20% for the coins' crews: their AI and their posts),
+  and 100% of $WICK's own creator fees. The site never holds its key.
 
 ## How it's built
 
@@ -268,6 +292,7 @@ small JSON API, backed by a [D1](https://developers.cloudflare.com/d1/) database
 | Burn queue: buybacks and launch burns | `lib/buyback.js` |
 | Creator fee sharing (pump.fun fee sharing, distributions) | `lib/sharing.js` |
 | Coins that burn themselves (Candles page, coin pages) | `lib/candles.js`, `src/client/candles.js` |
+| The crew page, the Scout (trending narratives with sources) | `lib/crew.js`, `lib/scout.js`, `src/client/crew.js` |
 | Operators (the AI agent of each coin): burns, voices, journal | `lib/keepers.js` |
 | Spark (the AI creates the coin), its logo, questions to a Operator | `lib/spark.js`, `src/api/spark.js`, `src/client/keeper.js` |
 | Living matches (DexScreener market caps) | `lib/markets.js` |
@@ -329,7 +354,7 @@ Locally, `CYCLE_MINUTES=1` in `.dev.vars` makes the breath (buyback countdown) 1
    | `LAUNCH_FEE_SHARED_SOL` | Ignition Fee when the creator shares its creator fees (default `0.01`) |
    | `TEAM_FEE_BPS` | team share of the Ignition Fee, in basis points (default `5000` = 50%) |
    | `TEAM_WALLET` | where the team share goes (default: the dev wallet) |
-   | `SHARE_BURN_BPS`, `SHARE_TEAM_BPS` | burn and team parts of shared creator fees, in basis points (default `500` + `500`: 90/5/5) |
+   | `SHARE_BURN_BPS`, `SHARE_TEAM_BPS`, `SHARE_CREW_BPS` | burn, team and crew parts of shared creator fees, in basis points (default `1000` + `1000` + `2000`: 60/20/10/10) |
    | `HOLDER_MIN` | minimum $WICK held for a golden flame (default: any amount) |
    | `TELEGRAM_BOT_TOKEN` (secret), `TELEGRAM_CHAT_ID` | the bot (from @BotFather) and the channel (`@yourchannel` or its numeric id); the bot must be an admin of the channel |
    | `SITE_URL` | the link in Telegram posts (default `https://trywick.fun`) |

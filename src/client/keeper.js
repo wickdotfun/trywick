@@ -1,15 +1,15 @@
-// Parler à un Keeper (l'agent IA d'un coin), ou à The Wick (celui de $WICK) : une petite
+// Parler à un Operator (l'agent IA d'un coin), ou à The Wick (celui de $WICK) : une petite
 // conversation dans la page. Les réponses viennent de /api/ask ; rien n'est gardé côté serveur,
 // la conversation vit le temps de la visite.
 import { aiLogo, esc, icon } from './util.js';
 
 const ERRORS = {
-  too_many: 'Your Keeper needs a breather. Ask again in a little while.',
-  ai_busy: 'The Keepers have talked a lot today. Come back tomorrow.',
-  ai_off: 'The Keepers are asleep for now. Try again later.',
+  too_many: 'Your Operator needs a breather. Ask again in a little while.',
+  ai_busy: 'The Operators have talked a lot today. Come back tomorrow.',
+  ai_off: 'The Operators are asleep for now. Try again later.',
   ai_failed: 'No answer this time. Try again.',
   bad_question: 'Ask a real question.',
-  unknown_coin: 'This Keeper is not lit yet.',
+  unknown_coin: 'This Operator is not lit yet.',
 };
 const logs = new Map();   // mint → [{ who, text }]
 
@@ -17,10 +17,10 @@ const logs = new Map();   // mint → [{ who, text }]
 export function chatHtml({ mint, keeper, symbol, suggestions = [] }) {
   const log = logs.get(mint) || [];
   return `<div class="kchat" data-chat="${esc(mint)}">
-    <div class="kchat-log" aria-live="polite">${log.length ? log.map(bubble(keeper)).join('') : `<p class="kchat-empty">${icon('keeper')} Ask ${esc(keeper?.name || 'the Keeper')} anything${symbol ? ` about $${esc(symbol)}` : ''}. It answers in character, from real numbers.</p>`}</div>
+    <div class="kchat-log" aria-live="polite">${log.length ? log.map(bubble(keeper)).join('') : `<p class="kchat-empty">${icon('keeper')} Ask ${esc(keeper?.name || 'the Operator')} anything${symbol ? ` about $${esc(symbol)}` : ''}. It answers in character, from real numbers.</p>`}</div>
     ${suggestions.length ? `<div class="kchat-sugg">${suggestions.map((s) => `<button type="button" data-q="${esc(s)}">${esc(s)}</button>`).join('')}</div>` : ''}
     <form class="kchat-form" autocomplete="off">
-      <input name="q" maxlength="240" placeholder="${esc(`Message ${keeper?.name || 'the Keeper'}…`)}" aria-label="Your question">
+      <input name="q" maxlength="240" placeholder="${esc(`Message ${keeper?.name || 'the Operator'}…`)}" aria-label="Your question">
       <button type="submit" class="cta small-cta" aria-label="Send">${icon('send')}</button>
     </form>
     ${keeper?.model ? `<small class="kchat-foot">${aiLogo(keeper, 12)} ${esc(keeper.model)} by ${esc(keeper.by)} · not financial advice</small>` : ''}

@@ -114,9 +114,9 @@ test('a coin\'s Keeper answers its holders in character, from the coin\'s real f
   const mint = await coin(e);
   const res = await askKeeper(e, { mint, question: 'what is the story?', ip: 'ip1', now: NOW });
   assert.equal(res.value.answer, 'ser we are just getting started, the candle is lit');
-  assert.deepEqual(res.value.keeper, { name: 'Keeper of $MOTH', label: 'Degen', model: 'Qwen3 30B', by: 'Qwen', logo: '/brand/ai/qwen.svg' });
+  assert.deepEqual(res.value.keeper, { name: 'Operator of $MOTH', label: 'Degen', model: 'Qwen3 30B', by: 'Qwen', logo: '/brand/ai/qwen.svg' });
   const sys = ai.calls[0].input.messages[0].content;
-  assert.match(sys, /Keeper of \$MOTH/);
+  assert.match(sys, /Operator of \$MOTH/);
   assert.match(sys, /Moths love the flame/);
   assert.match(sys, /\$50,000/);
   assert.match(sys, /Never give financial advice/);

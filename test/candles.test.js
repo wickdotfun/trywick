@@ -86,8 +86,14 @@ test('a coin burn buys the coin itself, burns it, and melts its own candle, not 
   // La forêt, le fil et la page du coin le montrent.
   assert.equal((await candleForest(db))[0].mint, mint);
   assert.equal((await coinBurnLog(db))[0].symbol, 'MOTH');
-  assert.equal((await coinPage(db, mint)).burns.length, 1);
+  const page = await coinPage(db, mint);
+  assert.equal(page.burns.length, 1);
   assert.deepEqual(await candleTotals(db), { candles: 1, candleBurns: 1, candleSol: 0.05 });
+  // Le journal de son Operator note le burn, avec sa transaction.
+  assert.equal(page.operator.log.length, 1);
+  assert.equal(page.operator.log[0].kind, 'burned');
+  assert.equal(page.operator.log[0].title, 'Burned 1 $MOTH');
+  assert.ok(page.operator.log[0].sig);
 });
 
 test('a failed coin buy gives its SOL back to the coin, not to the $WICK pot', async () => {

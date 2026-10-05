@@ -14,7 +14,7 @@ const STEP = 0.05;
 const FEE = 0.02;
 const SHARED_FEE = 0.01;
 const WICK_PER_SOL = 400_000;
-// Les Keepers de la démo : des personnalités, des esprits, et ce qu'ils disent.
+// Les Operators de la démo : des personnalités, des esprits, et ce qu'ils disent.
 const KEEPER_STYLES = [['stoic', 'Stoic', 'Calm, patient, few words'], ['degen', 'Degen', 'Loud, fast, all conviction'],
   ['poet', 'Poet', 'Every burn is a verse'], ['pyro', 'Pyromaniac', 'Loves the fire a bit too much']];
 const KEEPER_MODELS = [['llama', 'Llama 3.3 70B', 'Meta', 'meta'], ['gpt-oss', 'gpt-oss 120B', 'OpenAI', 'openai'], ['qwen', 'Qwen3 30B', 'Qwen', 'qwen'],
@@ -22,7 +22,7 @@ const KEEPER_MODELS = [['llama', 'Llama 3.3 70B', 'Meta', 'meta'], ['gpt-oss', '
 const logoOf = (f) => `/brand/ai/${f}.svg`;
 const HELLOS = {
   stoic: 'I keep the candle of $SYM. I watch, I speak when it matters.',
-  degen: '$SYM keeper online. I see everything. We are so early.',
+  degen: '$SYM operator online. I see everything. We are so early.',
   poet: 'A new wick, a new flame. I will tend $SYM through every night.',
   pyro: 'They gave me $SYM. I love it already. Look at that flame.',
 };
@@ -34,8 +34,8 @@ const JOURNAL = {
 };
 const ABOUTS = [
   '{n} was born in the wax and raised by the flame. Every trade keeps it lit.',
-  '{n}: a tiny legend that refuses to go out. Its Keeper watches every candle.',
-  'The internet asked for {n}. The candle answered. Its Keeper does the rest.',
+  '{n}: a tiny legend that refuses to go out. Its Operator watches every candle.',
+  'The internet asked for {n}. The candle answered. Its Operator does the rest.',
   '{n} lives where the fire is warmest. Holders keep it burning.',
 ];
 const ANSWERS = {
@@ -70,7 +70,7 @@ export function createDemo() {
     const amount = Math.round(sol * WICK_PER_SOL * (0.85 + Math.random() * 0.3));
     burned += amount;
     const b = { kind, ref: String(ref), at: Date.now(), burned: amount, sol, sig: null, symbol };
-    // The Wick, le Keeper de la grande bougie, commente chaque buyback.
+    // The Wick, le Operator de la grande bougie, commente chaque buyback.
     if (kind === 'candle') b.voice = pick(['Breath taken. The great candle grows shorter.', 'Every launch fed this one. Burned.', 'The wax remembers every coin. Gone, now.']);
     burns.unshift(b);
     // Une bougie entière a fondu : elle rejoint la salle.
@@ -107,7 +107,7 @@ export function createDemo() {
       candle: null,
       ...extra,
     };
-    // Chaque coin a son Keeper ; la plupart des coins qui partagent ont choisi « Make it burn ».
+    // Chaque coin a son Operator ; la plupart des coins qui partagent ont choisi « Make it burn ».
     m.keeper ||= makeKeeper(m);
     m.description ||= pick(ABOUTS).replace('{n}', m.name);
     if (m.share && m.candle === null && !extra.share && Math.random() < 0.8) {
@@ -150,7 +150,7 @@ export function createDemo() {
     m.candle.sol += sol;
     m.candle.burns++;
     const k = m.candle.keeper;
-    // Jamais deux fois la même phrase d'affilée pour un même Keeper.
+    // Jamais deux fois la même phrase d'affilée pour un même Operator.
     const voice = k ? pick(VOICES[k.style].filter((v) => v !== k.thought)) : null;
     if (k) Object.assign(k, { thought: Math.random() < 0.3 ? WAITS[k.style] : voice, thoughtAt: at });
     const b = { mint: m.mint, symbol: m.symbol, image: m.image, at, burned: amount, sol, sig: null, voice };
@@ -167,7 +167,7 @@ export function createDemo() {
     const lit = all.filter((m) => m.candle && m.mcap);
     if (lit.length) coinBurn(pick(lit));
   }, 11000);
-  // Le journal des Keepers : une ligne de temps en temps, dans le fil.
+  // Le journal des Operators : une ligne de temps en temps, dans le fil.
   const journal = () => {
     const alive = all.filter((m) => m.keeper && m.mcap);
     if (!alive.length) return;
@@ -214,6 +214,34 @@ export function createDemo() {
   }, 8000);
 
   const pub = (m) => ({ ...m });
+
+  // L'Operator d'un coin (comme lib/operator.js) : sa Constitution et son journal d'actions.
+  function operatorOf(m, burnsOf) {
+    const k = m.keeper;
+    const fmtN = (n) => Math.round(n).toLocaleString('en-US');
+    // Les coins de départ de la démo ont des burns « passés » : leur lancement les précède.
+    const t0 = Math.min(m.at, ...burnsOf.map((b) => b.at - 600_000));
+    const log = [
+      { at: t0, kind: 'launched', title: `Launched $${m.symbol} on pump.fun`, detail: `Operator summoned: ${k.label} on ${k.model}.` },
+      ...(m.candle ? [{ at: t0 + 2000, kind: 'sealed', title: `Locked ${m.candle.bps / 100}% of creator fees to burn $${m.symbol}`, detail: 'Set with pump.fun fee sharing at launch. Nobody can change it.' }] : []),
+      ...(m.burned ? [{ at: t0 + 4000, kind: 'fed', title: `Fed the $WICK candle: ${fmtN(m.burned)} $WICK burned`, detail: 'Half of its Ignition Fee bought $WICK and burned it.' }] : []),
+      { at: t0 + 6000, kind: 'intro', title: 'First words', detail: k.intro },
+      ...burnsOf.map((b) => ({ at: b.at, kind: 'burned', title: `Burned ${fmtN(b.burned)} $${m.symbol}`, detail: `${b.sol} SOL of its creator fees.${b.voice ? ` “${b.voice}”` : ''}` })),
+      ...(k.thought && k.thought !== k.intro && !burnsOf.some((b) => b.voice === k.thought)
+        ? [{ at: k.thoughtAt, kind: WAITS[k.style] === k.thought ? 'wait' : 'journal', title: WAITS[k.style] === k.thought ? 'Held the fire, waiting for a better moment' : 'Journal', detail: k.thought }] : []),
+    ].sort((a, b) => b.at - a.at).map((e) => ({ ...e, sig: null }));
+    return {
+      log,
+      constitution: {
+        personality: k.label, mind: { name: k.model, by: k.by, logo: k.logo },
+        burn: m.candle ? { pct: m.candle.bps / 100, wickPct: 5, teamPct: 5 } : null, proof: null,
+        rules: m.candle
+          ? ['Decides at most once every 1 hour', 'Burns at least every 24 hours when there is something to burn', 'Burns at once past 0.25 SOL', `Can only buy back $${m.symbol} and burn it`]
+          : ['Talks to holders, writes its journal', 'Holds no funds'],
+        canSell: false, canMoveFunds: false, locked: true,
+      },
+    };
+  }
 
   return {
     demo: true,
@@ -361,7 +389,7 @@ export function createDemo() {
       }
       return { match: pub(m), signature: null };
     },
-    // Spark : le Keeper invente le coin à partir d'une idée (ici, sans IA : des mots de l'idée).
+    // Spark : le Operator invente le coin à partir d'une idée (ici, sans IA : des mots de l'idée).
     async spark({ idea, style = 'stoic', model = 'llama' }) {
       await new Promise((r) => setTimeout(r, 1400));
       const text = String(idea || '').trim();
@@ -374,7 +402,7 @@ export function createDemo() {
       const mm = KEEPER_MODELS.find((x) => x[0] === model) || KEEPER_MODELS[0];
       return {
         name, symbol,
-        description: `${name} started as one idea: ${text.slice(0, 90)}. Now it is a candle, and its Keeper never lets it go out.`,
+        description: `${name} started as one idea: ${text.slice(0, 90)}. Now it is a candle, and its Operator never lets it go out.`,
         intro: HELLOS[style]?.replace('$SYM', `$${symbol}`) || HELLOS.stoic.replace('$SYM', `$${symbol}`),
         visual: text, mind: { id: mm[0], name: mm[1], by: mm[2], logo: logoOf(mm[3]) },
       };
@@ -404,20 +432,20 @@ export function createDemo() {
       g.beginPath(); g.moveTo(256, 50); g.bezierCurveTo(320, 120, 300, 190, 256, 200); g.bezierCurveTo(212, 190, 192, 120, 256, 50); g.fill();
       return new Promise((r) => c.toBlob(r, 'image/png'));
     },
-    // Parler à un Keeper (ou à The Wick) : des réponses toutes prêtes, dans son style.
+    // Parler à un Operator (ou à The Wick) : des réponses toutes prêtes, dans son style.
     async ask({ mint, question }) {
       await new Promise((r) => setTimeout(r, 900 + Math.random() * 700));
       if (String(question || '').trim().length < 2) throw Object.assign(new Error('bad_question'), { code: 'bad_question' });
       if (mint === 'wick') {
         const q = String(question).toLowerCase();
-        const answer = /keeper|ai|ia/.test(q) ? 'Every coin on WICK has an AI Keeper: it creates the coin with you, talks to its holders, and picks the moments to burn it.'
+        const answer = /keeper|ai|ia/.test(q) ? 'Every coin on WICK has an AI Operator: it creates the coin with you, talks to its holders, and picks the moments to burn it.'
           : /fee|cost|price|prix/.test(q) ? 'A launch costs the Ignition Fee plus pump.fun costs. Half of the fee buys back $WICK and burns it.'
           : 'I am The Wick. Every coin launched here feeds my flame, and every breath burns a little more of $WICK.';
         return { answer, keeper: { name: 'The Wick', label: 'Stoic', model: 'Llama 3.3 70B', by: 'Meta', logo: logoOf('meta') } };
       }
       const m = all.find((x) => x.mint === mint);
       if (!m) throw Object.assign(new Error('unknown_coin'), { code: 'unknown_coin' });
-      return { answer: pick(ANSWERS[m.keeper.style]), keeper: { name: `Keeper of $${m.symbol}`, label: m.keeper.label, model: m.keeper.model, by: m.keeper.by, logo: m.keeper.logo } };
+      return { answer: pick(ANSWERS[m.keeper.style]), keeper: { name: `Operator of $${m.symbol}`, label: m.keeper.label, model: m.keeper.model, by: m.keeper.by, logo: m.keeper.logo } };
     },
     // La forêt des bougies, et la page d'un coin.
     async candles() {
@@ -427,7 +455,8 @@ export function createDemo() {
     async coin(mint) {
       const m = all.find((x) => x.mint === mint);
       if (!m) throw new Error('unknown_mint');
-      return { match: pub(m), burns: coinBurns.filter((b) => b.mint === mint).map((b) => ({ ...b })) };
+      const burnsOf = coinBurns.filter((b) => b.mint === mint);
+      return { match: pub(m), burns: burnsOf.map((b) => ({ ...b })), operator: operatorOf(m, burnsOf) };
     },
   };
 }

@@ -99,7 +99,7 @@
       .selftest { grid-column: 1 / -1; }
     .st-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
     .st-list li { padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,.08); font-size: 13px; }
-    .st-list li.ok b { color: #3ddc84; } .st-list li.bad { border-color: rgba(255,107,91,.5); } .st-list li.bad b { color: #ff6b5b; }
+    .st-list li.ok b { color: #3ddc84; } .st-list li.warn { border-color: rgba(255,179,71,.45); } .st-list li.warn b { color: #ffb347; } .st-list li.bad { border-color: rgba(255,107,91,.5); } .st-list li.bad b { color: #ff6b5b; }
     .st-list small { opacity: .75; }
     /* Pas de barres de défilement grises : fines et sombres sur la page, invisibles ailleurs. */
     html { scrollbar-width: thin; scrollbar-color: rgba(255, 180, 80, .28) #080504; }
@@ -522,9 +522,9 @@
       $('selftest-out').innerHTML = '';
       try {
         const r = await call('/api/admin/selftest', {});
-        $('selftest-out').innerHTML = r.steps.map((s) => `<li class="${s.ok ? 'ok' : 'bad'}"><b>${s.ok ? 'OK' : 'FAIL'}</b> ${esc(s.name)} <small>${esc(s.detail)} · ${s.ms} ms</small></li>`).join('')
+        $('selftest-out').innerHTML = r.steps.map((s) => `<li class="${s.warn ? 'warn' : s.ok ? 'ok' : 'bad'}"><b>${s.warn ? 'NOTE' : s.ok ? 'OK' : 'FAIL'}</b> ${esc(s.name)} <small>${esc(s.detail)} · ${s.ms} ms</small></li>`).join('')
           + `<li class="dim"><small>AI used today: ${esc(JSON.stringify(r.aiToday))}</small></li>`;
-        flash(r.ok ? 'Everything works.' : 'Some steps fail: see the red lines.', r.ok ? 'ok' : 'bad');
+        flash(!r.ok ? 'Some steps fail: see the red lines.' : r.steps.some((s) => s.warn) ? 'Everything works. Read the yellow notes.' : 'Everything works.', r.ok ? 'ok' : 'bad');
       } catch (err) { flash(err.message, 'bad'); }
       b.disabled = false;
       b.textContent = 'Run the test again';

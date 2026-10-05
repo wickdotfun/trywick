@@ -2,6 +2,7 @@
 //   GET  /api/admin/status  → tout l'état du buyback
 //   POST /api/admin/pause   { paused: true | false } → l'interrupteur d'urgence
 //   POST /api/admin/run     → fait avancer le buyback tout de suite
+//   GET  /api/admin/social, POST /api/admin/post → les posts et leurs cartes (plus bas)
 import { buybackWallet, feeSummary, potSol, runBuyback } from '../../lib/buyback.js';
 import { supplyCandle } from '../../lib/candle.js';
 import { CONFIG, candlePct, cycleTiming } from '../../lib/config.js';
@@ -10,7 +11,9 @@ import { json } from '../../lib/http.js';
 import { pinataStatus } from '../../lib/pump.js';
 import { candleTotals } from '../../lib/candles.js';
 import { ensureSchema } from '../../lib/schema.js';
-import { deployer } from '../../lib/announce.js';
+import { announceText, deployer } from '../../lib/announce.js';
+import { MILESTONES, milestoneFile } from '../../lib/cards.js';
+import { cardBytes, postText, publish, socialStatus } from '../../lib/social.js';
 import { PUMP, PUMP_AMM, shareTotals } from '../../lib/sharing.js';
 import { buybackPaused, getSetting, setSetting } from '../../lib/settings.js';
 import { WSOL, ataAddress, findPda, fromBase58, getBalance, rpc, tokenHolding } from '../../lib/solana.js';
@@ -212,3 +215,61 @@ export async function recordRun(env, run) {
     return `error: ${err?.message ?? err}`;
   }
 }
+
+// ------------------------------------------------------------ les posts et leurs cartes
+//   GET  /api/admin/social → ce qui a été posté, les canaux prêts, les textes à copier pour X
+//   POST /api/admin/post   { kind, mcap?, lock?, image?, channels? } → poste une carte maintenant
+export const adminSocial = guarded(async ({ env }) => {
+  const mint = env.TOKEN_MINT || (await getSetting(env.DB, 'launch.detected'))?.mint || null;
+  const site = env.SITE_URL || 'https://trywick.fun';
+  const ticker = env.TOKEN_TICKER || 'WICK';
+  const status = await socialStatus(env);
+  return json({
+    ...status, mint, ticker, supply: CONFIG.pumpSupply,
+    texts: {
+      live: mint ? announceText(mint, { ticker, site }).replace(/<\/?code>/g, '') : null,
+      dexpaid: postText('dexpaid', { mint }, env).x,
+      mcap: Object.fromEntries(status.milestones.map((m) => [m.value, postText('mcap', { mint, mcap: m.value }, env).x])),
+    },
+  });
+});
+
+const B64 = /^[A-Za-z0-9+/]+=*$/;
+export const adminPost = guarded(async ({ request, env }) => {
+  const body = await request.json().catch(() => null);
+  const kind = body?.kind;
+  const mint = env.TOKEN_MINT || (await getSetting(env.DB, 'launch.detected'))?.mint || null;
+  const ticker = env.TOKEN_TICKER || 'WICK';
+  const site = env.SITE_URL || 'https://trywick.fun';
+  // Seulement les canaux demandés (Telegram, X, ou les deux).
+  const channels = Array.isArray(body?.channels) ? body.channels : ['telegram', 'x'];
+  const e = { ...env };
+  if (!channels.includes('telegram')) delete e.TELEGRAM_BOT_TOKEN;
+  if (!channels.includes('x')) delete e.X_API_KEY;
+  let post;
+  if (kind === 'live') {
+    if (!mint) return json({ error: 'not_live' }, 409);
+    const text = announceText(mint, { ticker, site });
+    post = { image: await cardBytes(env, 'live.png'), caption: text, x: text.replace(/<\/?code>/g, ''), mint };
+  } else if (kind === 'dexpaid') {
+    post = { image: await cardBytes(env, 'dex-paid.png'), mint, ...postText('dexpaid', { mint }, env) };
+  } else if (kind === 'mcap') {
+    const n = Number(body.mcap);
+    if (!MILESTONES.includes(n)) return json({ error: 'bad_milestone' }, 400);
+    post = { image: await cardBytes(env, milestoneFile(n)), mint, ...postText('mcap', { mint, mcap: n }, env) };
+  } else if (kind === 'lock') {
+    const l = body.lock || {};
+    const amount = Number(l.amount);
+    if (!(amount > 0)) return json({ error: 'bad_amount' }, 400);
+    if (l.link && !/^https:\/\/\S+$/.test(l.link)) return json({ error: 'bad_link' }, 400);
+    if (typeof body.image !== 'string' || body.image.length > 4_000_000 || !B64.test(body.image)) return json({ error: 'bad_image' }, 400);
+    const image = Uint8Array.from(atob(body.image), (c) => c.charCodeAt(0));
+    const data = { amount, pct: (amount / CONFIG.pumpSupply) * 100, until: String(l.until || '').slice(0, 40), where: String(l.where || 'Streamflow').slice(0, 40), link: l.link || null };
+    post = { image, mint, ...postText('lock', data, env) };
+  } else {
+    return json({ error: 'bad_kind' }, 400);
+  }
+  const out = await publish(e, `${kind}${kind === 'mcap' ? `.${body.mcap}` : ''}.manual.${Date.now()}`, post, { once: false });
+  await setSetting(env.DB, `social.${kind}.manual.${Date.now()}`, { status: out.telegram || out.x ? 'posted' : 'failed', at: Date.now(), ...out });
+  return json({ ...out, xText: post.x });
+});

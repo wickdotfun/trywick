@@ -4,12 +4,14 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "build": "esbuild src/client/app.js --bundle --splitting --minify --format=esm --target=es2022 --outdir=public/build --entry-names=[name] --chunk-names=chunks/[name]-[hash]",
+    "build": "esbuild src/client/app.js src/client/cardmaker.js --bundle --splitting --minify --format=esm --target=es2022 --outdir=public/build --entry-names=[name] --chunk-names=chunks/[name]-[hash] && cp node_modules/@resvg/resvg-wasm/index_bg.wasm public/build/resvg.wasm",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "test": "node --no-warnings --test test/*.test.js"
+    "test": "node --no-warnings --test test/*.test.js",
+    "cards": "node scripts/cards.mjs"
   },
   "devDependencies": {
+    "@resvg/resvg-wasm": "^2.6.2",
     "@solana/web3.js": "^1.99.0",
     "esbuild": "^0.28.2",
     "three": "^0.186.1",

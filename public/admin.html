@@ -82,6 +82,18 @@
     .scroll { overflow-x: auto; }
     .mono { font-family: var(--mono); }
     a.ext { color: var(--gold); }
+    .soc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin-top: 12px; }
+    .soc { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: rgba(255,220,180,.025); display: flex; flex-direction: column; }
+    .soc img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #070403; }
+    .soc .b { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .soc .b b { font-size: 13px; } .soc .b small { color: var(--muted); font-size: 11.5px; }
+    .soc .row .btn { height: 28px; padding: 0 9px; font-size: 12px; border-radius: 8px; }
+    .lock-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-top: 10px; }
+    .lock-form label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--muted); }
+    .lock-form input[type=text], .lock-form input[type=number], .lock-form input[type=url] { height: 38px; padding: 0 10px; border-radius: 10px; color: var(--text); border: 1px solid var(--line-2); background: rgba(255,220,180,.04); font: 13.5px var(--sans); }
+    .lock-prev { margin-top: 12px; display: grid; grid-template-columns: minmax(0, 520px) 1fr; gap: 14px; align-items: start; }
+    .lock-prev img { width: 100%; border-radius: 12px; border: 1px solid var(--line); }
+    @media (max-width: 760px) { .lock-prev { grid-template-columns: 1fr; } }
     @media (max-width: 1000px) { .kpis { grid-template-columns: repeat(3, 1fr); } }
     @media (max-width: 560px) { .kpis { grid-template-columns: repeat(2, 1fr); } .grid { grid-template-columns: 1fr; } .checklist { grid-template-columns: 1fr; } }
   </style>
@@ -132,6 +144,23 @@
         <div class="card"><h2>Launches on WICK</h2><dl class="kv" id="launchbox"></dl></div>
         <div class="card"><h2>Telegram &amp; health</h2><dl class="kv" id="health"></dl></div>
         <div class="card"><h2>Settings</h2><dl class="kv" id="checks"></dl></div>
+      </div>
+
+      <div class="card" id="social">
+        <h2>Posts &amp; cards <small id="soc-sum">automatic posts with their card: launch, DEX paid, market cap milestones</small></h2>
+        <dl class="kv" id="soc-status"></dl>
+        <div class="soc-grid" id="soc-cards"></div>
+        <details style="margin-top:12px"><summary class="dim" style="cursor:pointer">Market cap milestone cards</summary><div class="soc-grid" id="soc-miles"></div></details>
+        <h2 style="margin-top:20px">Tokens locked <small>fill in, preview, post: the card is drawn here</small></h2>
+        <form class="lock-form" id="lock-form">
+          <label>Amount locked ($WICK)<input type="number" name="amount" min="1" step="1" placeholder="34029058" required></label>
+          <label>Unlocks on<input type="text" name="until" placeholder="Oct 30, 2027"></label>
+          <label>Locked with<input type="text" name="where" value="Streamflow"></label>
+          <label>Proof link (https)<input type="url" name="link" placeholder="https://app.streamflow.finance/contract/solana/…"></label>
+          <label style="flex-direction:row;align-items:center;gap:8px;margin-top:20px"><input type="checkbox" name="noncancel" checked> Non-cancelable</label>
+          <div class="row" style="align-items:flex-end"><button class="btn" type="submit" id="lock-preview">Preview the card</button></div>
+        </form>
+        <div class="lock-prev" id="lock-prev" hidden></div>
       </div>
 
       <div class="card">
@@ -282,9 +311,6 @@
       $('steps').innerHTML = S.map((s, i) => `<li class="${s.state}"><span class="dot">${s.state === 'done' ? '✓' : s.state === 'bad' ? '!' : i + 1}</span>
         <span class="txt"><b>${s.title}</b><small>${s.detail}</small></span>${s.action ? `<span class="act">${s.action}</span>` : ''}</li>`).join('');
       $('tweet')?.addEventListener('click', () => window.open(`https://x.com/intent/post?text=${encodeURIComponent(tweet(d))}`, '_blank', 'noopener'));
-      document.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', async () => {
-        try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = 'Copied'; } catch { b.textContent = 'Select it'; }
-      }));
 
       // KPIs
       const supply = d.supply;
@@ -444,6 +470,7 @@
         $('dash').hidden = false;
         $('live-dot').classList.remove('off');
         render();
+        if (!soc) loadSocial();
       } catch (err) {
         if (err.status === 401) { try { sessionStorage.removeItem('wick.admin'); } catch {} key = ''; showLogin('Wrong key.'); }
         else if (err.status === 404) showLogin('Admin is off: set an ADMIN_KEY (16+ characters) in Cloudflare.');
@@ -481,6 +508,93 @@
         flash(step ? `Done: ${step}` : 'Nothing to do: no breath has ended yet.', step?.startsWith('error') ? 'bad' : 'ok');
       } catch (err) { flash(err.message, 'bad'); }
       load();
+    });
+
+
+    // ------------------------------------------------------------ posts & cards
+    let soc = null, lockBlob = null, lockData = null;
+    const channels = (s) => [s.telegram ? 'Telegram' : null, s.x ? 'X' : null].filter(Boolean);
+    const xIntent = (text) => `https://x.com/intent/post?text=${encodeURIComponent(text || '')}`;
+    const NAMES = { live: '$WICK is live', dexpaid: 'DEX paid', mcap: 'Market cap', lock: 'Tokens locked' };
+    function socCard({ file, title, hint, kind, mcap, text }) {
+      return `<div class="soc"><img src="/cards/${esc(file)}" alt="" loading="lazy"><div class="b">
+        <b>${esc(title)}</b><small>${esc(hint)}</small>
+        <div class="row">
+          <a class="btn" href="/cards/${esc(file)}" download>Download</a>
+          ${text ? `<button class="btn" data-copy="${esc(text)}">Copy X text</button><a class="btn x" href="${xIntent(text)}" target="_blank" rel="noopener">Open X</a>` : ''}
+          <button class="btn" data-post="${esc(kind)}"${mcap ? ` data-mcap="${mcap}"` : ''}>Post now</button>
+        </div></div></div>`;
+    }
+    function renderSocial() {
+      const s = soc;
+      const ch = channels(s);
+      const done = (k) => s.posts.find((p) => p.key === k);
+      const line = (label, p, auto) => `<dt>${label}</dt><dd>${p ? `${pill(p.status === 'posted' ? 'posted' : p.status, p.status === 'posted' ? 'ok' : 'bad')} ${ago(p.at)}${p.telegram ? ' · Telegram' : ''}${p.x ? ' · X' : ''}${p.xError ? ` <small class="bad">X: ${esc(p.xError)}</small>` : ''}${p.telegramError ? ` <small class="bad">Telegram: ${esc(p.telegramError)}</small>` : ''}` : `<span class="dim">${auto}</span>`}</dd>`;
+      const best = s.posts.find((p) => p.key === 'mcap');
+      $('soc-status').innerHTML = `
+        <dt>Channels</dt><dd>${ch.length ? `<span class="ok">${ch.join(' + ')}</span>` : '<span class="warn">none</span>'}${s.x ? '' : ' <small>· X: add X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET in Cloudflare to post there too (paid per post), or use Copy X text + Open X below</small>'}</dd>
+        <div class="sep"></div>
+        ${line('Launch announcement', done('live') || (data?.checks?.announced ? { status: 'posted', at: data.checks.announced.at, telegram: 1 } : null), 'posted by itself with the LIVE card, within a minute of the launch')}
+        ${line('DEX paid', done('dexpaid'), 'checked every 3 minutes on DEX Screener once $WICK is live')}
+        <dt>Market cap milestones</dt><dd>${best ? `highest posted: <b class="gold">${esc(s.milestones.find((m) => m.value === best.value)?.label || best.value)}</b> ${ago(best.at)}` : `<span class="dim">${esc(s.milestones.map((m) => m.label).join(' · '))}, each posted once</span>`}</dd>`;
+      $('soc-cards').innerHTML = [
+        socCard({ file: 'live.png', title: NAMES.live, hint: 'Posted with the launch announcement (pinned on Telegram).', kind: 'live', text: s.texts.live }),
+        socCard({ file: 'dex-paid.png', title: NAMES.dexpaid, hint: 'Posted by itself when DEX Screener approves the profile.', kind: 'dexpaid', text: s.texts.dexpaid }),
+      ].join('');
+      $('soc-miles').innerHTML = s.milestones.map((m) => socCard({ file: m.file, title: `${m.label} market cap`, hint: 'Posted by itself the first time $WICK crosses it.', kind: 'mcap', mcap: m.value, text: s.texts.mcap[m.value] })).join('');
+    }
+    async function loadSocial() {
+      try { soc = await call('/api/admin/social'); renderSocial(); } catch (err) { $('soc-status').innerHTML = `<dt>Posts</dt><dd class="bad">${esc(err.message)}</dd>`; }
+    }
+    async function postCard(body, label) {
+      const ch = channels(soc);
+      if (!ch.length) { flash('No channel set: connect Telegram (or X) in Cloudflare first. You can still download the card and post it yourself.', 'warn'); return; }
+      if (!confirm(`Post "${label}" now on ${ch.join(' and ')}?`)) return;
+      flash('Posting…', 'warn');
+      try {
+        const r = await call('/api/admin/post', body);
+        const ok = [r.telegram ? 'Telegram' : null, r.x ? 'X' : null].filter(Boolean);
+        flash(ok.length ? `Posted on ${ok.join(' and ')}.${r.xError ? ` X failed: ${r.xError}` : ''}${r.telegramError ? ` Telegram failed: ${r.telegramError}` : ''}` : `Not posted. ${r.telegramError || ''} ${r.xError || ''}`, ok.length ? 'ok' : 'bad');
+      } catch (err) { flash(err.message, 'bad'); }
+      loadSocial();
+    }
+    // Copier (le CA, un texte pour X) : un seul écouteur pour toute la page.
+    document.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-copy]');
+      if (!b) return;
+      try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = 'Copied'; } catch { b.textContent = 'Select it'; }
+    });
+    document.addEventListener('click', (e) => {
+      const p = e.target.closest('[data-post]');
+      if (p) postCard({ kind: p.dataset.post, mcap: p.dataset.mcap ? Number(p.dataset.mcap) : undefined }, p.closest('.soc').querySelector('b').textContent);
+    });
+    $('lock-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = Object.fromEntries(new FormData(e.target));
+      const amount = Number(f.amount);
+      if (!(amount > 0)) return;
+      lockData = { amount, until: f.until.trim(), where: f.where.trim() || 'Streamflow', link: f.link.trim() || null, cancelable: !f.noncancel };
+      const box = $('lock-prev');
+      box.hidden = false;
+      box.innerHTML = '<p class="dim">Drawing the card…</p>';
+      try {
+        const { renderCard } = await import('/build/cardmaker.js');
+        lockBlob = await renderCard('lock', { ticker: soc?.ticker || 'WICK', ...lockData, pct: (amount / (soc?.supply || 1e9)) * 100 });
+        const url = URL.createObjectURL(lockBlob);
+        const pct = (amount / (soc?.supply || 1e9)) * 100;
+        const text = `tokens are locked.\n\n${Math.round(amount).toLocaleString('en-US')} $${soc?.ticker || 'WICK'} (${+pct.toFixed(2)}% of the supply) locked${lockData.until ? ` until ${lockData.until}` : ''}.${lockData.link ? `\n\n${lockData.link}` : ''}`;
+        box.innerHTML = `<img src="${url}" alt="The lock card">
+          <div><p class="small">Looks right? Post it now, or download it and post it yourself.</p>
+            <div class="row"><button class="btn primary" id="lock-post">${channels(soc).length ? `Post on ${esc(channels(soc).join(' + '))}` : 'Post (no channel set)'}</button>
+              <a class="btn" href="${url}" download="wick-locked.png">Download</a>
+              <button class="btn" data-copy="${esc(text)}">Copy X text</button><a class="btn x" href="${xIntent(text)}" target="_blank" rel="noopener">Open X</a></div></div>`;
+        $('lock-post').addEventListener('click', async () => {
+          const buf = new Uint8Array(await lockBlob.arrayBuffer());
+          let bin = '';
+          for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+          postCard({ kind: 'lock', lock: lockData, image: btoa(bin) }, NAMES.lock);
+        });
+      } catch (err) { box.innerHTML = `<p class="bad">Could not draw the card: ${esc(err.message)}</p>`; }
     });
 
     if (key) load(); else showLogin();

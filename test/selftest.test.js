@@ -77,3 +77,23 @@ test('the Telegram token is cleaned of what people paste around it', async () =>
   assert.match(tgTokenProblem({ TELEGRAM_BOT_TOKEN: '123456789:short' }), /after ":"/);
   assert.match(tgTokenProblem({ TELEGRAM_BOT_TOKEN: 'AAbbcc:ddeeffgghhiijjkkllmmnnooppqqrrss' }), /bot number/);
 });
+
+test('with the free backup brain set, a used-up Workers AI quota is green: agents keep answering', async () => {
+  const { dexReset } = await import('../lib/dex.js');
+  dexReset();
+  const db = fakeD1();
+  await ensureSchema(db);
+  globalThis.fetch = async (url) => {
+    url = String(url);
+    if (url.includes('groq')) return Response.json({ choices: [{ message: { content: 'OK' } }] });
+    return Response.json([]);
+  };
+  const ai = { run: async () => { throw new Error('4006: daily free allocation of 10,000 neurons'); } };
+  const r = await selfTest({ DB: db, AI: ai, GROQ_API_KEY: 'gsk_test' });
+  const by = Object.fromEntries(r.steps.map((s) => [s.name, s]));
+  assert.equal(by['AI binding (Workers AI)'].ok, true);
+  assert.equal(by['AI binding (Workers AI)'].warn, undefined);
+  assert.match(by['AI binding (Workers AI)'].detail, /backup brain/);
+  assert.equal(by['Backup brain (Groq, free)'].ok, true);
+  assert.match(by['Backup brain (Groq, free)'].detail, /OK/);
+});

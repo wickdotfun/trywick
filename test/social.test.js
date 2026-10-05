@@ -151,3 +151,41 @@ test('X: OAuth 1.0a signature (HMAC-SHA1 over the method, URL and oauth params)'
   assert.equal(await xPost(X_KEYS, { text: 'hello', image: PNG }), '901');
   assert.deepEqual(w.sent.x[0], { text: 'hello', media: { media_ids: ['777'] } });
 });
+
+test('every new coin is posted on WICK\'s X by itself (with its agent, CA and image), once; a failure leaves the admin button', async () => {
+  const { runCoinX, coinXText } = await import('../lib/social.js');
+  const { ensureSchema } = await import('../lib/schema.js');
+  const { fakeD1 } = await import('./helpers/d1.js');
+  const DB = fakeD1();
+  await ensureSchema(DB);
+  const now = Date.UTC(2026, 9, 5, 20);
+  await DB.prepare(`INSERT INTO matches (mint, creator, name, symbol, image, uri, ip, created_at, seq, lit_at, keeper_style, keeper_model)
+    VALUES ('MintA', 'C', 'Frog', 'FROG', 'https://ipfs.io/ipfs/a', 'x', 'i', 0, 1, ?, 'analyst', 'gpt-oss'),
+           ('MintB', 'C', 'Toad', 'TOAD', null, 'x', 'i', 0, 2, ?, null, null)`).bind(now - 60_000, now - 30_000).run();
+  const text = coinXText({ mint: 'MintA', name: 'Frog', symbol: 'FROG', keeper_style: 'analyst', keeper_model: 'gpt-oss' }, {});
+  assert.equal(text, 'new coin on WICK: $FROG\n\nFrog\nits agent: Analyst on gpt-oss 120B\n\nCA: MintA\n\nhttps://trywick.fun/#coin/MintA');
+  const tweets = [];
+  let uploads = 0;
+  globalThis.fetch = async (url, init) => {
+    url = String(url);
+    if (url === 'https://ipfs.io/ipfs/a') return new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/jpeg' } });
+    if (url.includes('/media/upload')) { uploads++; return Response.json({ data: { id: 'M9' } }); }
+    if (url.endsWith('/2/tweets')) {
+      const body = JSON.parse(init.body);
+      if (body.text.includes('TOAD')) return Response.json({ title: 'CreditsDepleted' }, { status: 402 });
+      tweets.push(body);
+      return Response.json({ data: { id: '1234' } });
+    }
+    return Response.json({});
+  };
+  const env = { DB, X_API_KEY: 'k', X_API_SECRET: 's', X_ACCESS_TOKEN: 't', X_ACCESS_SECRET: 'u' };
+  assert.equal(await runCoinX({ DB }, now), 0, 'no X keys: nothing (the admin has a button)');
+  assert.equal(await runCoinX(env, now), 1);
+  assert.equal(uploads, 1);
+  assert.deepEqual(tweets[0].media, { media_ids: ['M9'] });
+  assert.match(tweets[0].text, /its agent: Analyst on gpt-oss 120B/);
+  const rows = (await DB.prepare('SELECT mint, x_state FROM matches ORDER BY seq').all()).results;
+  assert.equal(rows[0].x_state, '1234');
+  assert.match(rows[1].x_state, /^error: x 402/);
+  assert.equal(await runCoinX(env, now + 60_000), 0, 'never twice, never retried in a loop');
+});

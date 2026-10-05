@@ -157,7 +157,7 @@ test('Telegram: one clean post per match with its photo, updated once its fee is
   assert.equal(await runTelegram(env, 2000), 1);
   assert.equal(calls[0].method, 'sendPhoto');
   assert.equal(calls[0].body.photo, 'https://ipfs.io/ipfs/x');
-  assert.match(calls[0].body.caption, /NEW MATCH STRUCK<\/b> · #1/);
+  assert.match(calls[0].body.caption, /NEW COIN ON WICK<\/b> · #1/);
   assert.match(calls[0].body.caption, /<b>Frog &lt;Wick&gt;<\/b> · <b>\$FROG<\/b>/);
   assert.match(calls[0].body.caption, /<code>M1<\/code>/);
   assert.match(calls[0].body.caption, /👑 \$WICK holder/);

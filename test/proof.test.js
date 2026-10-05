@@ -73,3 +73,15 @@ test('proof: every burn in a CSV', async () => {
   assert.match(lines[1], /,coin,MOTH,0\.2,5000000,B3,buy-B3$/);
   assert.match(lines[2], /,buyback,WICK,0\.4,160000,B2,buy-B2$/);
 });
+
+test('a lock posted from the admin shows on the Proof page', async () => {
+  const { proofPage } = await import('../lib/proof.js');
+  const { setSetting } = await import('../lib/settings.js');
+  const { ensureSchema } = await import('../lib/schema.js');
+  const { fakeD1 } = await import('./helpers/d1.js');
+  const DB = fakeD1();
+  await ensureSchema(DB);
+  assert.equal((await proofPage({ DB })).lock, null);
+  await setSetting(DB, 'team.lock', { url: 'https://app.streamflow.finance/contract/solana/X', amount: 50_000_000, until: null, where: 'Streamflow' });
+  assert.equal((await proofPage({ DB })).lock.url, 'https://app.streamflow.finance/contract/solana/X');
+});

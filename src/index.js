@@ -24,7 +24,7 @@ import { runKits } from '../lib/kit.js';
 import { runPublish } from '../lib/publish.js';
 import { runScout } from '../lib/scout.js';
 import { runXPosts } from '../lib/xoperator.js';
-import { runSocial } from '../lib/social.js';
+import { runCoinX, runSocial } from '../lib/social.js';
 import { runTelegram } from '../lib/telegram.js';
 import { sweep } from '../lib/matches.js';
 import { ensureSchema } from '../lib/schema.js';
@@ -121,6 +121,8 @@ export default {
       runTelegram(env, Date.now()),
       // Les grands moments de $WICK (DEX payé, paliers de market cap), avec leur carte.
       runSocial(env, Date.now()),
+      // Chaque nouveau coin, posté aussi sur le X de WICK (si ses clés sont réglées).
+      runCoinX(env, Date.now()),
       // L'Operator de chaque coin poste dans ses groupes Telegram (et les temps forts sur le canal).
       runPublish(env, Date.now()),
       // Le Scout lit ce qui monte sur Solana (toutes les 30 minutes).

@@ -135,6 +135,18 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
         <span class="op-meta"><time data-at="${e.at}">${ago(e.at)}</time>${e.sig ? `<a href="${solscan(esc(e.sig))}" target="_blank" rel="noopener">TX ↗</a>` : ''}</span>
       </li>`).join('')}</ol>`;
   }
+  // Les missions : ce qu'il a fait (coché), ce qu'il vise (avec sa progression), ce qu'il fait tout le temps.
+  function missionsHtml(list = []) {
+    if (!list.length) return '<p class="muted small">This coin was launched before Operators had missions.</p>';
+    const ico = { done: 'check', active: 'clock', ongoing: 'chart' };
+    const label = { active: 'in progress', ongoing: 'always on' };
+    return `<ol class="op-missions">${list.map((x) => `<li class="om ${esc(x.status)}">
+        <span class="om-ico">${icon(ico[x.status] || 'clock')}</span>
+        <span class="om-txt"><b>${esc(x.title)}</b>${x.hint ? `<small>${esc(x.hint)}</small>` : ''}
+          ${x.status === 'active' && x.progress != null ? `<span class="om-bar"><i style="width:${Math.max(3, Math.round(x.progress * 100))}%"></i></span>` : ''}</span>
+        <span class="om-meta">${x.status === 'done' ? (x.at ? `<time data-at="${x.at}">${ago(x.at)}</time>` : 'done') : label[x.status]}</span>
+      </li>`).join('')}</ol>`;
+  }
   function constitutionHtml(c, m) {
     if (!c) return '<p class="muted small">This coin was launched before Operators had a Constitution.</p>';
     const row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
@@ -167,10 +179,12 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
       ${k.intro ? `<blockquote>“${esc(k.intro)}”</blockquote>` : ''}
       <div class="op-tabs" role="tablist">
         <button type="button" class="on" data-optab="act" role="tab">Activity <small>${log.length}</small></button>
+        <button type="button" data-optab="missions" role="tab">Missions <small>${(op.missions || []).filter((x) => x.status === 'done').length}/${(op.missions || []).filter((x) => x.status !== 'ongoing').length}</small></button>
         <button type="button" data-optab="const" role="tab">Constitution</button>
         <button type="button" data-optab="talk" role="tab">Talk</button>
       </div>
       <div class="op-pane" data-oppane="act">${activity(log)}</div>
+      <div class="op-pane" data-oppane="missions" hidden>${missionsHtml(op.missions)}</div>
       <div class="op-pane" data-oppane="const" hidden>${constitutionHtml(op.constitution, m)}</div>
       <div class="op-pane" data-oppane="talk" hidden>${chatHtml({
         mint: m.mint, symbol: m.symbol,

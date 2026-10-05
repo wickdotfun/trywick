@@ -126,6 +126,15 @@ when there is one: the launch, the split locked on pump.fun, its first words, it
 is noted at most every 6 hours), every burn of the coin, and the $WICK its launch burned. Each action has a key and is
 never noted twice. `GET /api/coin` returns it with the coin, under `operator.log`.
 
+**Track** (`lib/track.js`, `lib/missions.js`): the market refresh follows coins with an Operator for 30 days (market
+cap and 24 h volume from DEX Screener, every few minutes), and the Operator notes the milestones it sees: market cap
+($10K → $100M), volume in 24 hours ($10K → $10M) and the share of its own supply burned (1% → 50%). Once each, only the
+highest crossed since the last one, never more than one every 15 minutes (`operator` in `lib/config.js`).
+
+**Missions** (`operator.missions`): computed from the coin and its log, nothing made up: launch, split locked, first
+words, next market cap milestone (with its progress), first burn or next burn milestone, today's journal, and what it
+always does (tracking).
+
 **Constitution** (`operator.constitution`): what was set at launch and never changes: personality, mind, burn
 allocation, rules, `canSell: false`, `canMoveFunds: false`, and the fee-sharing transaction as on-chain proof. The
 conversation, the decision (burn or wait), the fixed rules and the transaction signer are separate: talking to an

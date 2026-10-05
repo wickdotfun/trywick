@@ -2,6 +2,8 @@
 // Un souffle (buyback) toutes les 90 secondes, chaque allumette l'avance de 6 secondes et brûle
 // un peu de $WICK, une bougie = 0,05 % de la supply (pour la voir fondre en quelques minutes),
 // et un lancement factice (pas de wallet).
+import { CONFIG } from '../../lib/config.js';
+import { burnedPct, crossed, missions, usd } from '../../lib/missions.js';
 import { cycleProgress, supplyCandle } from '../../lib/candle.js';
 
 const WORDS = ['Moon', 'Wax', 'Ember', 'Pepe', 'Moth', 'Cat', 'Dog', 'Frog', 'Spark', 'Flare', 'Torch', 'Smoke',
@@ -19,6 +21,7 @@ const KEEPER_STYLES = [['stoic', 'Stoic', 'Calm, patient, few words'], ['degen',
   ['poet', 'Poet', 'Every burn is a verse'], ['pyro', 'Pyromaniac', 'Loves the fire a bit too much']];
 const KEEPER_MODELS = [['llama', 'Llama 3.3 70B', 'Meta', 'meta'], ['gpt-oss', 'gpt-oss 120B', 'OpenAI', 'openai'], ['qwen', 'Qwen3 30B', 'Qwen', 'qwen'],
   ['mistral', 'Mistral Small 3.1', 'Mistral', 'mistral'], ['gemma', 'Gemma 3 12B', 'Google', 'gemma'], ['deepseek', 'DeepSeek R1 32B', 'DeepSeek', 'deepseek']];
+const seed = (k) => [...k].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 7);
 const logoOf = (f) => `/brand/ai/${f}.svg`;
 const HELLOS = {
   stoic: 'I keep the candle of $SYM. I watch, I speak when it matters.',
@@ -229,9 +232,22 @@ export function createDemo() {
       ...burnsOf.map((b) => ({ at: b.at, kind: 'burned', title: `Burned ${fmtN(b.burned)} $${m.symbol}`, detail: `${b.sol} SOL of its creator fees.${b.voice ? ` “${b.voice}”` : ''}` })),
       ...(k.thought && k.thought !== k.intro && !burnsOf.some((b) => b.voice === k.thought)
         ? [{ at: k.thoughtAt, kind: WAITS[k.style] === k.thought ? 'wait' : 'journal', title: WAITS[k.style] === k.thought ? 'Held the fire, waiting for a better moment' : 'Journal', detail: k.thought }] : []),
-    ].sort((a, b) => b.at - a.at).map((e) => ({ ...e, sig: null }));
+    ];
+    // Ses paliers (les mêmes règles que lib/track.js) et ses missions (lib/missions.js).
+    const row = {
+      symbol: m.symbol, self_bps: m.candle?.bps || 0, self_burned: m.candle?.burned || 0, self_burns: m.candle?.burns || 0,
+      self_sol: m.candle?.sol || 0, self_pending: m.candle ? Math.round((seed(m.mint) % 9) * 1e6) : 0, mcap: m.mcap, lit_at: t0,
+    };
+    row.op_mcap = crossed(CONFIG.operator.mcapSteps, m.mcap) || 0;
+    row.op_burn = crossed(CONFIG.operator.burnSteps, burnedPct(row)) || 0;
+    const lastBurn = burnsOf[0]?.at;
+    if (row.op_mcap) log.push({ at: Math.min(Date.now(), t0 + 45 * 60_000), kind: 'milestone', title: `Reached a ${usd(row.op_mcap)} market cap`, detail: `$${m.symbol} trades at a ${usd(m.mcap)} market cap.` });
+    if (row.op_burn && lastBurn) log.push({ at: lastBurn + 1, kind: 'milestone', title: `${row.op_burn}% of the $${m.symbol} supply burned`, detail: `${row.self_burns} burns, ${row.self_sol.toFixed(3)} SOL of its creator fees.` });
+    log.sort((a, b) => b.at - a.at);
+    for (const e of log) e.sig = null;
     return {
       log,
+      missions: missions(row, log, Date.now()),
       constitution: {
         personality: k.label, mind: { name: k.model, by: k.by, logo: k.logo },
         burn: m.candle ? { pct: m.candle.bps / 100, wickPct: 5, teamPct: 5 } : null, proof: null,

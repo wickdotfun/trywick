@@ -1660,3 +1660,9 @@ body.home:has(.demo-bar:not([hidden])) .top { top: 26px; }
   .h-sec-head small { display: none; }
 }
 @media (max-width: 900px) { .h-hero { padding-bottom: 10px; } .h-hero-art { padding-top: 64px; } .home .cta-sub { margin-top: 12px; } }
+.h-mind.soon { opacity: .55; }
+/* Les esprits du lancement : 2 colonnes, les noms jamais coupés */
+#launch-form .k-minds.big { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#launch-form .k-mind b { overflow-wrap: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#launch-form .k-mind small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#launch-form .k-mind span { min-width: 0; }

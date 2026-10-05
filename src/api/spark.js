@@ -10,7 +10,12 @@ const STATUS = { bad_idea: 400, blocked_idea: 400, bad_question: 400, unknown_co
 const fail = (error) => json({ error }, STATUS[error] || 400);
 const body = (request) => request.json().catch(() => null);
 
+// L'IA au lancement (créer le coin, peindre son logo) est coupée : le créateur apporte son image,
+// son nom, son ticker, comme sur pump.fun. SPARK=on la rallume (elle coûte, à nous).
+const sparkOff = (env) => env.SPARK !== 'on';
+
 export async function spark({ request, env }) {
+  if (sparkOff(env)) return fail('ai_off');
   await ensureSchema(env.DB);
   const b = await body(request);
   const res = await sparkCoin(env, { idea: b?.idea, style: b?.style, model: b?.model, surprise: b?.surprise === true, goal: b?.goal, prompt: b?.prompt, ip: await ipHash(request, env) });
@@ -18,6 +23,7 @@ export async function spark({ request, env }) {
 }
 
 export async function sparkLogo({ request, env }) {
+  if (sparkOff(env)) return fail('ai_off');
   await ensureSchema(env.DB);
   const b = await body(request);
   const res = await sparkImage(env, { visual: b?.visual, name: b?.name, ip: await ipHash(request, env) });

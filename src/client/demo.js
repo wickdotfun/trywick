@@ -18,14 +18,10 @@ const FEE = 0.02;
 const SHARED_FEE = 0.01;
 const WICK_PER_SOL = 400_000;
 // Les Operators de la démo : des personnalités, des esprits, et ce qu'ils disent.
-const KEEPER_STYLES = [['stoic', 'Stoic', 'Calm, patient, few words'], ['degen', 'Degen', 'Loud, fast, all conviction'],
-  ['poet', 'Poet', 'Every burn is a verse'], ['pyro', 'Pyromaniac', 'Loves the fire a bit too much'], ['analyst', 'Analyst', 'Numbers first, no hype'],
-  ['builder', 'Builder', 'Plans, ships, reports'], ['guardian', 'Guardian', 'Watches over the holders'], ['custom', 'Custom', 'Write its character']];
+const KEEPER_STYLES = Object.entries(CONFIG.keepers.styles).filter(([, x]) => !x.hidden).map(([id, x]) => [id, x.label, x.hint]);
 const KEEPER_GOALS = Object.entries(CONFIG.keepers.goals).map(([id, g]) => ({ id, label: g.label, hint: g.hint }));
-const KEEPER_MODELS = [['llama', 'Llama 3.3 70B', 'Meta', 'meta'], ['gpt-oss', 'gpt-oss 120B', 'OpenAI', 'openai'], ['qwen', 'Qwen3 30B', 'Qwen', 'qwen'],
-  ['mistral', 'Mistral Small 3.1', 'Mistral', 'mistral'], ['gemma', 'Gemma 3 12B', 'Google', 'gemma'], ['deepseek', 'DeepSeek R1 32B', 'DeepSeek', 'deepseek'],
-  ['claude', 'Claude Sonnet 5.5', 'Anthropic', 'anthropic', true], ['gpt', 'GPT-5.6 Luna', 'OpenAI', 'openai', true],
-  ['gemini', 'Gemini 3.8 Flash', 'Google', 'gemini', true], ['grok', 'Grok 4.3', 'xAI', 'xai', true]];
+// Les esprits (les mêmes que le vrai site) : [id, nom, fournisseur, logo, premium].
+const KEEPER_MODELS = CONFIG.keepers.models.filter((m) => !m.hidden).map((m) => [m.id, m.name, m.by, m.logo.split('/').pop().replace('.svg', ''), Boolean(m.premium)]);
 const seed = (k) => [...k].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 7);
 const logoOf = (f) => `/brand/ai/${f}.svg`;
 const HELLOS = {

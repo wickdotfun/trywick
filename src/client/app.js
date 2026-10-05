@@ -2,7 +2,6 @@
 import { createCandles } from './candles.js';
 import { createCrew } from './crew.js';
 import { createProof } from './proof.js';
-import { draftCoin, drawLogo } from './draft.js';
 import { createDemo } from './demo.js';
 import { createPages } from './pages.js';
 import { createScene, headColor } from './scene.js';
@@ -42,9 +41,7 @@ const api = DEMO ? createDemo() : {
   // Le compte X d'un coin : son créateur le relie (signature de son wallet, puis X).
   xStart: (b) => post('/api/x/start', b),
   xUnlink: (b) => post('/api/x/unlink', b),
-  // L'IA : Spark (le coin inventé par le Operator), son logo, et les questions aux Operators.
-  spark: (b) => post('/api/spark', b),
-  sparkImage: (b) => post('/api/spark/image', b, 'blob'),
+  // L'IA : les questions aux agents (créer le coin se fait à la main, comme sur pump.fun).
   ask: (b) => post('/api/ask', b),
 };
 
@@ -241,8 +238,8 @@ function renderHome() {
   }
   const minds = $('h-minds');
   if (minds && world.launch?.keepers && !minds.childElementCount) {
-    minds.innerHTML = world.launch.keepers.models.filter((m) => !m.premium || m.available)
-      .map((m) => `<span class="h-mind">${aiLogo(m, 22)}<b>${esc(m.name)}</b><small>${esc(m.by)}</small></span>`).join('');
+    minds.innerHTML = world.launch.keepers.models
+      .map((m) => `<span class="h-mind${m.premium && !m.available ? ' soon' : ''}">${aiLogo(m, 22)}<b>${esc(m.by)}</b><small>${m.premium && !m.available ? 'soon' : esc(m.name)}</small></span>`).join('');
   }
   renderHeroAgent();
 }
@@ -571,14 +568,6 @@ const pages = createPages({
 const crewPage = createCrew({ api, openModal, isOpen, world, ticker, avatar, onStrike: () => launchForm() });
 // La page Proof : les wallets, les règles, chaque SOL et chaque burn.
 const proofPage = createProof({ api, openModal, isOpen, ticker, demo: DEMO });
-// Lancer sur un narratif du Scout : l'idée part dans Spark.
-function launchOnIdea(idea) {
-  draft.idea = idea;
-  draft.step = 0;
-  launchForm();
-  const form = $('launch-form');
-  if (form) runSpark(form);
-}
 const candlesPage = createCandles({
   api, openModal, world, ticker, avatar, holderTag, demo: DEMO,
   onStrike: () => launchForm(),
@@ -595,7 +584,7 @@ const ROUTES = {
   hall: () => pages.leaderboard('hall'),
   flames: () => pages.flames(),
   how: () => pages.how(),
-  crew: () => crewPage.open(launchOnIdea),
+  crew: () => crewPage.open(() => launchForm()),
   proof: () => proofPage.open(),
   strike: () => launchForm(),
 };
@@ -646,7 +635,7 @@ const ERRORS = {
 
 let busy = false;
 // burn : « Make it burn », la part (en %) des creator fees qui rachète et brûle le coin lui-même.
-const DRAFT = () => ({ fields: {}, image: null, preview: null, burn: 20, keeper: { style: 'stoic', model: 'llama', goal: null, prompt: '' }, idea: '', spark: null, step: 0 });
+const DRAFT = () => ({ fields: {}, image: null, preview: null, burn: 20, keeper: { style: 'analyst', model: 'gpt-oss', goal: null, prompt: '' }, idea: '', spark: null, step: 0 });
 let draft = DRAFT();
 
 
@@ -693,20 +682,8 @@ const head = (i, title, sub) => `<div class="lf-step-head"><b>${title}</b><small
 const show = (i) => (draft.step === i ? '' : ' hidden');
 
 function identityStep(f) {
-  const sp = draft.spark;
   return `<section class="lf-step" data-step="0"${show(0)}>
-    ${head(0, 'Its <span class="grad">identity</span>', 'Spark it with one idea, let its agent surprise you, or fill it in yourself.')}
-    <div class="spark">
-      <div class="spark-box">
-        <textarea id="sp-idea" maxlength="200" rows="2" placeholder="${esc(pick(IDEAS))}">${esc(draft.idea || '')}</textarea>
-        <div class="spark-btns">
-          <button type="button" class="cta spark-go" id="sp-go">${icon('sparkle')} <span>${sp ? 'Spark again' : 'Spark it'}</span></button>
-          <button type="button" class="wbtn spark-surprise" id="sp-surprise">Surprise me</button>
-        </div>
-      </div>
-      <div class="spark-status" id="sp-status"${sp ? '' : ' hidden'}>${sp ? sparkDone(sp) : ''}</div>
-      <div class="sp-picks" id="sp-picks" hidden></div>
-    </div>
+    ${head(0, 'Its <span class="grad">identity</span>', 'Like on pump.fun: its image, its name, its ticker. Its agent comes next.')}
     <div class="lf-top">
       <label class="drop">
         <input type="file" id="lf-image" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
@@ -717,7 +694,7 @@ function identityStep(f) {
         <label>Ticker<input name="symbol" maxlength="11" autocomplete="off" placeholder="WCAT" value="${esc(f.symbol)}" class="mono up-case"></label>
       </div>
     </div>
-    <label><span>Description <em>· optional</em></span><textarea name="description" maxlength="500" rows="3">${esc(f.description)}</textarea></label>
+    <label><span>Description <em>· optional</em></span><textarea name="description" maxlength="500" rows="3" placeholder="What is it about? Its agent will tell its story from here.">${esc(f.description)}</textarea></label>
     <details${f.twitter || f.telegram || f.website ? ' open' : ''}><summary>Links <em>· optional</em></summary>
       <label>X<input name="twitter" type="url" placeholder="https://x.com/…" value="${esc(f.twitter)}"></label>
       <label>Telegram<input name="telegram" type="url" placeholder="https://t.me/…" value="${esc(f.telegram)}"></label>
@@ -727,15 +704,10 @@ function identityStep(f) {
 }
 
 function mindStep(k) {
-  const card = (m) => `<button type="button" class="k-mind${m.premium ? ' premium' : ''}${draft.keeper.model === m.id ? ' on' : ''}" data-kmodel="${esc(m.id)}" aria-pressed="${draft.keeper.model === m.id}"${m.premium && !m.available ? ' disabled' : ''}><i>${aiLogo(m, 22)}</i><span><b>${esc(m.name)}</b><small>${esc(m.by)}${m.premium && !m.available ? ' · soon' : ''}</small></span></button>`;
-  const premium = k.models.filter((m) => m.premium);
-  const p = k.premium || { boostDays: 7, minCrewSol: 0.02 };
-  return `<div class="ag-block"><h4>Its mind <small>the AI model it thinks with</small></h4>
-    ${premium.length && premium.some((m) => m.available) ? `<small class="k-label">Premium <em>· paid by its fees</em></small>
-    <div class="k-minds big premium" role="group" aria-label="Premium minds">${premium.map(card).join('')}</div>
-    <small class="muted k-note">${icon('sparkle')} Free for its first ${p.boostDays} days, then paid by its own fees (${p.minCrewSol} SOL a week). Otherwise it thinks with Llama, and says so.</small>
-    <small class="k-label">Open models</small>` : ''}
-    <div class="k-minds big" role="group" aria-label="The mind">${k.models.filter((m) => !m.premium).map(card).join('')}</div>
+  const card = (m) => `<button type="button" class="k-mind${m.premium ? ' premium' : ''}${draft.keeper.model === m.id ? ' on' : ''}" data-kmodel="${esc(m.id)}" aria-pressed="${draft.keeper.model === m.id}"${m.premium && !m.available ? ' disabled' : ''}><i>${aiLogo(m, 22)}</i><span><b>${esc(m.by)}</b><small>${esc(m.name)}${m.premium && !m.available ? ' · soon' : ''}</small></span></button>`;
+  return `<div class="ag-block"><h4>Its mind <small>the AI it thinks with</small></h4>
+    <div class="k-minds big" role="group" aria-label="The mind">${k.models.map(card).join('')}</div>
+    <small class="muted k-note">${icon('sparkle')} Its agent runs on its own fees: nothing to pay up front.</small>
   </div>`;
 }
 
@@ -796,17 +768,6 @@ function fireStep(max, f) {
     ${burnTeaser()}
     <p class="cost" id="lf-cost">${costLine(burning())}</p>
   </section>`;
-}
-
-const IDEAS = ['A cat that is terrified of fire but lives in a candle shop', 'A tiny dragon who only breathes birthday candles',
-  'A moth that finally caught the flame', 'A frog who runs a candle factory on Solana', 'The last ember of a burned-down casino'];
-const pick = (a) => a[Math.floor(Math.random() * a.length)];
-function sparkDone(sp) {
-  return `<div class="sp-done">
-      <span class="sp-who">${aiLogo(sp.mind, 16)} <b>${esc(sp.mind?.name || 'Your agent')}</b> wrote it${draft.image ? ' and painted the logo' : ''}.</span>
-      ${sp.intro ? `<blockquote>“${esc(sp.intro)}”</blockquote>` : ''}
-      <span class="sp-actions"><button type="button" class="linkish" id="sp-logo">${icon('sparkle')} New logo</button></span>
-    </div>`;
 }
 
 // « Make it burn » avant $WICK : ce qui arrive, sans pouvoir le choisir.
@@ -915,124 +876,7 @@ function launchForm(error = '') {
     $('lf-legend').textContent = split.legend;
     $('lf-cost').innerHTML = costLine(pct);
   }));
-  $('sp-go')?.addEventListener('click', () => runSpark(form));
-  if (draft.step === 0) showPicks(form);
-  $('sp-surprise')?.addEventListener('click', () => runSpark(form, true));
-  $('sp-idea')?.addEventListener('input', (e) => { draft.idea = e.target.value; });
-  $('sp-idea')?.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); runSpark(form); } });
-  bindLogoAgain(form);
   form.addEventListener('submit', (e) => { e.preventDefault(); submitLaunch(form); });
-}
-
-// ------------------------------------------------------------ Spark
-const SPARK_ERRORS = {
-  bad_idea: 'Give your agent an idea first: a few words are enough.',
-  blocked_idea: "Your agent won't make that one. Try another idea.",
-  too_many: 'Lots of sparks from here. Try again in a little while.',
-  ai_busy: 'The agents have created a lot today. Come back tomorrow, or fill in your coin yourself.',
-  ai_off: 'Spark is resting right now. Fill in your coin yourself, or try again later.',
-  ai_failed: "Your agent couldn't find the words. Try again, or try another mind.",
-};
-let sparking = false;
-function sparkStatus(html, cls = '') {
-  const el = $('sp-status');
-  if (!el) return;
-  el.hidden = false;
-  el.className = `spark-status ${cls}`.trim();
-  el.innerHTML = html;
-}
-const thinking = (mind, what) => `<span class="sp-think">${aiLogo(mind, 16)} <b>${esc(mind?.name || 'Your agent')}</b> ${what}<i></i><i></i><i></i></span>`;
-
-// Les narratifs du Scout, sous Spark : un clic, et le Chandler fait le coin sur ce narratif.
-async function showPicks(form) {
-  const sc = await crewPage.picks();
-  const box = $('sp-picks');
-  if (!sc?.narratives?.length || !box || !document.body.contains(form)) return;
-  box.innerHTML = `<small>${icon('scout')} Scout's picks <em>· ${ago(sc.at)}</em></small>${sc.narratives.map((n, i) => `<button type="button" class="sp-pick" data-pick="${i}" title="${esc(n.angle)}">${esc(n.title)}</button>`).join('')}<a class="linkish" href="#crew">Sources</a>`;
-  box.hidden = false;
-  box.querySelectorAll('[data-pick]').forEach((b) => b.addEventListener('click', () => {
-    const idea = sc.narratives[Number(b.dataset.pick)].idea;
-    $('sp-idea').value = idea;
-    draft.idea = idea;
-    runSpark(form);
-  }));
-}
-
-async function runSpark(form, surprise = false) {
-  if (sparking) return;
-  const idea = surprise ? '' : ($('sp-idea')?.value || '').trim();
-  if (!surprise) draft.idea = idea;
-  if (!surprise && idea.length < 3) { sparkStatus(SPARK_ERRORS.bad_idea, 'err'); return; }
-  const mind = mindOf(draft.keeper.model);
-  const btn = $('sp-go');
-  sparking = true;
-  btn.disabled = true;
-  btn.classList.add('busy');
-  sparkStatus(thinking(mind, surprise ? 'is inventing a coin' : 'is thinking'));
-  try {
-    const sp = await api.spark({ idea, style: draft.keeper.style, model: draft.keeper.model, goal: draft.keeper.goal, prompt: draft.keeper.prompt, surprise });
-    if (surprise && $('sp-idea')) { $('sp-idea').value = sp.visual ? `${sp.name}: ${sp.description}`.slice(0, 200) : sp.name; draft.idea = $('sp-idea').value; }
-    draft.spark = sp;
-    form.name.value = sp.name;
-    form.symbol.value = sp.symbol;
-    form.description.value = sp.description;
-    for (const el of [form.name, form.symbol, form.description]) { el.classList.remove('filled'); void el.offsetWidth; el.classList.add('filled'); }
-    draft.fields = Object.fromEntries(new FormData(form));
-    sparkStatus(thinking(sp.mind || mind, 'is painting the logo'));
-    await paintLogo(sp);
-    sparkStatus(sparkDone(sp), 'done');
-    bindLogoAgain(form);
-  } catch (err) {
-    // L'IA ne répond pas : un brouillon fait ici, pour que ça donne toujours quelque chose.
-    if (['ai_failed', 'ai_busy', 'ai_off'].includes(err.code) || !err.code) {
-      const d = draftCoin(surprise ? pick(IDEAS) : idea);
-      draft.spark = null;
-      form.name.value = d.name;
-      form.symbol.value = d.symbol;
-      form.description.value = d.description;
-      draft.fields = Object.fromEntries(new FormData(form));
-      if (!draft.image) await paintLogo({ visual: d.visual, name: d.name }, true);
-      sparkStatus(`${icon('sparkle')} The AI is busy right now, so here is a quick draft from your idea. Edit anything, or press Spark again in a moment.`, 'err');
-    } else {
-      sparkStatus(SPARK_ERRORS[err.code] || SPARK_ERRORS.ai_failed, 'err');
-    }
-  } finally {
-    sparking = false;
-    if ($('sp-go')) {
-      btn.disabled = false;
-      btn.classList.remove('busy');
-      btn.querySelector('span').textContent = draft.spark ? 'Spark again' : 'Spark it';
-    }
-  }
-}
-
-// Le logo peint par l'IA devient l'image du coin (recadré comme une image envoyée à la main).
-async function paintLogo(sp, local = false) {
-  const view = $('drop-view');
-  view?.classList.add('painting');
-  try {
-    // L'IA d'abord ; si elle ne répond pas, un logo dessiné ici (à remplacer par le sien).
-    const blob = local ? await drawLogo(`${sp.visual}${sp.name}`) : await api.sparkImage({ visual: sp.visual, name: sp.name }).catch(() => drawLogo(`${sp.visual}${sp.name}`));
-    draft.image = await prepareImage(new File([blob], 'logo.png', { type: blob.type || 'image/png' }));
-    draft.preview = URL.createObjectURL(draft.image);
-    if ($('drop-view')) $('drop-view').innerHTML = `<img src="${draft.preview}" alt="">`;
-  } catch {
-    // Pas de logo cette fois : le reste est là, on peut en envoyer un.
-  } finally {
-    $('drop-view')?.classList.remove('painting');
-  }
-}
-
-function bindLogoAgain(form) {
-  $('sp-logo')?.addEventListener('click', async () => {
-    if (sparking || !draft.spark) return;
-    sparking = true;
-    sparkStatus(thinking(draft.spark.mind || mindOf(draft.keeper.model), 'is painting a new logo'));
-    await paintLogo(draft.spark);
-    sparking = false;
-    sparkStatus(sparkDone(draft.spark), 'done');
-    bindLogoAgain(form);
-  });
 }
 
 function showFormError(msg) {
@@ -1059,13 +903,12 @@ async function prepareImage(file) {
   return new File([blob], blob.type === 'image/png' ? 'image.png' : 'image.jpg', { type: blob.type });
 }
 
-// Ce qui manque à une étape du tunnel (ou null).
 function stepProblem(step, fields) {
   if (step === 0) {
     const symbol = (fields.symbol || '').trim().replace(/^\$/, '');
     if (!fields.name?.trim()) return ERRORS.bad_name;
     if (!/^[A-Za-z0-9]{1,10}$/.test(symbol)) return ERRORS.bad_symbol;
-    if (!draft.image) return sparking ? 'Still painting the logo. One moment.' : ERRORS.no_image;
+    if (!draft.image) return ERRORS.no_image;
   }
   if (step === 1 && draft.keeper.style === 'custom' && (draft.keeper.prompt || '').trim().length < 8) return ERRORS.bad_prompt;
   return null;

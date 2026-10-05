@@ -19,7 +19,7 @@ test('the admin test says exactly what works and what does not', async () => {
   assert.equal(r.ok, false);
   assert.equal(by['Database (D1)'].ok, true);
   assert.match(by['AI binding (Workers AI)'].detail, /No AI binding/);
-  assert.match(by['Spark: the AI writes a coin'].detail, /ai_off/);
+  assert.match(by['AI at launch (coin, logo)'].detail, /off by design/);
   assert.match(by['Pinata (image upload)'].detail, /PINATA_JWT is not set/);
   assert.equal(by['Solana RPC'].ok, true);
   assert.equal(by['PumpPortal (builds the launch)'].ok, true);

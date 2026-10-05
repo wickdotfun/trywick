@@ -95,6 +95,11 @@
     .soc .row .btn { height: 28px; padding: 0 9px; font-size: 12px; border-radius: 8px; }
     .lib .soc-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
     .lib h3 { margin: 18px 0 0; font-size: 13px; color: var(--gold); letter-spacing: .02em; }
+    .lib h3 { display: flex; align-items: center; gap: 10px; margin-top: 26px; } .lib h3 small { color: var(--dim); font-weight: 400; font-size: 12px; }
+    .lib .ph { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--gold); color: #1d1003; font-size: 13px; font-weight: 800; }
+    .lib .slot { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 3px 10px; border-radius: 99px; font: 600 11.5px var(--mono); color: #ffc05a; background: rgba(255,190,90,.1); border: 1px solid rgba(255,196,110,.35); }
+    .lib .slot i { font-style: normal; color: var(--dim); }
+    .lib-auto { margin: 10px 0 0; padding: 12px 14px 12px 32px; border-radius: 12px; border: 1px dashed var(--line-2); display: grid; gap: 7px; font-size: 13px; line-height: 1.5; color: var(--muted); }
     .lib .when { color: var(--muted); font-size: 12px; line-height: 1.45; }
     .lib textarea { width: 100%; min-height: 150px; resize: vertical; padding: 9px 10px; border-radius: 10px; color: var(--text); border: 1px solid var(--line-2); background: rgba(255,220,180,.04); font: 12.5px/1.45 var(--sans); box-sizing: border-box; }
     .lib .btn.both { color: #1d1003; background: linear-gradient(#ffd978, #f1b440); border-color: transparent; font-weight: 700; }
@@ -218,9 +223,16 @@
         <p class="lib-how"><b>Post on X + Telegram</b> fait trois choses d'un coup : il <b>copie l'image</b>, il <b>ouvre X avec le texte</b>, et il <b>envoie le post dans ton canal Telegram</b>.
           Sur X, appuie juste sur <b>Ctrl+V</b> (Cmd+V sur Mac) pour coller l'image, puis sur <b>Post</b>. Sur téléphone : <b>Image</b> pour l'enregistrer, puis ajoute-la dans X.
           Tu peux modifier le texte avant de cliquer. Les posts « après le lancement » ajoutent le CA tout seuls dès que $WICK est en ligne.</p>
-        <h3>Avant le lancement</h3><div class="soc-grid" id="lib-before"></div>
-        <h3>Au lancement</h3><div class="soc-grid" id="lib-launch"></div>
-        <h3>Après le lancement</h3><div class="soc-grid" id="lib-after"></div>
+        <h3><span class="ph">1</span> Avant le lancement <small>faire monter l'attente, un post par jour</small></h3><div class="soc-grid" id="lib-before"></div>
+        <h3><span class="ph">2</span> Le lancement <small>le CA, puis le lock</small></h3><div class="soc-grid" id="lib-launch"></div>
+        <h3><span class="ph">3</span> Après le lancement <small>faire venir les créateurs de coins</small></h3><div class="soc-grid" id="lib-after"></div>
+        <h3><span class="ph">4</span> Tout seul, sans rien faire <small>le bot Telegram s'en occupe</small></h3>
+        <ul class="lib-auto">
+          <li><b>Chaque nouveau coin</b> lancé sur WICK : son image, son CA, son agent. (Sur X : bouton « Post on X » dans « Latest launches ».)</li>
+          <li><b>L'annonce de $WICK</b> avec le CA, épinglée, dans la minute du lancement.</li>
+          <li><b>Chaque buyback + burn</b> de $WICK, avec ses transactions, et <b>le rapport du jour</b>.</li>
+          <li><b>DEX payé</b> et <b>chaque palier de market cap</b> ($50K, $100K…), avec leur carte (plus bas, dans « Posts &amp; cards »).</li>
+        </ul>
         <h3>Tu as posté sur X directement ? Relaie-le sur Telegram</h3>
         <form class="relay" id="relay-form">
           <input name="url" type="url" placeholder="Lien du post X : https://x.com/…/status/…" required>
@@ -669,9 +681,11 @@
     }
     // ------------------------------------------------------------ la bibliothèque de posts
     const lastPost = (prefix) => soc.posts.filter((p) => p.key.startsWith(prefix) && p.status === 'posted').sort((a, b) => b.at - a.at)[0];
-    function libCard({ id, file, label, when, text, both = true, tgDone = null, disabled = '' }) {
+    let libN = 0;
+    function libCard({ id, file, label, slot, when, text, both = true, tgDone = null, disabled = '' }) {
       const last = id ? lastPost(`library.${id}.`) : null;
       return `<div class="soc" data-lib="${esc(id || '')}" data-file="${esc(file)}"><img src="/cards/${esc(file)}" alt="" loading="lazy"><div class="b">
+        <span class="slot">#${++libN} <i>·</i> ${esc(slot || '')}</span>
         <b>${esc(label)}</b><span class="when">${when}</span>
         <textarea spellcheck="false"${disabled ? ' disabled' : ''}>${esc(text || '')}</textarea>
         ${last ? `<span class="done">✓ Posté ${ago(last.at)}${last.telegram ? ' sur Telegram' : ''}</span>` : tgDone ? `<span class="done">${tgDone}</span>` : ''}
@@ -684,18 +698,20 @@
     }
     function renderLibrary() {
       const s = soc, L = s.library || [];
+      libN = 0;
       $('lib-before').innerHTML = L.filter((p) => p.phase === 'before').map((p) => libCard(p)).join('');
-      $('lib-after').innerHTML = L.filter((p) => p.phase === 'after').map((p) => libCard(p)).join('');
       const live = s.posts.find((p) => p.key === 'live');
       $('lib-launch').innerHTML = [
-        libCard({ file: 'live.png', label: `$${s.ticker} is live (le CA)`, both: false, text: s.texts.live,
+        libCard({ file: 'live.png', slot: 'T0, le lancement', label: `$${s.ticker} is live (le CA)`, both: false, text: s.texts.live,
           when: "Le post le plus important. Sur Telegram, il part <b>tout seul</b> dans la minute du lancement, épinglé. Ici : ton post X, avec le CA, puis épingle-le sur ton profil.",
           tgDone: live || data?.checks?.announced ? '✓ Déjà posté et épinglé sur Telegram (automatique)' : null,
           disabled: s.mint ? '' : 'Disponible dès que $WICK est lancé (le CA se remplit tout seul).' }),
-        `<div class="soc"><img src="/cards/post-fees.png" alt="" loading="lazy" style="filter:grayscale(.6) brightness(.7)"><div class="b">
-          <b>Tokens locked</b><span class="when">Après avoir verrouillé tes $WICK sur Streamflow : remplis le formulaire « Tokens locked » plus bas. Sa carte est dessinée avec tes chiffres, et un clic la poste sur Telegram (et l'affiche sur la page Proof).</span>
+        `<div class="soc"><img src="/cards/lock-example.png" alt="" loading="lazy"><div class="b">
+          <span class="slot">#${++libN} <i>·</i> T0 + 15 min</span>
+          <b>Tokens locked</b><span class="when">(Image d'exemple : la vraie reprend tes chiffres.) Après avoir verrouillé tes $WICK sur Streamflow : remplis le formulaire « Tokens locked » plus bas. Sa carte est dessinée avec tes chiffres, et un clic la poste sur Telegram (et l'affiche sur la page Proof).</span>
           <div class="row"><a class="btn both" href="#lock-form">Aller au formulaire</a></div></div></div>`,
       ].join('');
+      $('lib-after').innerHTML = L.filter((p) => p.phase === 'after').map((p) => libCard(p)).join('');
     }
     async function copyImage(file) {
       // L'image dans le presse-papier, pour la coller dans X (Ctrl+V). Pas grave si le navigateur refuse.

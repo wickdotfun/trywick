@@ -94,24 +94,37 @@ test('the daily AI budget is per use: Spark running out never stops the Keepers'
   assert.ok(await spendAi(e.DB, 'spark', NOW + 24 * HOUR), 'a new day, a new budget');
 });
 
-test('the logo: Leonardo Phoenix paints it from the Operator\'s art direction; FLUX if Phoenix fails', async () => {
+test('the logo: FLUX by default (cheap); Leonardo Phoenix only when turned on, FLUX if it fails', async () => {
   const jpeg = new Uint8Array(2000).fill(7);
-  // Phoenix renvoie un flux d'octets.
-  const ai = fakeAI((model) => (model.includes('leonardo') ? new Response(jpeg).body : null));
-  const e = await env(ai);
+  // FLUX renvoie du base64 : décodé sans y passer de CPU.
+  const flux = fakeAI((model) => (model.includes('flux') ? { image: Buffer.from(jpeg).toString('base64') } : new Error('not this one')));
+  const e = await env(flux);
   const res = await sparkImage(e, { visual: 'a tiny red dragon, glossy 3D render', name: 'Dragon Candle', ip: 'ip1', now: NOW });
-  assert.equal(res.bytes.length, 2000);
-  assert.equal(res.model, '@cf/leonardo/phoenix-1.0');
-  assert.match(ai.calls[0].input.prompt, /tiny red dragon/);
-  assert.match(ai.calls[0].input.prompt, /No text/);
-  assert.equal(ai.calls[0].input.width, 1024);
-  // Phoenix en panne : FLUX (base64).
-  const flux = await env(fakeAI((model) => (model.includes('leonardo') ? new Error('quota') : { image: Buffer.from(jpeg).toString('base64') })));
-  const r2 = await sparkImage(flux, { visual: 'a dragon', name: 'x', ip: 'ip1', now: NOW });
-  assert.equal(r2.model, '@cf/black-forest-labs/flux-1-schnell');
+  assert.deepEqual([res.bytes.length, res.model], [2000, '@cf/black-forest-labs/flux-1-schnell']);
+  assert.equal(flux.calls.length, 1, 'Phoenix is never called by default');
+  assert.match(flux.calls[0].input.prompt, /tiny red dragon/);
+  assert.match(flux.calls[0].input.prompt, /No text/);
+  // SPARK_IMAGE_MODEL=phoenix : Phoenix d'abord (un flux d'octets), FLUX s'il échoue.
+  const phoenix = fakeAI((model) => (model.includes('leonardo') ? new Response(jpeg).body : null));
+  const p = await env(phoenix);
+  p.SPARK_IMAGE_MODEL = 'phoenix';
+  const r2 = await sparkImage(p, { visual: 'a dragon', name: 'x', ip: 'ip1', now: NOW });
+  assert.equal(r2.model, '@cf/leonardo/phoenix-1.0');
+  assert.equal(phoenix.calls[0].input.width, 1024);
   assert.equal((await sparkImage(e, { visual: 'a naked dragon', name: 'x', ip: 'ip1', now: NOW })).error, 'blocked_idea');
   const broken = await env(fakeAI(new Error('down')));
   assert.equal((await sparkImage(broken, { visual: 'a dragon', name: 'x', ip: 'ip1', now: NOW })).error, 'ai_failed');
+});
+
+test('daily free AI used up (4006): no more calls until midnight UTC, the site offers its draft', async () => {
+  const out = fakeAI(new Error('4006: you have used up your daily free allocation of 10,000 neurons'));
+  const e = await env(out);
+  assert.equal((await sparkImage(e, { visual: 'a dragon', name: 'x', ip: 'ip9', now: NOW })).error, 'ai_failed');
+  const calls = out.calls.length;
+  assert.equal((await sparkImage(e, { visual: 'a dragon', name: 'x', ip: 'ip9', now: NOW + 1000 })).error, 'ai_busy');
+  assert.equal((await sparkCoin(e, { idea: 'a dragon', ip: 'ip9', now: NOW + 2000 })).error, 'ai_busy');
+  assert.equal(out.calls.length, calls, 'no call while it is used up');
+  assert.notEqual((await sparkImage(e, { visual: 'a dragon', name: 'x', ip: 'ip8', now: NOW + 86_400_000 })).error, 'ai_busy', 'back the next day');
 });
 
 test('Spark can surprise: no idea needed, the Operator invents the concept', async () => {

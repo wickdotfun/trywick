@@ -81,7 +81,8 @@ test('post library: every post has its card and text; one click sends it to Tele
   const { existsSync } = await import('node:fs');
   for (const p of LIBRARY) {
     assert.ok(existsSync(new URL(`../public/cards/post-${p.id}.png`, import.meta.url)), `card for ${p.id}`);
-    assert.ok(libraryText(p).length <= 280, `${p.id} fits in a post on X`);
+    assert.ok(libraryText(p, { mint: 'M'.repeat(44) }).length <= 280, `${p.id} fits in a post on X, with the CA`);
+    assert.match(p.slot, /^H|Quand/, 'posted by the hour, around the launch');
     assert.doesNotMatch(libraryText(p), /\$\{|\{site/, 'placeholders are filled');
   }
   assert.match(libraryText(LIBRARY.find((p) => p.id === 'open'), { mint: 'MintW' }), /CA: MintW$/);

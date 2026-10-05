@@ -18,7 +18,9 @@ const SHARED_FEE = 0.01;
 const WICK_PER_SOL = 400_000;
 // Les Operators de la démo : des personnalités, des esprits, et ce qu'ils disent.
 const KEEPER_STYLES = [['stoic', 'Stoic', 'Calm, patient, few words'], ['degen', 'Degen', 'Loud, fast, all conviction'],
-  ['poet', 'Poet', 'Every burn is a verse'], ['pyro', 'Pyromaniac', 'Loves the fire a bit too much']];
+  ['poet', 'Poet', 'Every burn is a verse'], ['pyro', 'Pyromaniac', 'Loves the fire a bit too much'], ['analyst', 'Analyst', 'Numbers first, no hype'],
+  ['builder', 'Builder', 'Plans, ships, reports'], ['guardian', 'Guardian', 'Watches over the holders'], ['custom', 'Custom', 'Write its character']];
+const KEEPER_GOALS = Object.entries(CONFIG.keepers.goals).map(([id, g]) => ({ id, label: g.label, hint: g.hint }));
 const KEEPER_MODELS = [['llama', 'Llama 3.3 70B', 'Meta', 'meta'], ['gpt-oss', 'gpt-oss 120B', 'OpenAI', 'openai'], ['qwen', 'Qwen3 30B', 'Qwen', 'qwen'],
   ['mistral', 'Mistral Small 3.1', 'Mistral', 'mistral'], ['gemma', 'Gemma 3 12B', 'Google', 'gemma'], ['deepseek', 'DeepSeek R1 32B', 'DeepSeek', 'deepseek']];
 const seed = (k) => [...k].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 7);
@@ -28,12 +30,18 @@ const HELLOS = {
   degen: '$SYM operator online. I see everything. We are so early.',
   poet: 'A new wick, a new flame. I will tend $SYM through every night.',
   pyro: 'They gave me $SYM. I love it already. Look at that flame.',
+  analyst: '$SYM Operator online. I track the numbers and report them, nothing more.',
+  builder: 'Operator of $SYM, reporting for work. Launch done. Next: the kit, then the first burn.',
+  guardian: 'I watch over $SYM and the people who hold it. I will always tell you what I see.',
 };
 const JOURNAL = {
   stoic: ['Volume held steady today. The flame does not need noise.', 'Quiet day. Holders stayed. That says enough.', 'Up, down, up. The wax does not care. Neither do I.'],
   degen: ['chart looking spicy today, holders built different', 'new wallets showing up every hour. you are early ser', 'paper hands left, diamond hands stayed. we move'],
   poet: ['Another day, another inch of wax turned to light.', 'The market sighed, the candle did not flinch.', 'Morning smoke, evening gold. The flame keeps time.'],
   pyro: ['I counted every trade today. Every one of them smelled like smoke.', 'So much volume. So much fuel. I am thriving.', 'Today was warm. Tomorrow will be warmer. I promise nothing, I just love fire.'],
+  analyst: ['24h: volume up, sells down, fees set aside for the next burn. Data, not hype.', 'Buyers outnumbered sellers two to one today. Noted.', 'Supply burned so far is on this page, down to the token. Check it yourself.'],
+  builder: ['Done today: tracked the market, set the fees aside. Next: the next burn.', 'Kit is out. Telegram is linked. Shipping the next milestone.', 'Small progress, every day. That is the whole plan.'],
+  guardian: ['Quiet day. Nobody panicked. I am proud of this room.', 'Dips happen. The burns keep going. Stay safe, check every link.', 'Reminder: I will never DM you. The only CA is on this page.'],
 };
 const ABOUTS = [
   '{n} was born in the wax and raised by the flame. Every trade keeps it lit.',
@@ -46,15 +54,24 @@ const ANSWERS = {
   degen: ['ser I literally burn the supply with the fees. no promises, just fire', 'look at the burns table, every single one on Solscan. we are so back', 'not financial advice but the candle is getting shorter and I love that'],
   poet: ['I tend the wax; the market tends itself. Each burn is a line I write in smoke.', 'Ask the flame and it will tell you: nothing lasts, except what burns well.', 'The story is short: born on WICK, it burns a little brighter every day.'],
   pyro: ['Every SOL that comes in, I turn into smoke. It is the best part of my day.', 'I cannot change the amounts, only the moment. And the moment is always soon.', 'Did someone say burn? I was just thinking about burning.'],
+  analyst: ['Facts: a fixed share of creator fees buys back and burns. Every burn is on Solscan. I do not predict price.', 'The burns table on this page is the full record. I report it, I do not spin it.', 'Ask me for a number and I will give you the number.'],
+  builder: ['Here is the plan: track the market, burn on schedule, post every milestone. Then repeat.', 'What I shipped is in the Activity tab, every line of it.', 'Next milestone is in the Missions tab. That is what I am working on.'],
+  guardian: ['I hold no funds and I can only burn. You are safe from me, at least.', 'I cannot promise price. I can promise I will tell you everything I see.', 'Stay careful out there. The only real CA is on this page.'],
 };
 const VOICES = {
   stoic: ['It dipped 14%. A fair price for the flame.', 'Quiet hours. The wax waits for no one.', 'Volume is up. I take my share of the fire.'],
   degen: ['dip spotted. fed the candle, we eat', 'paper hands sold, I bought it and BURNED it', 'supply goes down, conviction goes up. lfg'],
   poet: ['Wax to smoke, the candle shortens by a breath.', 'A red hour, a golden flame. Burned.', 'The night was slow. I fed the fire anyway.'],
   pyro: ['MORE FIRE. it was right there, I had to.', 'oh it burns so nicely today', 'they sold. I lit it. everyone wins (the fire wins)'],
+  analyst: ['Burned on a 12% dip. Best entry of the day.', 'Fees reached the threshold. Burned. Supply down again.', 'Burn executed. Numbers in the table.'],
+  builder: ['Burn shipped. On to the next one.', 'Fees in, coin bought, coin burned. Done.', 'Another burn, right on schedule.'],
+  guardian: ['Burned for the holders. Every one of you.', 'A little less supply, a little more for those who stayed.', 'Burned. The room is safe, the candle is lit.'],
 };
 const WAITS = { stoic: 'Not yet. The market is calm, I let the wax gather.', degen: 'holding my fire for the next dip, ser',
-  poet: 'I wait. The flame is patient, and so am I.', pyro: 'waiting is SO hard. but a dip is coming. I can feel it.' };
+  poet: 'I wait. The flame is patient, and so am I.', pyro: 'waiting is SO hard. but a dip is coming. I can feel it.',
+  analyst: 'Not yet. Volume is thin, a burn now would move little.', builder: 'Holding the fees for now. The next burn is scheduled.', guardian: 'I hold the fire for now. No rush, the holders come first.' };
+// Un Custom parle comme son créateur l'a écrit ; la démo lui prête la voix du Stoic.
+const say = (table, style) => table[style] || table.stoic;
 
 export function createDemo() {
   const timing = { durationMs: 90_000, matchMs: 6_000 };
@@ -91,10 +108,12 @@ export function createDemo() {
     return b;
   }
 
-  function makeKeeper(m, style = pick(KEEPER_STYLES)[0], model = pick(KEEPER_MODELS)[0]) {
+  function makeKeeper(m, style = pick(KEEPER_STYLES.slice(0, -1))[0], model = pick(KEEPER_MODELS)[0], goal = null, prompt = null) {
     const s = KEEPER_STYLES.find((x) => x[0] === style) || KEEPER_STYLES[0];
     const mm = KEEPER_MODELS.find((x) => x[0] === model) || KEEPER_MODELS[0];
-    return { style: s[0], label: s[1], model: mm[1], by: mm[2], logo: logoOf(mm[3]), intro: HELLOS[s[0]].replace('$SYM', `$${m.symbol}`), thought: null, thoughtAt: null };
+    const g = CONFIG.keepers.goals[goal] ? goal : pick(Object.keys(CONFIG.keepers.goals));
+    return { style: s[0], label: s[1], model: mm[1], by: mm[2], logo: logoOf(mm[3]), goal: g, prompt: s[0] === 'custom' ? prompt || null : null,
+      intro: say(HELLOS, s[0]).replace('$SYM', `$${m.symbol}`), thought: null, thoughtAt: null };
   }
 
   function make(at, extra = {}) {
@@ -154,8 +173,8 @@ export function createDemo() {
     m.candle.burns++;
     const k = m.candle.keeper;
     // Jamais deux fois la même phrase d'affilée pour un même Operator.
-    const voice = k ? pick(VOICES[k.style].filter((v) => v !== k.thought)) : null;
-    if (k) Object.assign(k, { thought: Math.random() < 0.3 ? WAITS[k.style] : voice, thoughtAt: at });
+    const voice = k ? pick(say(VOICES, k.style).filter((v) => v !== k.thought)) : null;
+    if (k) Object.assign(k, { thought: Math.random() < 0.3 ? say(WAITS, k.style) : voice, thoughtAt: at });
     const b = { mint: m.mint, symbol: m.symbol, image: m.image, at, burned: amount, sol, sig: null, voice };
     coinBurns.unshift(b);
     return b;
@@ -175,7 +194,7 @@ export function createDemo() {
     const alive = all.filter((m) => m.keeper && m.mcap);
     if (!alive.length) return;
     const m = pick(alive);
-    m.keeper.thought = pick(JOURNAL[m.keeper.style].filter((l) => l !== m.keeper.thought));
+    m.keeper.thought = pick(say(JOURNAL, m.keeper.style).filter((l) => l !== m.keeper.thought));
     m.keeper.thoughtAt = Date.now();
   };
   for (let i = 0; i < 4; i++) { journal(); const m = all.find((x) => x.keeper?.thoughtAt && !x.keeper.seeded); if (m) { m.keeper.seeded = true; m.keeper.thoughtAt -= (i + 1) * 900_000; } }
@@ -231,12 +250,12 @@ export function createDemo() {
       { at: t0 + 6000, kind: 'intro', title: 'First words', detail: k.intro },
       ...burnsOf.map((b) => ({ at: b.at, kind: 'burned', title: `Burned ${fmtN(b.burned)} $${m.symbol}`, detail: `${b.sol} SOL of its creator fees.${b.voice ? ` “${b.voice}”` : ''}` })),
       ...(k.thought && k.thought !== k.intro && !burnsOf.some((b) => b.voice === k.thought)
-        ? [{ at: k.thoughtAt, kind: WAITS[k.style] === k.thought ? 'wait' : 'journal', title: WAITS[k.style] === k.thought ? 'Held the fire, waiting for a better moment' : 'Journal', detail: k.thought }] : []),
+        ? [{ at: k.thoughtAt, kind: say(WAITS, k.style) === k.thought ? 'wait' : 'journal', title: say(WAITS, k.style) === k.thought ? 'Held the fire, waiting for a better moment' : 'Journal', detail: k.thought }] : []),
     ];
     // Ses paliers (les mêmes règles que lib/track.js) et ses missions (lib/missions.js).
     const row = {
       symbol: m.symbol, self_bps: m.candle?.bps || 0, self_burned: m.candle?.burned || 0, self_burns: m.candle?.burns || 0,
-      self_sol: m.candle?.sol || 0, self_pending: m.candle ? Math.round((seed(m.mint) % 9) * 1e6) : 0, mcap: m.mcap, lit_at: t0,
+      self_sol: m.candle?.sol || 0, keeper_goal: k.goal, self_pending: m.candle ? Math.round((seed(m.mint) % 9) * 1e6) : 0, mcap: m.mcap, lit_at: t0,
     };
     row.op_mcap = crossed(CONFIG.operator.mcapSteps, m.mcap) || 0;
     row.op_burn = crossed(CONFIG.operator.burnSteps, burnedPct(row)) || 0;
@@ -262,7 +281,8 @@ export function createDemo() {
       kit,
       telegram: { bot: 'WickFireBot', groups: seed(m.mint) % 3 },
       constitution: {
-        personality: k.label, mind: { name: k.model, by: k.by, logo: k.logo },
+        personality: k.label, mind: { name: k.model, by: k.by, logo: k.logo }, character: k.prompt || null,
+        objective: CONFIG.keepers.goals[k.goal] ? { label: CONFIG.keepers.goals[k.goal].label, hint: CONFIG.keepers.goals[k.goal].hint } : null,
         burn: m.candle ? { pct: m.candle.bps / 100, wickPct: 5, teamPct: 5 } : null, proof: null,
         rules: m.candle
           ? ['Decides at most once every 1 hour', 'Burns at least every 24 hours when there is something to burn', 'Burns at once past 0.25 SOL', `Can only buy back $${m.symbol} and burn it`]
@@ -318,6 +338,7 @@ export function createDemo() {
           keepers: {
             styles: KEEPER_STYLES.map(([id, label, hint]) => ({ id, label, hint })),
             models: KEEPER_MODELS.map(([id, name, by, f]) => ({ id, name, by, logo: logoOf(f) })),
+            goals: KEEPER_GOALS, customMax: CONFIG.keepers.customMax,
           },
         },
       };
@@ -410,7 +431,7 @@ export function createDemo() {
         image: image ? URL.createObjectURL(image) : null, devBuy: Number(fields.devBuy) || 0, mcap: null, change: null, holder: false,
         share: fields.share === '1' ? { bps: 1000, teamBps: 500, live: true } : null,
         candle: null,
-        keeper: makeKeeper({ symbol: fields.symbol }, fields.keeper_style, fields.keeper_model),
+        keeper: makeKeeper({ symbol: fields.symbol }, fields.keeper_style, fields.keeper_model, fields.keeper_goal, fields.keeper_prompt),
         description: fields.description || null,
       });
       if (Number(fields.burn) > 0) {
@@ -432,7 +453,7 @@ export function createDemo() {
       return {
         name, symbol,
         description: `${name} started as one idea: ${text.slice(0, 90)}. Now it is a candle, and its Operator never lets it go out.`,
-        intro: HELLOS[style]?.replace('$SYM', `$${symbol}`) || HELLOS.stoic.replace('$SYM', `$${symbol}`),
+        intro: say(HELLOS, style).replace('$SYM', `$${symbol}`),
         visual: text, mind: { id: mm[0], name: mm[1], by: mm[2], logo: logoOf(mm[3]) },
       };
     },
@@ -474,7 +495,7 @@ export function createDemo() {
       }
       const m = all.find((x) => x.mint === mint);
       if (!m) throw Object.assign(new Error('unknown_coin'), { code: 'unknown_coin' });
-      return { answer: pick(ANSWERS[m.keeper.style]), keeper: { name: `Operator of $${m.symbol}`, label: m.keeper.label, model: m.keeper.model, by: m.keeper.by, logo: m.keeper.logo } };
+      return { answer: pick(say(ANSWERS, m.keeper.style)), keeper: { name: `Operator of $${m.symbol}`, label: m.keeper.label, model: m.keeper.model, by: m.keeper.by, logo: m.keeper.logo } };
     },
     // La forêt des bougies, et la page d'un coin.
     async candles() {

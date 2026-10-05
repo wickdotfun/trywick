@@ -1069,9 +1069,9 @@ button.cdl:focus-visible { outline: 2px solid var(--gold); outline-offset: 6px; 
 #launch-form { display: flex; flex-direction: column; gap: 12px; }
 .lf-step { display: flex; flex-direction: column; gap: 9px; padding: 14px; border-radius: 16px; border: 1px solid var(--line-2); background: rgba(20, 13, 9, .55); }
 .lf-step.keeper-opt { border-color: var(--gold-line); }
-.lf-step-head { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; row-gap: 2px; align-items: center; }
+.lf-step-head { display: flex; flex-direction: column; gap: 3px; }
 .lf-step-head b { font-size: 15px; }
-.lf-step-head small { grid-column: 2; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.lf-step-head small { color: var(--muted); font-size: 12px; line-height: 1.4; }
 .lf-num { grid-row: span 2; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 700 12px/1 var(--mono);
   color: #1d1003; background: var(--gold-metal); box-shadow: 0 0 14px rgba(255, 180, 60, .35); }
 .lf-coin { gap: 12px; }
@@ -1260,3 +1260,54 @@ button.cdl:focus-visible { outline: 2px solid var(--gold); outline-offset: 6px; 
 .spark-btns .spark-go { min-height: 40px; }
 .spark-surprise { height: 30px; padding: 0 12px; font-size: 12px; border-radius: 9px; justify-content: center; }
 @media (max-width: 720px) { .spark-btns { flex-direction: row; } .spark-btns > * { flex: 1; } }
+
+/* ------------------------------------------------------------ Le tunnel de lancement en cinq étapes */
+.lf-stepper { list-style: none; margin: 14px 0 12px; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.lf-stepper li { position: relative; min-width: 0; }
+.lf-stepper button { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 8px 2px; border-radius: 12px; border: 1px solid var(--line-2);
+  background: rgba(20, 13, 9, .7); color: var(--muted); min-width: 0; transition: border-color .15s, color .15s, box-shadow .15s; }
+.lf-stepper button span { flex: none; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font: 700 10.5px/1 var(--mono);
+  border: 1px solid var(--line-2); color: var(--dim); }
+.lf-stepper button span .ico { width: 12px; height: 12px; }
+.lf-stepper button b { font-size: 11.5px; font-weight: 600; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lf-stepper button:hover { border-color: var(--gold-line); color: var(--text); }
+.lf-stepper button.done { color: #e9dccb; border-color: var(--gold-line); }
+.lf-stepper button.done span { background: rgba(255, 206, 112, .14); border-color: var(--gold-line); color: var(--gold); }
+.lf-stepper button.on { color: var(--text); border-color: transparent; box-shadow: 0 0 0 1.5px #f1b440 inset, 0 0 18px rgba(255, 180, 60, .2); background: rgba(255, 190, 80, .08); }
+.lf-stepper button.on span { background: var(--gold-metal); color: #1d1003; border-color: transparent; box-shadow: 0 0 12px rgba(255, 180, 60, .4); }
+.lf-nav { display: flex; gap: 8px; align-items: center; }
+.lf-nav .cta.wide { margin-top: 0; }
+.lf-nav .wbtn { flex: none; min-width: 92px; justify-content: center; }
+.lf-nav .cta { flex: 1; }
+.k-styles.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.k-styles.four .k-style { padding: 11px 11px; min-height: 64px; }
+.k-minds.big .k-mind { padding: 11px 12px; }
+.k-minds.big .k-mind i { width: 34px; height: 34px; border-radius: 10px; }
+.k-minds.big .k-mind i .ai-logo { width: 20px; height: 20px; }
+.k-minds.big .k-mind b { font-size: 13px; }
+.k-custom { display: flex; flex-direction: column; gap: 6px; }
+.k-custom textarea { min-height: 76px; resize: vertical; }
+.k-goals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.k-goal { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; row-gap: 3px; align-items: center; padding: 12px; border-radius: 14px; text-align: left;
+  border: 1px solid var(--line-2); background: rgba(20, 13, 9, .9); color: var(--text); min-width: 0; transition: border-color .15s, box-shadow .15s; }
+.k-goal .ico { grid-row: span 2; width: 32px; height: 32px; padding: 7px; border-radius: 10px; color: var(--gold); background: rgba(255, 206, 112, .1); border: 1px solid var(--gold-line); }
+.k-goal b { font-size: 14px; }
+.k-goal small { font-size: 11.5px; line-height: 1.35; color: var(--muted); }
+.k-goal:hover { border-color: var(--gold); }
+.k-goal.on { border-color: transparent; box-shadow: 0 0 0 1.5px #f1b440 inset, 0 0 18px rgba(255, 180, 60, .22); background: rgba(255, 190, 80, .08); }
+.k-goal.on .ico { background: var(--gold-metal); color: #1d1003; border-color: transparent; }
+.lf-summary { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--gold-line);
+  background: linear-gradient(90deg, rgba(255, 190, 80, .08), rgba(20, 13, 9, .5)); }
+.lf-summary img, .lf-sum-ph { flex: none; width: 48px; height: 48px; border-radius: 12px; object-fit: cover; }
+.lf-sum-ph { display: grid; place-items: center; border: 1px dashed var(--line-2); color: var(--dim); }
+.lf-summary > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.lf-summary b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lf-summary small { font-size: 11.5px; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.lf-summary small .ai-logo { width: 12px; height: 12px; }
+@media (max-width: 720px) {
+  .lf-stepper { gap: 4px; }
+  .lf-stepper button b { font-size: 10.5px; }
+  .k-styles.four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .k-goals { grid-template-columns: 1fr; }
+}
+.op-quote { color: #f3e4c8; }

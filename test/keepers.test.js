@@ -47,7 +47,7 @@ test('Workers AI answers are read whatever their shape, and lines are cleaned up
   assert.deepEqual(parseDecision('Sure! {"action":"wait","line":"Not yet. Let it dip."}'), { action: 'wait', line: 'Not yet. Let it dip.' });
   assert.equal(parseDecision('{"action":"sell everything"}'), null);
   assert.equal(parseDecision('no json here'), null);
-  assert.deepEqual(keeperChoices().styles.map((s) => s.id), ['stoic', 'degen', 'poet', 'pyro']);
+  assert.deepEqual(keeperChoices().styles.map((s) => s.id), ['stoic', 'degen', 'poet', 'pyro', 'analyst', 'builder', 'guardian', 'custom']);
 });
 
 test('a Keeper that says burn: the burn is queued with its line, on its chosen model', async () => {

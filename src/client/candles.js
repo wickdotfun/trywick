@@ -204,7 +204,9 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
     return `<div class="op-const">
       <p class="op-locked"><span class="op-badge">${icon('lock')} LOCKED</span> Set at launch. Nobody can change it, not even WICK.</p>
       <dl>
-        ${row('Personality', esc(c.personality))}
+        ${row('Character', esc(c.personality))}
+        ${c.character ? row('In its creator\'s words', `<i class="op-quote">“${esc(c.character)}”</i>`) : ''}
+        ${c.objective ? row('Objective', `<b>${esc(c.objective.label)}</b> <small>· ${esc(c.objective.hint)}</small>`) : ''}
         ${row('Mind', `<span class="kc-model">${aiLogo(c.mind, 14)} ${esc(c.mind.name)}</span> <small>by ${esc(c.mind.by)}</small>`)}
         ${row('Burn allocation', c.burn ? `<b class="gold">${c.burn.pct}%</b> of creator fees <small>· +${c.burn.wickPct}% burns ${tk()} · ${c.burn.teamPct}% team</small>` : 'Off <small>· its creator keeps all creator fees</small>')}
         ${row('Can sell', no)}
@@ -223,7 +225,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
     return `<section class="keeper-card op-panel">
       <div class="kc-head">
         <span class="kc-avatar">${icon('keeper')}${k.logo ? `<i class="kc-mind">${aiLogo(k, 14)}</i>` : ''}</span>
-        <div><b>Operator of $${esc(m.symbol)}</b><small>${esc(k.label)} · runs on <span class="kc-model">${aiLogo(k, 14)} ${esc(k.model)}</span> (${esc(k.by)})</small></div>
+        <div><b>Operator of $${esc(m.symbol)}</b><small>${esc(k.label)}${op.constitution?.objective ? ` · ${esc(op.constitution.objective.label)}` : ''} · runs on <span class="kc-model">${aiLogo(k, 14)} ${esc(k.model)}</span> (${esc(k.by)})</small></div>
         <span class="kc-status"><i></i>${last && Date.now() - last.at < 86_400_000 ? `active ${ago(last.at)}` : 'on duty'}</span>
       </div>
       ${k.intro ? `<blockquote>“${esc(k.intro)}”</blockquote>` : ''}

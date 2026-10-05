@@ -9,7 +9,7 @@ const DAY = 86_400_000;
 
 test('characters and objectives offered at launch', () => {
   const k = keeperChoices();
-  assert.deepEqual(k.styles.map((s) => s.id), ['stoic', 'degen', 'poet', 'pyro', 'analyst', 'builder', 'guardian', 'custom']);
+  assert.deepEqual(k.styles.map((s) => s.id), ['analyst', 'stoic', 'builder', 'degen', 'guardian', 'custom']);
   assert.deepEqual(k.goals.map((g) => g.id), ['deflation', 'survive', 'openbook', 'meme']);
   assert.equal(k.customMax, 280);
   assert.equal(keeperGoal('meme'), 'meme');

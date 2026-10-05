@@ -55,7 +55,7 @@ test('scout: the cron reads the market every 30 minutes, with the AI or without 
   const db = fakeD1();
   await ensureSchema(db);
   const answer = JSON.stringify({ narratives: [{ title: 'Animal casinos', angle: 'Frogs and cats run the tables.', idea: 'A hamster who deals blackjack on Solana', sources: ['CFROG', 'CCAT'] }] });
-  const env = { DB: db, AI: { run: async () => ({ response: answer }) } };
+  const env = { DB: db, SCOUT: 'on', AI: { run: async () => ({ response: answer }) } };
   assert.equal(await runScout(env, NOW), 1);
   assert.equal(await runScout(env, NOW + 10 * MIN), 0, 'not again before 30 minutes');
   const page = await crewPage(db, NOW);
@@ -63,7 +63,7 @@ test('scout: the cron reads the market every 30 minutes, with the AI or without 
   assert.equal(page.scout.narratives[0].title, 'Animal casinos');
   assert.deepEqual(page.scout.sources.map((s) => s.symbol), ['CFROG', 'CCAT']);
 
-  const plain = { DB: fakeD1() };
+  const plain = { DB: fakeD1(), SCOUT: 'on' };
   await ensureSchema(plain.DB);
   assert.equal(await runScout(plain, NOW), 1);
   const s = (await crewPage(plain.DB, NOW)).scout;
@@ -88,4 +88,11 @@ test('the crew page: what the Operators are doing, their fresh coins, the bigges
   assert.equal(page.fresh[0].burns, 20);
   assert.equal(page.top[0].mcap, 120000);
   assert.deepEqual(page.stats, { coins: 1, actions: 2, burns: 0, posts: 0 });
+});
+
+test('scout: off unless SCOUT=on (it is no longer offered at launch)', async () => {
+  const db = fakeD1();
+  await ensureSchema(db);
+  globalThis.fetch = async () => { throw new Error('no network call'); };
+  assert.equal(await runScout({ DB: db, AI: { run: async () => { throw new Error('no AI call'); } } }, NOW), 0);
 });

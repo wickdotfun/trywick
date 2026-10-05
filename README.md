@@ -389,8 +389,9 @@ Locally, `CYCLE_MINUTES=1` in `.dev.vars` makes the breath (buyback countdown) 1
    | `TEAM_FEE_BPS` | team share of the Ignition Fee, in basis points (default `5000` = 50%) |
    | `TEAM_WALLET` | where the team share goes (default: the dev wallet) |
    | `SHARE_BURN_BPS`, `SHARE_TEAM_BPS`, `SHARE_CREW_BPS` | burn, team and crew parts of shared creator fees, in basis points (default `1000` + `1000` + `2000`: 60/20/10/10) |
-   | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY` | secrets, optional: turn on each premium mind |
+   | `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `MINIMAX_API_KEY` (and `OPENAI_API_KEY`, `GEMINI_API_KEY`) | secrets, optional: turn on the premium minds (Anthropic, xAI, MiniMax are offered at launch; until their key is set they show as "soon"). The other minds (OpenAI gpt-oss, Google Gemma, Qwen, DeepSeek, Mistral, Moonshot Kimi, Z.ai GLM) run on Workers AI |
    | `PREMIUM_CLAUDE_MODEL`, `PREMIUM_GPT_MODEL`, `PREMIUM_GEMINI_MODEL`, `PREMIUM_GROK_MODEL` | optional: another model of the same provider |
+   | `SPARK`, `SCOUT` | optional, off by default: `on` turns back on the AI at launch (Spark writes the coin and paints its logo) and the Scout. Off, creators bring their own image, like on pump.fun, and nothing at launch costs AI |
    | `SPARK_IMAGE_MODEL`, `AI_IMAGE_PER_DAY` | optional: logos are painted by FLUX Schnell (about 500 a day in the free Workers AI quota). `phoenix` = Leonardo Phoenix 512 × 512 (nicer, about $0.006 each), `phoenix-hd` = 1024 × 1024 (about $0.023). `AI_IMAGE_PER_DAY` caps logos per day (default 60) |
    | `TEAM_LOCK_URL`, `TEAM_LOCK_AMOUNT`, `TEAM_LOCK_UNTIL` | optional: the team's $WICK lock, shown on the Proof page once it exists |
    | `X_CLIENT_ID`, `X_CLIENT_SECRET` | secrets, optional: an X app with OAuth 2.0, so each coin's Operator can run its X account |

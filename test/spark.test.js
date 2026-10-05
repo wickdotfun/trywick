@@ -188,3 +188,14 @@ test('the journal: once a day, a Keeper writes a line its holders see', async ()
   await coin(quiet);
   assert.equal(await runJournal(quiet, NOW), 0, 'without AI, no journal line (nothing made up)');
 });
+
+test('the AI at launch (coin and logo) is off unless SPARK=on: nothing can cost us', async () => {
+  const { spark, sparkLogo } = await import('../src/api/spark.js');
+  const ai = fakeAI(() => { throw new Error('no AI call'); });
+  const e = await env(ai);
+  const req = (b) => ({ request: new Request('http://x', { method: 'POST', body: JSON.stringify(b) }), env: e });
+  const r1 = await spark(req({ idea: 'a dragon' }));
+  const r2 = await sparkLogo(req({ visual: 'a dragon', name: 'x' }));
+  assert.deepEqual([r1.status, (await r1.json()).error, r2.status], [503, 'ai_off', 503]);
+  assert.equal(ai.calls.length, 0);
+});

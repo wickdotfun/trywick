@@ -17,10 +17,11 @@ async function db() {
   return d;
 }
 
-test('premium minds: offered only once their key is set', () => {
+test('the minds offered: one per provider, in order; premium ones usable only once their key is set', () => {
   const free = keeperChoices({}).models;
-  assert.equal(free.find((m) => m.id === 'llama').premium, undefined);
-  assert.deepEqual(free.filter((m) => m.premium).map((m) => [m.id, m.available]), [['claude', false], ['gpt', false], ['gemini', false], ['grok', false]]);
+  assert.deepEqual(free.map((m) => m.by), ['OpenAI', 'Anthropic', 'Google', 'Qwen', 'xAI', 'DeepSeek', 'MiniMax', 'Mistral', 'Moonshot', 'Z.ai']);
+  assert.equal(free.find((m) => m.id === 'llama'), undefined, 'Llama is the fallback, not offered');
+  assert.deepEqual(free.filter((m) => m.premium).map((m) => [m.id, m.available]), [['claude', false], ['grok', false], ['minimax', false]]);
   assert.equal(keeperChoices({ ANTHROPIC_API_KEY: 'k' }).models.find((m) => m.id === 'claude').available, true);
 });
 

@@ -3,6 +3,7 @@
 import { adminPause, adminPost, adminRun, adminSocial, adminStatus, recordRun } from './api/admin.js';
 import { candles, coin } from './api/candles.js';
 import { crew } from './api/crew.js';
+import { xCallback, xStart, xUnlink } from './api/x.js';
 import { launches, profile } from './api/explore.js';
 import { prepare, status, submit } from './api/launch.js';
 import { board } from './api/leaderboard.js';
@@ -21,6 +22,7 @@ import { queueSelfBurn, runShares } from '../lib/sharing.js';
 import { runKits } from '../lib/kit.js';
 import { runPublish } from '../lib/publish.js';
 import { runScout } from '../lib/scout.js';
+import { runXPosts } from '../lib/xoperator.js';
 import { runSocial } from '../lib/social.js';
 import { runTelegram } from '../lib/telegram.js';
 import { sweep } from '../lib/matches.js';
@@ -35,6 +37,9 @@ const ROUTES = {
   'GET /api/candles': candles,
   'GET /api/coin': coin,
   'GET /api/crew': crew,
+  'POST /api/x/start': xStart,
+  'GET /api/x/callback': xCallback,
+  'POST /api/x/unlink': xUnlink,
   'GET /api/token': token,
   'POST /api/trade/prepare': tradePrepare,
   'POST /api/trade/send': tradeSend,
@@ -114,6 +119,8 @@ export default {
       runPublish(env, Date.now()),
       // Le Scout lit ce qui monte sur Solana (toutes les 30 minutes).
       runScout(env, Date.now()),
+      // L'Operator de chaque coin poste sur son compte X (si son créateur l'a relié).
+      runXPosts(env, Date.now()),
     ];
     for (const r of await Promise.allSettled(steps)) {
       if (r.status === 'rejected') console.error('cron', r.reason?.message ?? r.reason);

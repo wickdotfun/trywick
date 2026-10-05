@@ -36,6 +36,9 @@ const api = DEMO ? createDemo() : {
   candles: () => get('/api/candles'),
   coin: (mint) => get(`/api/coin?mint=${encodeURIComponent(mint)}`),
   crew: () => get('/api/crew'),
+  // Le compte X d'un coin : son créateur le relie (signature de son wallet, puis X).
+  xStart: (b) => post('/api/x/start', b),
+  xUnlink: (b) => post('/api/x/unlink', b),
   // L'IA : Spark (le coin inventé par le Operator), son logo, et les questions aux Operators.
   spark: (b) => post('/api/spark', b),
   sparkImage: (b) => post('/api/spark/image', b, 'blob'),
@@ -1150,6 +1153,14 @@ function start() {
     if (breathNow().remaining === 0 && !scene?.burning) poll();
   }, 1000);
   startScene();
+  // Retour de X (le compte X d'un coin) : on dit ce qui s'est passé, puis on nettoie l'adresse.
+  const params = new URLSearchParams(location.search);
+  const xs = params.get('x');
+  if (xs) {
+    params.delete('x');
+    history.replaceState(null, '', `${location.pathname}${params.size ? `?${params}` : ''}${location.hash}`);
+    toast({ linked: `${icon('check')} Its Operator now runs its X account. First post within the hour.`, denied: 'X authorization cancelled. Nothing was connected.' }[xs] || 'Could not connect the X account. Try again from its Kit tab.', 7000);
+  }
   // Une page demandée dans l'adresse (trywick.fun/#wick…) s'ouvre une fois l'état chargé.
   const page = location.hash.slice(1);
   poll(true).then(() => { if (isRoute(page)) go(page); });

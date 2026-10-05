@@ -125,6 +125,20 @@ export async function signBytes(bytes) {
   }
 }
 
+// Signer un message (du texte, jamais une transaction) : la preuve qu'on est le créateur d'un coin.
+// Renvoie la signature en base64.
+export async function signText(text) {
+  if (!session) throw Object.assign(new Error('not_connected'), { code: 'no_connect' });
+  const feature = session.wallet.features['solana:signMessage'];
+  if (!feature) throw Object.assign(new Error('no_sign_message'), { code: 'no_sign_message' });
+  try {
+    const [out] = await feature.signMessage({ account: session.account, message: new TextEncoder().encode(text) });
+    return btoa(String.fromCharCode(...out.signature));
+  } catch (err) {
+    throw Object.assign(new Error('rejected'), { code: 'rejected', cause: err });
+  }
+}
+
 // ------------------------------------------------------------ la fenêtre de choix
 let dialog = null;
 function ensureDialog() {

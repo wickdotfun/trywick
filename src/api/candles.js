@@ -15,6 +15,6 @@ export async function coin({ request, env }) {
   await ensureSchema(env.DB);
   const mint = new URL(request.url).searchParams.get('mint');
   if (!isPubkey(mint)) return json({ error: 'bad_mint' }, 400);
-  const page = await coinPage(env.DB, mint);
+  const page = await coinPage(env.DB, mint, env);
   return page ? json(page) : json({ error: 'unknown_mint' }, 404);
 }

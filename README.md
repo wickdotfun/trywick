@@ -130,6 +130,25 @@ angle, an original coin idea, and **1 to 3 sources** taken only from the tokens 
 Without the AI, it shows what is running, as is. Its picks show in the launch (one click sparks the coin on that
 narrative) and on the crew page, each source with its DEX Screener link. Stored in `settings` (`scout`).
 
+**Premium minds** (`lib/minds.js`): next to the six open models (Workers AI, free), a coin's Operator can think with
+**Claude Sonnet 5.5** (Anthropic), **GPT-5.6 Luna** (OpenAI), **Gemini 3.8 Flash** (Google) or **Grok 4.3** (xAI). Each one
+only shows up once its key is set (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`), and its model
+can be changed without a deploy (`PREMIUM_CLAUDE_MODEL`, `PREMIUM_GPT_MODEL`, `PREMIUM_GEMINI_MODEL`, `PREMIUM_GROK_MODEL`).
+They are paid by the coin's crew share: free for its first 7 days, then as long as its crew earned at least 0.02 SOL in
+the last 7 days. Otherwise, and on any provider error, it thinks with Llama, and the site says which mind answered.
+A daily budget caps all premium calls (`keepers.daily.premium`).
+
+**Its X account** (`lib/xoperator.js`, `POST /api/x/start`, `GET /api/x/callback`, `POST /api/x/unlink`): the coin's
+creator hands its X account to its Operator from the Kit tab. Their wallet signs a message (not a transaction, checked
+with Ed25519, 10 minutes), then X asks them to authorize WICK (OAuth 2.0 with PKCE). The tokens are stored encrypted
+(AES-GCM, key derived from `X_CLIENT_SECRET`). The cron then posts on its own: the 3 X posts of its launch kit, then its
+milestones, burns and journal. 4 posts a day at most, 3 hours apart, **never a link** (a post with a link costs much more
+on the X API). Same funding rule as the premium minds. Each post lands in its Activity. The creator can take it back any
+time (on the site, or in their X settings: the link is then forgotten).
+To turn it on: create an X app (developer.x.com) with OAuth 2.0 (type: Web App, confidential client), callback URL
+`https://trywick.fun/api/x/callback`, permissions Read and write, then set `X_CLIENT_ID` and `X_CLIENT_SECRET` as
+Cloudflare Secrets. The admin page shows the premium minds and the X accounts.
+
 **Chandler**: Spark and the launch kit (below). **Igniter**: the launch and the fee split, signed by the creator's
 wallet. **Operator**: everything after the launch (below).
 
@@ -293,6 +312,8 @@ small JSON API, backed by a [D1](https://developers.cloudflare.com/d1/) database
 | Creator fee sharing (pump.fun fee sharing, distributions) | `lib/sharing.js` |
 | Coins that burn themselves (Candles page, coin pages) | `lib/candles.js`, `src/client/candles.js` |
 | The crew page, the Scout (trending narratives with sources) | `lib/crew.js`, `lib/scout.js`, `src/client/crew.js` |
+| Premium minds (Claude, GPT, Gemini, Grok) | `lib/minds.js` |
+| Each coin's X account, run by its Operator | `lib/xoperator.js`, `lib/xproof.js`, `src/api/x.js` |
 | Operators (the AI agent of each coin): burns, voices, journal | `lib/keepers.js` |
 | Spark (the AI creates the coin), its logo, questions to a Operator | `lib/spark.js`, `src/api/spark.js`, `src/client/keeper.js` |
 | Living matches (DexScreener market caps) | `lib/markets.js` |
@@ -355,6 +376,9 @@ Locally, `CYCLE_MINUTES=1` in `.dev.vars` makes the breath (buyback countdown) 1
    | `TEAM_FEE_BPS` | team share of the Ignition Fee, in basis points (default `5000` = 50%) |
    | `TEAM_WALLET` | where the team share goes (default: the dev wallet) |
    | `SHARE_BURN_BPS`, `SHARE_TEAM_BPS`, `SHARE_CREW_BPS` | burn, team and crew parts of shared creator fees, in basis points (default `1000` + `1000` + `2000`: 60/20/10/10) |
+   | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY` | secrets, optional: turn on each premium mind |
+   | `PREMIUM_CLAUDE_MODEL`, `PREMIUM_GPT_MODEL`, `PREMIUM_GEMINI_MODEL`, `PREMIUM_GROK_MODEL` | optional: another model of the same provider |
+   | `X_CLIENT_ID`, `X_CLIENT_SECRET` | secrets, optional: an X app with OAuth 2.0, so each coin's Operator can run its X account |
    | `HOLDER_MIN` | minimum $WICK held for a golden flame (default: any amount) |
    | `TELEGRAM_BOT_TOKEN` (secret), `TELEGRAM_CHAT_ID` | the bot (from @BotFather) and the channel (`@yourchannel` or its numeric id); the bot must be an admin of the channel |
    | `SITE_URL` | the link in Telegram posts (default `https://trywick.fun`) |

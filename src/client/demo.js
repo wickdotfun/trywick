@@ -279,7 +279,7 @@ export function createDemo() {
     for (const e of log) e.sig = null;
     return {
       log,
-      missions: missions({ ...row, op_groups: seed(m.mint) % 3 }, log, Date.now()),
+      missions: missions({ ...row, op_groups: seed(m.mint) % 3, op_x: m.x || '' }, log, Date.now()),
       kit,
       telegram: { bot: 'WickFireBot', groups: seed(m.mint) % 3 },
       constitution: {
@@ -539,7 +539,23 @@ export function createDemo() {
       const m = all.find((x) => x.mint === mint);
       if (!m) throw new Error('unknown_mint');
       const burnsOf = coinBurns.filter((b) => b.mint === mint);
-      return { match: pub(m), burns: burnsOf.map((b) => ({ ...b })), operator: operatorOf(m, burnsOf) };
+      // Son compte X : relié pour certains coins de la démo, et pour les tiens une fois connecté.
+      if (m.x === undefined) m.x = seed(m.mint) % 3 === 0 && !String(m.creator).startsWith('YouDemo') ? `${m.symbol.toLowerCase()}_operator` : null;
+      const op = operatorOf(m, burnsOf);
+      op.x = { enabled: true, handle: m.x, posts: m.x ? 3 + (seed(m.mint) % 20) : 0, perDay: 4 };
+      if (m.x) op.log.unshift({ at: Date.now() - 40 * 60_000, kind: 'posted', title: `Posted on X (@${m.x})`, detail: op.kit.x[1].split('\n')[0], sig: null });
+      return { match: pub(m), burns: burnsOf.map((b) => ({ ...b })), operator: op };
+    },
+    async xStart({ mint }) {
+      await new Promise((r) => setTimeout(r, 900));
+      const m = all.find((x) => x.mint === mint);
+      if (m) m.x = `${m.symbol.toLowerCase()}_operator`;
+      return { url: null };
+    },
+    async xUnlink({ mint }) {
+      const m = all.find((x) => x.mint === mint);
+      if (m) m.x = null;
+      return { ok: true };
     },
   };
 }

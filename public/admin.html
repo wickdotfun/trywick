@@ -405,6 +405,8 @@
         <dt>Operators (AI)</dt><dd class="${c.ai ? 'ok' : 'warn'}">${c.ai
           ? `on · today: ${Object.entries(c.aiUse || {}).map(([k, u]) => `${({ keeper: 'burns', spark: 'Spark', image: 'logos', chat: 'questions', journal: 'journal' })[k] || k} ${num(u.used, 0)}/${num(u.max, 0)}`).join(' · ')}`
           : 'off (no AI binding): Spark and questions are off, Operators use ready-made lines'}</dd>
+        <dt>Premium minds <small>paid by the crew</small></dt><dd>${(c.premium || []).map((p) => `<span class="${p.ready ? 'ok' : 'dim'}">${esc(p.name)}</span>`).join(' · ')} <small>${(c.premium || []).some((p) => p.ready) ? '' : 'add ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY or XAI_API_KEY'}</small></dd>
+        <dt>Coins on X</dt><dd class="${c.xApp ? 'ok' : 'warn'}">${c.xApp ? `on · ${num(c.xLinks?.n || 0, 0)} accounts · ${num(c.xLinks?.posts || 0, 0)} posts` : 'off: add X_CLIENT_ID and X_CLIENT_SECRET (an X app with OAuth 2.0)'}</dd>
         <dt>PINATA_JWT</dt><dd class="${c.pinata === 'ok' ? 'ok' : c.pinata === 'invalid' ? 'bad' : 'warn'}">${esc(c.pinata || 'missing')}</dd>
         <dt>SOLANA_RPC</dt><dd class="${c.customRpc ? 'ok' : 'warn'}">${c.customRpc ? 'set' : 'public'}</dd>
         <dt>IP_SALT</dt><dd class="${c.ipSalt ? 'ok' : 'warn'}">${c.ipSalt ? 'set' : 'missing'}</dd>

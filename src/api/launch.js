@@ -12,10 +12,17 @@ import { buildCreateTx, uploadMetadata } from '../../lib/pump.js';
 import { ensureSchema } from '../../lib/schema.js';
 import { buildShareTx, checkSignedShareTx } from '../../lib/sharing.js';
 import { keeperGoal, keeperModel, keeperPrompt, keeperStyle } from '../../lib/keepers.js';
+import { isPremium, premiumReady } from '../../lib/minds.js';
 import {
   base64FromBytes, buildFeeTx, bytesFromBase64, checkFeeTx, checkSignedLaunch, getLatestBlockhash,
   sendTransaction, signatureOf,
 } from '../../lib/solana.js';
+
+// L'esprit choisi : un esprit premium seulement s'il est réglé (sa clé), sinon Llama.
+function mindOf(env, id) {
+  const mind = keeperModel(id);
+  return mind && (!isPremium(mind) || premiumReady(env, mind)) ? mind.id : 'llama';
+}
 
 export async function prepare({ request, env }) {
   await ensureSchema(env.DB);
@@ -119,7 +126,7 @@ export async function prepare({ request, env }) {
   // Son caractère et son objectif (Deflation avec « Make it burn », sinon Survive, par défaut).
   const goal = keeperGoal(fields.keeper_goal) || (fee?.selfBps > 0 ? 'deflation' : 'survive');
   await env.DB.prepare('UPDATE matches SET keeper_style = ?, keeper_model = ?, keeper_goal = ?, keeper_prompt = ?, description = ? WHERE mint = ? AND seq IS NULL')
-    .bind(style, keeperModel(fields.keeper_model)?.id || 'llama', goal, character, launch.description || null, launch.mint).run();
+    .bind(style, mindOf(env, fields.keeper_model), goal, character, launch.description || null, launch.mint).run();
   return json({
     tx: base64FromBytes(tx),
     feeTx,

@@ -22,7 +22,9 @@ const KEEPER_STYLES = [['stoic', 'Stoic', 'Calm, patient, few words'], ['degen',
   ['builder', 'Builder', 'Plans, ships, reports'], ['guardian', 'Guardian', 'Watches over the holders'], ['custom', 'Custom', 'Write its character']];
 const KEEPER_GOALS = Object.entries(CONFIG.keepers.goals).map(([id, g]) => ({ id, label: g.label, hint: g.hint }));
 const KEEPER_MODELS = [['llama', 'Llama 3.3 70B', 'Meta', 'meta'], ['gpt-oss', 'gpt-oss 120B', 'OpenAI', 'openai'], ['qwen', 'Qwen3 30B', 'Qwen', 'qwen'],
-  ['mistral', 'Mistral Small 3.1', 'Mistral', 'mistral'], ['gemma', 'Gemma 3 12B', 'Google', 'gemma'], ['deepseek', 'DeepSeek R1 32B', 'DeepSeek', 'deepseek']];
+  ['mistral', 'Mistral Small 3.1', 'Mistral', 'mistral'], ['gemma', 'Gemma 3 12B', 'Google', 'gemma'], ['deepseek', 'DeepSeek R1 32B', 'DeepSeek', 'deepseek'],
+  ['claude', 'Claude Sonnet 5.5', 'Anthropic', 'anthropic', true], ['gpt', 'GPT-5.6 Luna', 'OpenAI', 'openai', true],
+  ['gemini', 'Gemini 3.8 Flash', 'Google', 'gemini', true], ['grok', 'Grok 4.3', 'xAI', 'xai', true]];
 const seed = (k) => [...k].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 7);
 const logoOf = (f) => `/brand/ai/${f}.svg`;
 const HELLOS = {
@@ -337,7 +339,8 @@ export function createDemo() {
           shareBps: 4000, split: { creatorBps: 6000, burnBps: 1000, teamBps: 1000, crewBps: 2000 }, selfOptions: [1000, 2000, 3000, 5000],
           keepers: {
             styles: KEEPER_STYLES.map(([id, label, hint]) => ({ id, label, hint })),
-            models: KEEPER_MODELS.map(([id, name, by, f]) => ({ id, name, by, logo: logoOf(f) })),
+            models: KEEPER_MODELS.map(([id, name, by, f, premium]) => ({ id, name, by, logo: logoOf(f), ...(premium ? { premium: true, available: true } : {}) })),
+            premium: { boostDays: 7, minCrewSol: 0.02 },
             goals: KEEPER_GOALS, customMax: CONFIG.keepers.customMax,
           },
         },

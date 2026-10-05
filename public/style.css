@@ -1429,3 +1429,11 @@ button.cdl:focus-visible { outline: 2px solid var(--gold); outline-offset: 6px; 
   .cw-fresh { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cw-fees { grid-template-columns: 1fr; }
 }
+
+/* Les esprits premium (payés par le crew) */
+.k-minds.premium .k-mind { border-color: var(--gold-line); background: linear-gradient(180deg, rgba(255, 206, 112, .07), rgba(20, 13, 9, .9)); }
+.k-mind.premium i { background: rgba(255, 255, 255, .06); }
+.k-mind:disabled { opacity: .45; cursor: not-allowed; }
+.k-mind:disabled:hover { border-color: var(--gold-line); }
+.k-note { display: flex; gap: 6px; align-items: flex-start; font-size: 11.5px; line-height: 1.4; }
+.k-note .ico { width: 13px; height: 13px; color: var(--gold); flex: none; margin-top: 1px; }

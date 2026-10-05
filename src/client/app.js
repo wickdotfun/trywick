@@ -673,9 +673,16 @@ function identityStep(f) {
 }
 
 function mindStep(k) {
+  const card = (m) => `<button type="button" class="k-mind${m.premium ? ' premium' : ''}${draft.keeper.model === m.id ? ' on' : ''}" data-kmodel="${esc(m.id)}" aria-pressed="${draft.keeper.model === m.id}"${m.premium && !m.available ? ' disabled' : ''}><i>${aiLogo(m, 22)}</i><span><b>${esc(m.name)}</b><small>${esc(m.by)}${m.premium && !m.available ? ' · soon' : ''}</small></span></button>`;
+  const premium = k.models.filter((m) => m.premium);
+  const p = k.premium || { boostDays: 7, minCrewSol: 0.02 };
   return `<section class="lf-step keeper-opt" data-step="1"${show(1)}>
-    ${head(1, 'Its <span class="grad">mind</span>', 'The model its Operator thinks with. Open models, run by Cloudflare. Locked at launch.')}
-    <div class="k-minds big" role="group" aria-label="The mind">${k.models.map((m) => `<button type="button" class="k-mind${draft.keeper.model === m.id ? ' on' : ''}" data-kmodel="${esc(m.id)}" aria-pressed="${draft.keeper.model === m.id}"><i>${aiLogo(m, 22)}</i><span><b>${esc(m.name)}</b><small>${esc(m.by)}</small></span></button>`).join('')}</div>
+    ${head(1, 'Its <span class="grad">mind</span>', 'The model its Operator thinks with: for its journal, its posts, its answers and its burns. Locked at launch.')}
+    ${premium.length ? `<small class="k-label">Premium <em>· paid by its crew</em></small>
+    <div class="k-minds big premium" role="group" aria-label="Premium minds">${premium.map(card).join('')}</div>
+    <small class="muted k-note">${icon('sparkle')} Free for its first ${p.boostDays} days, then as long as its crew earns ${p.minCrewSol} SOL a week from its fees. Otherwise it thinks with Llama, and says so.</small>
+    <small class="k-label">Open models <em>· free, run by Cloudflare</em></small>` : ''}
+    <div class="k-minds big" role="group" aria-label="The mind">${k.models.filter((m) => !m.premium).map(card).join('')}</div>
   </section>`;
 }
 

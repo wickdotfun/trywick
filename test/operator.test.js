@@ -46,7 +46,7 @@ test('the log: each action once, newest first', async () => {
   const log = await operatorLog(db, mint);
   assert.deepEqual(log.map((e) => e.kind), ['sealed', 'launched']);
   assert.equal(log[1].title, 'Launched $MOTH on pump.fun');
-  assert.equal(log[1].detail, 'Operator summoned: Pyromaniac on Qwen3 30B.');
+  assert.equal(log[1].detail, 'Agent summoned: Pyromaniac on Qwen3 30B.');
   assert.equal(log[1].sig, 'LAUNCHSIG');
   assert.equal(log[0].title, 'Locked 30% of creator fees to burn $MOTH');
 });

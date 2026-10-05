@@ -62,7 +62,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
           <span class="eyebrow">Make it burn</span>
           <h2>Every coin is a <span class="grad">candle</span>.</h2>
           <p class="muted">Coins launched on WICK can burn themselves: a share of their creator fees buys them back and
-            burns them, forever, locked on pump.fun. Each candle has an AI Operator that picks the moments and tells you why.
+            burns them, forever, locked on pump.fun. Each candle has an AI agent that picks the moments and tells you why.
             Every candle also burns ${tk()}.</p>
         </div>
         <button class="cta" id="cd-light">Light your candle</button>
@@ -87,7 +87,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
             <span class="mono dim">${String(i + 1).padStart(2, '0')}</span>
             ${candleHtml({ pct: m.candle?.pct ?? 0, w: 11, full: 30, gold: m.holder })}
             ${avatar(m, 30)}
-            <span class="cd-name"><b>$${esc(m.symbol)} ${holderTag(m)}</b><small>burns ${m.candle.bps / 100}% of its fees${m.candle.keeper ? ` · ${esc(m.candle.keeper.label)} Operator` : ''}</small></span>
+            <span class="cd-name"><b>$${esc(m.symbol)} ${holderTag(m)}</b><small>burns ${m.candle.bps / 100}% of its fees${m.candle.keeper ? ` · ${esc(m.candle.keeper.label)} agent` : ''}</small></span>
             <span class="cd-num gold">${pctText(m.candle.pct)}<small>burned</small></span>
             <span class="cd-num hide-sm">${usd(m.mcap)}<small>mcap</small></span>
           </button></li>`).join('')}</ol>`
@@ -118,8 +118,8 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
     return `<section class="cd-keepers">
       <div class="ck-head">
         <span class="kc-avatar">${icon('keeper')}</span>
-        <div><h3>Every candle has an AI <span class="grad">Operator</span></h3>
-          <p class="muted">The creator picks its personality and its mind. The Operator picks the moments to buy the coin back
+        <div><h3>Every candle has an AI <span class="grad">agent</span></h3>
+          <p class="muted">The creator picks its personality and its mind. The agent picks the moments to buy the coin back
           and burn it, and tells the holders why. It never touches the amounts.</p></div>
       </div>
       <div class="ck-minds">${k.models.map((m) => `<div class="ck-mind">${aiLogo(m, 22)}<span><b>${esc(m.name)}</b><small>${esc(m.by)}${m.premium ? (m.available ? ' · premium' : ' · soon') : ''}</small></span></div>`).join('')}</div>
@@ -140,7 +140,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
   }
   // Les missions : ce qu'il a fait (coché), ce qu'il vise (avec sa progression), ce qu'il fait tout le temps.
   function missionsHtml(list = []) {
-    if (!list.length) return '<p class="muted small">This coin was launched before Operators had missions.</p>';
+    if (!list.length) return '<p class="muted small">This coin was launched before agents had missions.</p>';
     const ico = { done: 'check', active: 'clock', ongoing: 'chart' };
     const label = { active: 'in progress', ongoing: 'always on' };
     return `<ol class="op-missions">${list.map((x) => `<li class="om ${esc(x.status)}">
@@ -157,7 +157,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
     const bot = t?.bot ? `@${esc(t.bot)}` : 'the WICK bot';
     const cmd = `/link ${m.mint}`;
     return `<section class="kit-tg"><h4>Its Telegram groups${t?.groups ? ` <small>· posting in ${t.groups}</small>` : ''}</h4>
-      <div class="kit-post"><p>Let its Operator post in your group: its launch kit, its milestones, its burns and a daily recap.
+      <div class="kit-post"><p>Let its agent post in your group: its launch kit, its milestones, its burns and a daily recap.
         <b>1.</b> Add ${t?.bot ? `<a href="https://t.me/${esc(t.bot)}" target="_blank" rel="noopener">${bot}</a>` : bot} to the group.
         <b>2.</b> An admin sends:</p>
         <code class="kit-cmd">${esc(cmd)}</code>
@@ -169,13 +169,13 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
     // La démo : les coins lancés dans la démo sont « les tiens ».
     const mine = demo ? String(m.creator).startsWith('YouDemo') : connect.current()?.address === m.creator;
     if (x.handle) {
-      return `<section class="kit-x on"><h4>${xLogo} Its X account <small>· run by its Operator</small></h4>
+      return `<section class="kit-x on"><h4>${xLogo} Its X account <small>· run by its agent</small></h4>
         <div class="kit-post"><p><a href="https://x.com/${esc(x.handle)}" target="_blank" rel="noopener"><b>@${esc(x.handle)}</b></a> · ${fmt(x.posts)} post${x.posts === 1 ? '' : 's'} so far.
           It posts its launch kit, then its milestones, its burns and its journal: ${x.perDay} posts a day at most, never a link.</p>
           ${mine ? '<div class="kit-act"><button type="button" class="wbtn" id="x-unlink">Take it back</button></div>' : ''}</div></section>`;
     }
     return `<section class="kit-x"><h4>${xLogo} Its X account</h4>
-      <div class="kit-post"><p>${mine ? 'Hand its X account to its Operator' : 'Its creator can hand its X account to its Operator'}: it posts there on its own,
+      <div class="kit-post"><p>${mine ? 'Hand its X account to its agent' : 'Its creator can hand its X account to its agent'}: it posts there on its own,
         in character. Its launch kit first, then its milestones, its burns and its journal. ${x.perDay} posts a day at most, never a link.
         Paid by its crew.</p>
         ${mine ? `<div class="kit-act"><button type="button" class="cta small-cta" id="x-connect">${xLogo} Connect its X account</button></div>
@@ -183,12 +183,12 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
           You can take it back any time, here or in your X settings.</small><p class="error" id="x-error" hidden></p>` : ''}</div></section>`;
   }
   function kitHtml(kit, m, op) {
-    if (!kit) return `${xHtml(op?.x, m)}<p class="muted small">Its Operator writes the launch kit right after the launch: the lore, three posts for X and a Telegram announcement.</p>${telegramHtml(op?.telegram, m)}`;
+    if (!kit) return `${xHtml(op?.x, m)}<p class="muted small">Its agent writes the launch kit right after the launch: the lore, three posts for X and a Telegram announcement.</p>${telegramHtml(op?.telegram, m)}`;
     const page = `${location.origin}/#coin/${m.mint}`;
     const xIntent = (t) => `https://x.com/intent/post?text=${encodeURIComponent(t)}&url=${encodeURIComponent(page)}`;
     return `<div class="op-kit">
       ${xHtml(op?.x, m)}
-      <p class="kit-note">${icon('sparkle')} Written by its Operator${kit.ai ? '' : ', from its templates'}. Anyone can post it: the creator, the holders, you.</p>
+      <p class="kit-note">${icon('sparkle')} Written by its agent${kit.ai ? '' : ', from its templates'}. Anyone can post it: the creator, the holders, you.</p>
       <section><h4>Lore</h4><div class="kit-post"><p>${lines(kit.lore)}</p>
         <div class="kit-act"><button type="button" class="wbtn" data-kcopy="${esc(kit.lore)}">Copy</button></div></div></section>
       <section><h4>Posts for X</h4>${kit.x.map((p) => `<div class="kit-post"><p>${lines(p)}</p>
@@ -255,7 +255,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
     });
   }
   function constitutionHtml(c, m) {
-    if (!c) return '<p class="muted small">This coin was launched before Operators had a Constitution.</p>';
+    if (!c) return '<p class="muted small">This coin was launched before agents had a Constitution.</p>';
     const row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
     const no = '<span class="op-no">NO</span>';
     return `<div class="op-const">
@@ -282,7 +282,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
     return `<section class="keeper-card op-panel">
       <div class="kc-head">
         <span class="kc-avatar">${icon('keeper')}${k.logo ? `<i class="kc-mind">${aiLogo(k, 14)}</i>` : ''}</span>
-        <div><b>Operator of $${esc(m.symbol)}</b><small>${esc(k.label)}${op.constitution?.objective ? ` · ${esc(op.constitution.objective.label)}` : ''} · runs on <span class="kc-model">${aiLogo(k, 14)} ${esc(k.model)}</span> (${esc(k.by)})</small></div>
+        <div><b>Agent of $${esc(m.symbol)}</b><small>${esc(k.label)}${op.constitution?.objective ? ` · ${esc(op.constitution.objective.label)}` : ''} · runs on <span class="kc-model">${aiLogo(k, 14)} ${esc(k.model)}</span> (${esc(k.by)})</small></div>
         <span class="kc-status"><i></i>${last && Date.now() - last.at < 86_400_000 ? `active ${ago(last.at)}` : 'on duty'}</span>
       </div>
       ${k.intro ? `<blockquote>“${esc(k.intro)}”</blockquote>` : ''}
@@ -299,7 +299,7 @@ export function createCandles({ api, openModal, world, ticker, avatar, holderTag
       <div class="op-pane" data-oppane="const" hidden>${constitutionHtml(op.constitution, m)}</div>
       <div class="op-pane" data-oppane="talk" hidden>${chatHtml({
         mint: m.mint, symbol: m.symbol,
-        keeper: { name: `Operator of $${m.symbol}`, label: k.label, model: k.model, by: k.by, logo: k.logo },
+        keeper: { name: `Agent of $${m.symbol}`, label: k.label, model: k.model, by: k.by, logo: k.logo },
         suggestions: [`What's the story of $${m.symbol}?`, c ? 'When do you burn next?' : 'How is it doing today?', 'What have you done so far?'],
       })}</div>
     </section>`;

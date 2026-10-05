@@ -87,7 +87,7 @@ test('in a linked group: new milestones and burns are posted, 10 minutes apart, 
   assert.equal(await runPublish(env, NOW + 5 * MIN), 0, 'too soon after the welcome post');
   assert.equal(await runPublish(env, NOW + 11 * MIN), 1);
   const update = sent.find((s) => s.method === 'sendMessage');
-  assert.match(update.text, /Operator update/);
+  assert.match(update.text, /agent update/);
   assert.match(update.text, /Reached a \$100K market cap/);
   assert.ok(!/Journal/.test(update.text), 'only milestones and burns');
   await logAction(db, mint, { kind: 'burned', title: 'Burned 1,000 $MOTH', detail: '0.1 SOL', sig: 'SIG1', at: NOW + 12 * MIN, ref: 'b1' });

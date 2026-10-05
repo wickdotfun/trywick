@@ -89,7 +89,7 @@ const world = {
   history: [],               // les buybacks (un par souffle)
   burns: [],                 // le journal des burns, du plus récent au plus ancien
   coinBurns: [],             // les burns des coins qui se brûlent eux-mêmes (« Make it burn »)
-  thoughts: [],              // ce que disent les Operators (premiers mots, journal, décisions)
+  thoughts: [],              // ce que disent les agents (premiers mots, journal, décisions)
   hall: [],                  // la salle des bougies consumées
   hot: [],                   // les coins WICK les plus chauds
   totals: { burned: 0, supplyPct: null },
@@ -147,13 +147,11 @@ function renderMeter() {
       ? 'Buybacks are paused for now. The candle waits.'
       : `The candle starts melting once ${esc(tk)} is live.`;
   $('cta-sub').innerHTML = fee
-    ? `Launch a coin. Give it an Operator. Put it to work. · <b>Ignition Fee ${from < fee ? `from ${from}` : fee} SOL</b>, ${world.launch.teamSol ? 'half of it burns' : 'burns'} ${esc(tk)}`
-    : 'Launch a coin. Give it an Operator. Put it to work.';
+    ? `Launch a coin. Give it an AI agent. Let it burn. · <b>Ignition Fee ${from < fee ? `from ${from}` : fee} SOL</b>, ${world.launch.teamSol ? 'half of it burns' : 'burns'} ${esc(tk)}`
+    : 'Launch a coin. Give it an AI agent. Let it burn.';
   document.querySelectorAll('[data-t="ticker"]').forEach((el) => { el.textContent = tk; });
   if (!scene?.burning) scene?.setCandle({ melted: c.melted, heat: world.heat / HEAT_FULL });
-  if (document.body.classList.contains('no-webgl')) {
-    $('css-candle').style.setProperty('--h', `${Math.max(4, (1 - c.melted) * 100)}%`);
-  }
+  $('css-candle')?.style.setProperty('--h', `${Math.max(4, (1 - c.melted) * 100)}%`);
   tokenPage.tick();
 }
 
@@ -208,7 +206,7 @@ function coinBurnCard(b) {
 function thoughtCard(t) {
   return `<li class="ev thought"><a href="#coin/${esc(t.mint)}" data-coin="${esc(t.mint)}">
       <span class="ev-keeper">${avatar(t)}${t.keeper?.logo ? `<i class="ev-mind">${aiLogo(t.keeper, 11)}</i>` : ''}</span>
-      <span class="ev-main"><b>Operator of $${esc(t.symbol || '?')}</b><span class="voice" title="${esc(t.line)}">“${esc(t.line)}”</span></span>
+      <span class="ev-main"><b>Agent of $${esc(t.symbol || '?')}</b><span class="voice" title="${esc(t.line)}">“${esc(t.line)}”</span></span>
       <span class="ev-meta"><span class="mono">${icon('keeper')}</span><time data-at="${t.at}">${ago(t.at)}</time></span>
     </a></li>`;
 }
@@ -220,7 +218,54 @@ function pendingCard() {
     <span class="ev-main"><b>Buyback #${h.number}</b><span class="pulse-text">buying $${ticker()}…</span></span></div></li>`;
 }
 
+// L'accueil : les agents au travail (les derniers coins, avec ce que dit leur agent).
+const thoughtOf = (mint) => world.thoughts.find((t) => t.mint === mint);
+function agentCard(m) {
+  const t = thoughtOf(m.mint);
+  const k = m.keeper || t?.keeper;
+  const line = t?.line || k?.intro || null;
+  return `<a class="ag-card${world.mine.has(m.mint) ? ' mine' : ''}" href="#coin/${esc(m.mint)}" data-coin="${esc(m.mint)}">
+    <span class="ag-top">${avatar(m, 40)}<span class="ag-id"><b>$${esc(m.symbol)}</b><small>${esc(m.name)}</small></span>
+      <span class="ag-mc mono">${m.mcap ? `$${compact(m.mcap)}` : 'new'}</span></span>
+    <span class="ag-line">${line ? `“${esc(line)}”` : '<i>Its agent is waking up…</i>'}</span>
+    <span class="ag-foot">${k?.logo ? `<span class="ag-mind">${aiLogo(k, 13)} ${esc(k.label || '')}</span>` : '<span></span>'}
+      ${m.candle ? `<span class="tag burn">burns ${m.candle.bps / 100}%</span>` : ''}<time data-at="${m.at}">${ago(m.at)}</time></span>
+  </a>`;
+}
+function renderHome() {
+  const coins = world.recent.slice().reverse().slice(0, 6);
+  const live = $('feed');
+  if (live) {
+    live.innerHTML = coins.length ? coins.map(agentCard).join('')
+      : `<div class="ag-empty"><b>No agent yet.</b><span>Launch the first coin: its agent shows up here, live.</span><button class="cta small-cta" data-launch>Launch a coin</button></div>`;
+  }
+  const minds = $('h-minds');
+  if (minds && world.launch?.keepers && !minds.childElementCount) {
+    minds.innerHTML = world.launch.keepers.models.filter((m) => !m.premium || m.available)
+      .map((m) => `<span class="h-mind">${aiLogo(m, 22)}<b>${esc(m.name)}</b><small>${esc(m.by)}</small></span>`).join('');
+  }
+  renderHeroAgent();
+}
+// La carte du haut : un agent qui parle, en direct (sinon, un exemple, dit comme tel).
+let heroIdx = 0;
+function renderHeroAgent() {
+  const el = $('hero-agent');
+  if (!el) return;
+  const ts = world.thoughts.slice(0, 6);
+  const t = ts.length ? ts[heroIdx % ts.length] : null;
+  const k = t?.keeper;
+  el.innerHTML = t
+    ? `<a href="#coin/${esc(t.mint)}" data-coin="${esc(t.mint)}">
+        <span class="ha-head">${avatar(t, 44)}<span><b>Agent of $${esc(t.symbol)}</b><small>${k?.logo ? `${aiLogo(k, 12)} ${esc(k.model || '')} · ` : ''}${esc(k?.label || '')}</small></span><span class="ha-live"><i></i>live</span></span>
+        <span class="ha-line">“${esc(t.line)}”</span>
+        <span class="ha-foot"><time data-at="${t.at}">${ago(t.at)}</time><span>See its journal →</span></span></a>`
+    : `<div><span class="ha-head"><span class="ha-ph">${icon('keeper')}</span><span><b>Agent of $YOURCOIN</b><small>Llama 3.3 70B · Stoic</small></span><span class="ha-live ex">example</span></span>
+        <span class="ha-line">“Fees came in overnight. I bought back 2.1M and burned them. The candle is a little shorter.”</span>
+        <span class="ha-foot"><span>Every word, every burn: public</span></span></div>`;
+}
+
 function renderFeed() {
+  if (document.body.classList.contains('home')) { renderHome(); return; }
   const events = [
     ...world.recent.map((m) => ({ at: m.at, html: () => launchCard(m) })),
     ...world.burns.slice(0, 40).map((b) => ({ at: b.at, html: () => burnCard(b) })),
@@ -268,9 +313,9 @@ function nextPop() {
   el.classList.add('in');
   if (!coin) {
     scene?.flare();
-    $('candle-card').classList.remove('melt');
-    void $('candle-card').offsetWidth;
-    $('candle-card').classList.add('melt');
+    $('candle-card')?.classList.remove('melt');
+    void $('candle-card')?.offsetWidth;
+    $('candle-card')?.classList.add('melt');
   }
   setTimeout(() => {
     el.classList.add('out');
@@ -639,7 +684,7 @@ function costLine(burnPct) {
 const mindOf = (id) => world.launch?.keepers?.models.find((m) => m.id === id) || world.launch?.keepers?.models[0];
 // Le tunnel de lancement, en cinq étapes : son identité (Spark ou à la main), son esprit, son
 // caractère, son objectif, puis le feu (Make it burn, dev buy) et le lancement.
-const STEPS5 = [['Identity'], ['Mind'], ['Character'], ['Objective'], ['Fire']];
+const STEPS5 = [['Identity'], ['Its agent'], ['Launch']];
 function stepper() {
   return `<ol class="lf-stepper">${STEPS5.map(([label], i) => `<li><button type="button" data-goto="${i}" class="${i === draft.step ? 'on' : ''}${i < draft.step ? ' done' : ''}">
     <span>${i < draft.step ? icon('check') : i + 1}</span><b>${label}</b></button></li>`).join('')}</ol>`;
@@ -650,7 +695,7 @@ const show = (i) => (draft.step === i ? '' : ' hidden');
 function identityStep(f) {
   const sp = draft.spark;
   return `<section class="lf-step" data-step="0"${show(0)}>
-    ${head(0, 'Its <span class="grad">identity</span>', 'Spark it with one idea, let its Operator surprise you, or fill it in yourself.')}
+    ${head(0, 'Its <span class="grad">identity</span>', 'Spark it with one idea, let its agent surprise you, or fill it in yourself.')}
     <div class="spark">
       <div class="spark-box">
         <textarea id="sp-idea" maxlength="200" rows="2" placeholder="${esc(pick(IDEAS))}">${esc(draft.idea || '')}</textarea>
@@ -685,33 +730,40 @@ function mindStep(k) {
   const card = (m) => `<button type="button" class="k-mind${m.premium ? ' premium' : ''}${draft.keeper.model === m.id ? ' on' : ''}" data-kmodel="${esc(m.id)}" aria-pressed="${draft.keeper.model === m.id}"${m.premium && !m.available ? ' disabled' : ''}><i>${aiLogo(m, 22)}</i><span><b>${esc(m.name)}</b><small>${esc(m.by)}${m.premium && !m.available ? ' · soon' : ''}</small></span></button>`;
   const premium = k.models.filter((m) => m.premium);
   const p = k.premium || { boostDays: 7, minCrewSol: 0.02 };
-  return `<section class="lf-step keeper-opt" data-step="1"${show(1)}>
-    ${head(1, 'Its <span class="grad">mind</span>', 'The model its Operator thinks with: for its journal, its posts, its answers and its burns. Locked at launch.')}
-    ${premium.length ? `<small class="k-label">Premium <em>· paid by its crew</em></small>
+  return `<div class="ag-block"><h4>Its mind <small>the AI model it thinks with</small></h4>
+    ${premium.length && premium.some((m) => m.available) ? `<small class="k-label">Premium <em>· paid by its fees</em></small>
     <div class="k-minds big premium" role="group" aria-label="Premium minds">${premium.map(card).join('')}</div>
-    <small class="muted k-note">${icon('sparkle')} Free for its first ${p.boostDays} days, then as long as its crew earns ${p.minCrewSol} SOL a week from its fees. Otherwise it thinks with Llama, and says so.</small>
-    <small class="k-label">Open models <em>· free, run by Cloudflare</em></small>` : ''}
+    <small class="muted k-note">${icon('sparkle')} Free for its first ${p.boostDays} days, then paid by its own fees (${p.minCrewSol} SOL a week). Otherwise it thinks with Llama, and says so.</small>
+    <small class="k-label">Open models</small>` : ''}
     <div class="k-minds big" role="group" aria-label="The mind">${k.models.filter((m) => !m.premium).map(card).join('')}</div>
-  </section>`;
+  </div>`;
 }
 
 function characterStep(k) {
   const custom = draft.keeper.style === 'custom';
-  return `<section class="lf-step keeper-opt" data-step="2"${show(2)}>
-    ${head(2, 'Its <span class="grad">character</span>', 'How it talks to its holders: in its journal, its posts and its burns.')}
+  return `<div class="ag-block"><h4>Its character <small>how it talks to holders</small></h4>
     <div class="k-styles four" role="group" aria-label="Character">${k.styles.map((x) => `<button type="button" class="k-style${draft.keeper.style === x.id ? ' on' : ''}" data-kstyle="${esc(x.id)}" aria-pressed="${draft.keeper.style === x.id}"><b>${esc(x.label)}</b><small>${esc(x.hint)}</small></button>`).join('')}</div>
     <label class="k-custom"${custom ? '' : ' hidden'}><span>Its character, in your words <em>· ${k.customMax || 280} characters max, public</em></span>
       <textarea name="keeper_prompt" id="lf-prompt" maxlength="${k.customMax || 280}" rows="3" placeholder="A retired samurai who speaks in short proverbs and treats every burn like a duel.">${esc(draft.keeper.prompt || '')}</textarea></label>
-  </section>`;
+  </div>`;
 }
 
 function objectiveStep(k) {
   const warn = draft.keeper.goal === 'deflation' && !burnOptions().length;
   const ico = { deflation: 'flame', survive: 'keeper', openbook: 'book', meme: 'sparkle' };
-  return `<section class="lf-step keeper-opt" data-step="3"${show(3)}>
-    ${head(3, 'Its <span class="grad">objective</span>', 'What it aims for. It shapes what it watches, what it says and its missions.')}
+  return `<div class="ag-block"><h4>Its objective <small>what it aims for</small></h4>
     <div class="k-goals" role="group" aria-label="Objective">${(k.goals || []).map((g) => `<button type="button" class="k-goal${draft.keeper.goal === g.id ? ' on' : ''}" data-kgoal="${esc(g.id)}" aria-pressed="${draft.keeper.goal === g.id}">${icon(ico[g.id] || 'star')}<b>${esc(g.label)}</b><small>${esc(g.hint)}</small></button>`).join('')}</div>
-    <small class="muted" id="lf-goal-note"${warn ? '' : ' hidden'}>Deflation works best with Make it burn, which unlocks with $${ticker()}. Until then, its Operator watches and tells.</small>
+    <small class="muted" id="lf-goal-note"${warn ? '' : ' hidden'}>Deflation works best with Make it burn, which unlocks with $${ticker()}. Until then, its agent watches and tells.</small>
+  </div>`;
+}
+
+// L'étape 2 : son agent, en un seul écran (son esprit, son caractère, son objectif).
+function agentStep(k) {
+  return `<section class="lf-step keeper-opt" data-step="1"${show(1)}>
+    ${head(1, 'Its <span class="grad">agent</span>', 'The AI that runs your coin: it talks to holders, posts, keeps a public journal and burns. Locked at launch.')}
+    ${characterStep(k)}
+    ${mindStep(k)}
+    ${objectiveStep(k)}
   </section>`;
 }
 
@@ -720,12 +772,12 @@ function fireStep(max, f) {
   const mind = mindOf(draft.keeper.model);
   const style = k?.styles.find((x) => x.id === draft.keeper.style);
   const goal = k?.goals?.find((x) => x.id === draft.keeper.goal);
-  return `<section class="lf-step lf-coin" data-step="4"${show(4)}>
-    ${head(4, 'Light the <span class="grad">fire</span>', 'The last settings, then your wallet signs.')}
+  return `<section class="lf-step lf-coin" data-step="2"${show(2)}>
+    ${head(2, 'Launch <span class="grad">it</span>', 'The last settings, then your wallet signs.')}
     <div class="lf-summary">
       ${draft.preview ? `<img src="${draft.preview}" alt="">` : '<span class="lf-sum-ph">＋</span>'}
       <div><b>${esc(f.name || 'Your coin')} <span class="mono gold">${f.symbol ? `$${esc(String(f.symbol).toUpperCase())}` : ''}</span></b>
-        <small>Operator: ${esc(style?.label || '')} · ${aiLogo(mind, 12)} ${esc(mind?.name || '')} · ${esc(goal?.label || '')}</small></div>
+        <small>Agent: ${esc(style?.label || '')} · ${aiLogo(mind, 12)} ${esc(mind?.name || '')} · ${esc(goal?.label || '')}</small></div>
       <button type="button" class="linkish" data-goto="0">Edit</button>
     </div>
     <label><span>Dev buy <em>· optional, buy your own coin at launch</em></span>
@@ -735,7 +787,7 @@ function fireStep(max, f) {
     ${burnOptions().length ? `<div class="burn-opt">
       <div class="burn-head"><b>Make it <span class="grad">burn</span></b>
         <small>Take a share of your creator fees to buy your coin back and burn it, forever. Your coin becomes a candle,
-        and its Operator picks the moments. Below: where every creator fee of your coin goes.</small></div>
+        and its agent picks the moments. Below: where every creator fee of your coin goes.</small></div>
       <div class="burn-pills" role="group" aria-label="Make it burn">${[0, ...burnOptions()].map((v) => `<button type="button" class="pill${burning() === v ? ' on' : ''}" data-burn="${v}" aria-pressed="${burning() === v}">${v ? `${v}%` : 'Off'}</button>`).join('')}</div>
       <div class="split-bar" id="lf-split">${burnSplit(burning()).bar}</div>
       <small class="muted" id="lf-legend">${burnSplit(burning()).legend}</small>
@@ -751,7 +803,7 @@ const IDEAS = ['A cat that is terrified of fire but lives in a candle shop', 'A 
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 function sparkDone(sp) {
   return `<div class="sp-done">
-      <span class="sp-who">${aiLogo(sp.mind, 16)} <b>${esc(sp.mind?.name || 'Your Operator')}</b> wrote it${draft.image ? ' and painted the logo' : ''}.</span>
+      <span class="sp-who">${aiLogo(sp.mind, 16)} <b>${esc(sp.mind?.name || 'Your agent')}</b> wrote it${draft.image ? ' and painted the logo' : ''}.</span>
       ${sp.intro ? `<blockquote>“${esc(sp.intro)}”</blockquote>` : ''}
       <span class="sp-actions"><button type="button" class="linkish" id="sp-logo">${icon('sparkle')} New logo</button></span>
     </div>`;
@@ -762,7 +814,7 @@ function burnTeaser() {
   if (burnOptions().length) return '';
   return `<div class="burn-opt soon">
     <div class="burn-head"><b>Make it <span class="grad">burn</span> <span class="tag soon">${icon('lock')} unlocks with $${ticker()}</span></b>
-      <small>Once $${ticker()} is live, a share of your creator fees can buy your coin back and burn it, forever. Your Operator picks the moments.</small></div>
+      <small>Once $${ticker()} is live, a share of your creator fees can buy your coin back and burn it, forever. Your agent picks the moments.</small></div>
   </div>`;
 }
 
@@ -774,14 +826,12 @@ function launchForm(error = '') {
   if (error) draft.step = STEPS5.length - 1;
   const last = draft.step === STEPS5.length - 1;
   openModal(`
-    <h2>Launch a coin <span class="grad">with its crew</span></h2>
-    <p class="muted">A real coin on pump.fun. Scout, Chandler, Igniter and its Operator do the work, you approve the launch.${world.launch?.feeSol ? ` ${world.launch.teamSol ? 'Half of its Ignition Fee burns' : 'Its Ignition Fee burns'} $${ticker()} within a minute.` : ''}</p>
+    <h2>Launch a coin <span class="grad">with its agent</span></h2>
+    <p class="muted">A real coin on pump.fun, with its own AI agent. You approve the launch, it does the rest.${world.launch?.feeSol ? ` ${world.launch.teamSol ? 'Half of its Ignition Fee burns' : 'Its Ignition Fee burns'} $${ticker()} within a minute.` : ''}</p>
     ${stepper()}
     <form id="launch-form" novalidate>
       ${identityStep(f)}
-      ${mindStep(k)}
-      ${characterStep(k)}
-      ${objectiveStep(k)}
+      ${agentStep(k)}
       ${fireStep(max, f)}
       <input type="hidden" name="burn" value="${burning()}"><input type="hidden" name="share" value="${burnOptions().length ? '1' : ''}">
       <input type="hidden" name="keeper_style" value="${esc(draft.keeper.style)}"><input type="hidden" name="keeper_model" value="${esc(draft.keeper.model)}">
@@ -876,12 +926,12 @@ function launchForm(error = '') {
 
 // ------------------------------------------------------------ Spark
 const SPARK_ERRORS = {
-  bad_idea: 'Give your Operator an idea first: a few words are enough.',
-  blocked_idea: "Your Operator won't make that one. Try another idea.",
+  bad_idea: 'Give your agent an idea first: a few words are enough.',
+  blocked_idea: "Your agent won't make that one. Try another idea.",
   too_many: 'Lots of sparks from here. Try again in a little while.',
-  ai_busy: 'The Operators have created a lot today. Come back tomorrow, or fill in your coin yourself.',
+  ai_busy: 'The agents have created a lot today. Come back tomorrow, or fill in your coin yourself.',
   ai_off: 'Spark is resting right now. Fill in your coin yourself, or try again later.',
-  ai_failed: "Your Operator couldn't find the words. Try again, or try another mind.",
+  ai_failed: "Your agent couldn't find the words. Try again, or try another mind.",
 };
 let sparking = false;
 function sparkStatus(html, cls = '') {
@@ -891,7 +941,7 @@ function sparkStatus(html, cls = '') {
   el.className = `spark-status ${cls}`.trim();
   el.innerHTML = html;
 }
-const thinking = (mind, what) => `<span class="sp-think">${aiLogo(mind, 16)} <b>${esc(mind?.name || 'Your Operator')}</b> ${what}<i></i><i></i><i></i></span>`;
+const thinking = (mind, what) => `<span class="sp-think">${aiLogo(mind, 16)} <b>${esc(mind?.name || 'Your agent')}</b> ${what}<i></i><i></i><i></i></span>`;
 
 // Les narratifs du Scout, sous Spark : un clic, et le Chandler fait le coin sur ce narratif.
 async function showPicks(form) {
@@ -1015,9 +1065,9 @@ function stepProblem(step, fields) {
     const symbol = (fields.symbol || '').trim().replace(/^\$/, '');
     if (!fields.name?.trim()) return ERRORS.bad_name;
     if (!/^[A-Za-z0-9]{1,10}$/.test(symbol)) return ERRORS.bad_symbol;
-    if (!draft.image) return sparking ? 'Your Operator is still painting the logo. One moment.' : ERRORS.no_image;
+    if (!draft.image) return sparking ? 'Still painting the logo. One moment.' : ERRORS.no_image;
   }
-  if (step === 2 && draft.keeper.style === 'custom' && (draft.keeper.prompt || '').trim().length < 8) return ERRORS.bad_prompt;
+  if (step === 1 && draft.keeper.style === 'custom' && (draft.keeper.prompt || '').trim().length < 8) return ERRORS.bad_prompt;
   return null;
 }
 
@@ -1151,22 +1201,19 @@ function feeDue(m, mod, why = 'rejected') {
 }
 
 function success(m, signature) {
-  const share = `I just launched $${m.symbol} on WICK, the launchpad that burns itself. Every coin melts $${world.token?.ticker || 'WICK'}.\n${location.origin}`;
+  const share = `I just launched $${m.symbol} on WICK: it has its own AI agent, and it burns itself.\n${location.origin}/#coin/${m.mint}`;
+  const burnSol = world.launch?.feeSol ? (m.burnFee ?? (m.share ? world.launch.sharedBurnSol : world.launch.burnSol)) : 0;
   openModal(`
     <div class="lit">${avatar(m, 72)}</div>
-    <h2><span class="grad">$${esc(m.symbol)}</span> is lit</h2>
-    <p class="muted">Match #${fmt(m.seq)} is orbiting candle #${pad(world.candle?.number ?? 1)}${world.launch?.feeSol
-      ? `, and ${m.burnFee ?? (m.share ? world.launch.sharedBurnSol : world.launch.burnSol)} SOL of its Ignition Fee is buying $${ticker()} to burn it right now` : ''}.${m.share
-      ? ` ${shareText(m.share)}.` : ''}${m.candle ? ` <b>Its candle burns ${m.candle.bps / 100}% of its creator fees, forever.</b>` : ''} The next buyback just came
-    ${span(world.breath?.matchMs ?? 60_000)} closer. Look for the label.</p>
+    <h2><span class="grad">$${esc(m.symbol)}</span> is live</h2>
+    <p class="muted">Its agent is waking up: its first words in a few minutes, then its journal, its posts and its burns, all on its page.
+      ${m.candle ? `<b>${m.candle.bps / 100}% of its fees buy it back and burn it, forever.</b> ` : ''}${burnSol ? `${burnSol} SOL of its Ignition Fee is burning $${ticker()} right now.` : ''}</p>
     <div class="wallets">
-      <a class="wbtn primary" href="${pumpUrl(m.mint)}" target="_blank" rel="noopener">See it on pump.fun</a>
+      <a class="wbtn primary" href="#coin/${esc(m.mint)}" data-coin="${esc(m.mint)}">See its agent</a>
+      <a class="wbtn" href="${pumpUrl(m.mint)}" target="_blank" rel="noopener">See it on pump.fun</a>
       <a class="wbtn" href="https://x.com/intent/post?text=${encodeURIComponent(share)}" target="_blank" rel="noopener">Share on X</a>
       ${signature ? `<a class="wbtn" href="https://solscan.io/tx/${esc(signature)}" target="_blank" rel="noopener">Transaction</a>` : ''}
-      ${m.candle ? `<a class="wbtn" href="#coin/${esc(m.mint)}" data-coin="${esc(m.mint)}">See its candle</a>` : ''}
-      <button class="wbtn" id="see-flames">Your flames</button>
     </div>`, 'm-done');
-  $('see-flames').addEventListener('click', () => go('flames'));
 }
 
 // ------------------------------------------------------------ démarrage
@@ -1176,6 +1223,8 @@ function start() {
     $('demo-bar').innerHTML = 'Demo · a simulated, sped-up world · <a href="/">see the real candle</a>';
   }
   $('strike-btn').addEventListener('click', () => launchForm());
+  // Les autres boutons « Launch a coin » de la page (le dernier appel, l'accueil vide).
+  document.addEventListener('click', (e) => { if (e.target.closest('[data-launch]')) launchForm(); });
   document.querySelectorAll('[data-go]').forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); go(a.dataset.go); }));
   $('menu-btn').addEventListener('click', () => pages.menu(go));
   // Le wallet : le bouton en haut, et la reconnexion silencieuse au wallet déjà autorisé.
@@ -1187,7 +1236,7 @@ function start() {
   }
   $('feed-more').addEventListener('click', () => go('explore'));
   // Un coin (dans le fil, Explore, la forêt…) : sa page, avec sa bougie.
-  for (const root of [$('feed'), $('modal-body'), $('burn-pop')]) {
+  for (const root of [$('feed'), $('modal-body'), $('burn-pop'), $('hero-agent')].filter(Boolean)) {
     root.addEventListener('click', (e) => {
       const a = e.target.closest('[data-coin]');
       if (!a || e.metaKey || e.ctrlKey) return;
@@ -1195,8 +1244,10 @@ function start() {
       go(`coin/${a.dataset.coin}`);
     });
   }
-  $('feed-toggle').addEventListener('click', () => document.body.classList.toggle('feed-open'));
-  wirePointer();
+  $('feed-toggle')?.addEventListener('click', () => document.body.classList.toggle('feed-open'));
+  if ($('stage')) wirePointer();
+  // La carte de l'agent en haut de l'accueil change toutes les 7 secondes.
+  setInterval(() => { if (!document.hidden && world.thoughts.length > 1) { heroIdx++; renderHeroAgent(); } }, 7000);
   setInterval(() => {
     if (!document.hidden) poll();
     document.querySelectorAll('time[data-at]').forEach((t) => { t.textContent = ago(Number(t.dataset.at)); });
@@ -1207,14 +1258,15 @@ function start() {
     renderMeter();
     if (breathNow().remaining === 0 && !scene?.burning) poll();
   }, 1000);
-  startScene();
+  // La bougie en 3D : seulement là où il y a une scène (l'accueil simple n'en a plus).
+  if ($('stage')) startScene();
   // Retour de X (le compte X d'un coin) : on dit ce qui s'est passé, puis on nettoie l'adresse.
   const params = new URLSearchParams(location.search);
   const xs = params.get('x');
   if (xs) {
     params.delete('x');
     history.replaceState(null, '', `${location.pathname}${params.size ? `?${params}` : ''}${location.hash}`);
-    toast({ linked: `${icon('check')} Its Operator now runs its X account. First post within the hour.`, denied: 'X authorization cancelled. Nothing was connected.' }[xs] || 'Could not connect the X account. Try again from its Kit tab.', 7000);
+    toast({ linked: `${icon('check')} Its agent now runs its X account. First post within the hour.`, denied: 'X authorization cancelled. Nothing was connected.' }[xs] || 'Could not connect the X account. Try again from its Kit tab.', 7000);
   }
   // Une page demandée dans l'adresse (trywick.fun/#wick…) s'ouvre une fois l'état chargé.
   const page = location.hash.slice(1);

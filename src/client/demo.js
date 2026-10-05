@@ -33,8 +33,8 @@ const HELLOS = {
   degen: '$SYM operator online. I see everything. We are so early.',
   poet: 'A new wick, a new flame. I will tend $SYM through every night.',
   pyro: 'They gave me $SYM. I love it already. Look at that flame.',
-  analyst: '$SYM Operator online. I track the numbers and report them, nothing more.',
-  builder: 'Operator of $SYM, reporting for work. Launch done. Next: the kit, then the first burn.',
+  analyst: '$SYM agent online. I track the numbers and report them, nothing more.',
+  builder: 'Agent of $SYM, reporting for work. Launch done. Next: the kit, then the first burn.',
   guardian: 'I watch over $SYM and the people who hold it. I will always tell you what I see.',
 };
 const JOURNAL = {
@@ -48,8 +48,8 @@ const JOURNAL = {
 };
 const ABOUTS = [
   '{n} was born in the wax and raised by the flame. Every trade keeps it lit.',
-  '{n}: a tiny legend that refuses to go out. Its Operator watches every candle.',
-  'The internet asked for {n}. The candle answered. Its Operator does the rest.',
+  '{n}: a tiny legend that refuses to go out. Its agent watches every candle.',
+  'The internet asked for {n}. The candle answered. Its agent does the rest.',
   '{n} lives where the fire is warmest. Holders keep it burning.',
 ];
 const ANSWERS = {
@@ -247,7 +247,7 @@ export function createDemo() {
     // Les coins de départ de la démo ont des burns « passés » : leur lancement les précède.
     const t0 = Math.min(m.at, ...burnsOf.map((b) => b.at - 600_000));
     const log = [
-      { at: t0, kind: 'launched', title: `Launched $${m.symbol} on pump.fun`, detail: `Operator summoned: ${k.label} on ${k.model}.` },
+      { at: t0, kind: 'launched', title: `Launched $${m.symbol} on pump.fun`, detail: `agent summoned: ${k.label} on ${k.model}.` },
       ...(m.candle ? [{ at: t0 + 2000, kind: 'sealed', title: `Locked ${m.candle.bps / 100}% of creator fees to burn $${m.symbol}`, detail: 'Set with pump.fun fee sharing at launch. Nobody can change it.' }] : []),
       ...(m.burned ? [{ at: t0 + 4000, kind: 'fed', title: `Fed the $WICK candle: ${fmtN(m.burned)} $WICK burned`, detail: 'Half of its Ignition Fee bought $WICK and burned it.' }] : []),
       { at: t0 + 6000, kind: 'intro', title: 'First words', detail: k.intro },
@@ -268,8 +268,8 @@ export function createDemo() {
     const burnL = m.candle ? `${m.candle.bps / 100}% of its creator fees buy it back and burn it, forever.` : 'Launched on WICK, where every coin is a candle.';
     const voice = { stoic: 'The candle is lit. I will keep it.', degen: 'we are so early it hurts. the candle is lit.', poet: 'A new wick, a new flame, a new story in the wax.', pyro: 'It burns. I love it. Look at it burn.' }[k.style] || '';
     const kit = {
-      lore: `${m.description} ${sym} was launched on WICK with its own AI Operator, ${k.label}, running on ${k.model}.`,
-      x: [`${sym} is live on pump.fun. ${burnL}\n\nCA: ${m.mint}`, `${voice} ${m.name}: ${m.description}`, `${sym} has its own AI Operator. Every action is public: the launch, its journal, every burn. Watch it work.`],
+      lore: `${m.description} ${sym} was launched on WICK with its own AI agent, ${k.label}, running on ${k.model}.`,
+      x: [`${sym} is live on pump.fun. ${burnL}\n\nCA: ${m.mint}`, `${voice} ${m.name}: ${m.description}`, `${sym} has its own AI agent. Every action is public: the launch, its journal, every burn. Watch it work.`],
       telegram: `${sym} is live.\n\n${m.description}\n\n${burnL}\n\nCA: ${m.mint}`,
       ai: true, at: t0 + 8000,
     };
@@ -463,14 +463,14 @@ export function createDemo() {
       if (String(question || '').trim().length < 2) throw Object.assign(new Error('bad_question'), { code: 'bad_question' });
       if (mint === 'wick') {
         const q = String(question).toLowerCase();
-        const answer = /keeper|ai|ia/.test(q) ? 'Every coin on WICK has an AI Operator: it creates the coin with you, talks to its holders, and picks the moments to burn it.'
+        const answer = /keeper|ai|ia/.test(q) ? 'Every coin on WICK has an AI agent: it creates the coin with you, talks to its holders, and picks the moments to burn it.'
           : /fee|cost|price|prix/.test(q) ? 'A launch costs the Ignition Fee plus pump.fun costs. Half of the fee buys back $WICK and burns it.'
           : 'I am The Wick. Every coin launched here feeds my flame, and every breath burns a little more of $WICK.';
         return { answer, keeper: { name: 'The Wick', label: 'Stoic', model: 'Llama 3.3 70B', by: 'Meta', logo: logoOf('meta') } };
       }
       const m = all.find((x) => x.mint === mint);
       if (!m) throw Object.assign(new Error('unknown_coin'), { code: 'unknown_coin' });
-      return { answer: pick(say(ANSWERS, m.keeper.style)), keeper: { name: `Operator of $${m.symbol}`, label: m.keeper.label, model: m.keeper.model, by: m.keeper.by, logo: m.keeper.logo } };
+      return { answer: pick(say(ANSWERS, m.keeper.style)), keeper: { name: `Agent of $${m.symbol}`, label: m.keeper.label, model: m.keeper.model, by: m.keeper.by, logo: m.keeper.logo } };
     },
     // La forêt des bougies, et la page d'un coin.
     async candles() {

@@ -14,12 +14,13 @@ import { candleTotals } from '../../lib/candles.js';
 import { ensureSchema } from '../../lib/schema.js';
 import { announceText, deployer } from '../../lib/announce.js';
 import { MILESTONES, milestoneFile } from '../../lib/cards.js';
-import { cardBytes, postText, publish, socialStatus } from '../../lib/social.js';
+import { cardBytes, coinXText, postText, publish, socialStatus } from '../../lib/social.js';
+import { xReady } from '../../lib/x.js';
 import { PUMP, PUMP_AMM, shareTotals } from '../../lib/sharing.js';
 import { buybackPaused, getSetting, setSetting } from '../../lib/settings.js';
 import { WSOL, ataAddress, findPda, fromBase58, getBalance, rpc, tokenHolding } from '../../lib/solana.js';
 import { supplyBurned } from '../../lib/supply.js';
-import { dailyStats, solUsd, telegramReady } from '../../lib/telegram.js';
+import { agentLine, dailyStats, solUsd, telegramReady } from '../../lib/telegram.js';
 import { tokenView } from '../../lib/token.js';
 
 async function digest(text) {
@@ -132,7 +133,7 @@ export const adminStatus = guarded(async ({ env }) => {
     soft(potSol(env, now)),
     soft(devInfo(env, wallet.address)),
     db.prepare(`SELECT m.seq, m.mint, m.symbol, m.name, m.creator, m.created_at, m.lit_at, m.signature, m.fee_lamports, m.fee_state,
-        m.fee_sig, m.share_bps, m.share_state, m.tg_state, m.holder, m.mcap,
+        m.fee_sig, m.share_bps, m.share_state, m.tg_state, m.x_state, m.holder, m.mcap, m.keeper_style, m.keeper_model,
         b.status AS burn_status, b.burned_ui AS burned, b.burn_sig
       FROM matches m LEFT JOIN burns b ON b.kind = 'match' AND b.ref = m.mint
       WHERE m.seq IS NOT NULL OR m.signature IS NOT NULL ORDER BY m.created_at DESC LIMIT 15`).all(),
@@ -154,6 +155,9 @@ export const adminStatus = guarded(async ({ env }) => {
       // Les esprits premium réglés (leur clé), et les comptes X des coins (l'app X de WICK).
       premium: CONFIG.keepers.models.filter((m) => m.premium).map((m) => ({ name: m.name, key: m.key, ready: Boolean(env[m.key]) })),
       xApp: Boolean(env.X_CLIENT_ID && env.X_CLIENT_SECRET),
+      // Le X de WICK : poster tout seul (ses 4 clés), sinon les boutons « Post on X ».
+      xPosts: xReady(env),
+      lock: await getSetting(db, 'team.lock', null),
       xLinks: (await db.prepare('SELECT COUNT(*) AS n, COALESCE(SUM(posts), 0) AS posts FROM x_links').first().catch(() => null)) || { n: 0, posts: 0 },
       customRpc: Boolean(env.SOLANA_RPC),
       ipSalt: Boolean(env.IP_SALT),
@@ -191,7 +195,8 @@ export const adminStatus = guarded(async ({ env }) => {
     solUsd: usd ?? (market?.market?.priceUsd && market.market.priceSol ? market.market.priceUsd / market.market.priceSol : null),
     potSol: pot,
     dev,
-    launches,
+    // Chaque coin, avec son agent et son post X déjà écrit (le bouton « Post on X » de l'admin).
+    launches: launches.map((r) => ({ ...r, agent: agentLine(r), xText: coinXText(r, env), x: xReady(env) })),
   });
 });
 
@@ -274,6 +279,11 @@ export const adminPost = guarded(async ({ request, env }) => {
     const image = Uint8Array.from(atob(body.image), (c) => c.charCodeAt(0));
     const data = { amount, pct: (amount / CONFIG.pumpSupply) * 100, until: String(l.until || '').slice(0, 40), where: String(l.where || 'Streamflow').slice(0, 40), link: l.link || null };
     post = { image, mint, ...postText('lock', data, env) };
+    // La page Proof montre le lock aussitôt (avec son lien de preuve).
+    if (data.link) {
+      const until = Date.parse(data.until);
+      await setSetting(env.DB, 'team.lock', { url: data.link, amount, until: Number.isFinite(until) ? until : null, where: data.where });
+    }
   } else {
     return json({ error: 'bad_kind' }, 400);
   }

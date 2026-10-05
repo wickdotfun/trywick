@@ -52,6 +52,10 @@
     .ok { color: #3ddc84; } .bad { color: var(--danger); } .warn { color: #ffb347; } .gold { color: var(--gold); } .dim { color: var(--dim); }
     .note-box { margin-top: 12px; padding: 10px 12px; border-radius: 10px; font-size: 12.5px; color: var(--muted); background: rgba(255,220,180,.04); border: 1px solid var(--line); line-height: 1.45; }
     .note-box b { color: var(--text); }
+    .guide summary { display: block; cursor: pointer; list-style: none; } .guide summary::-webkit-details-marker { display: none; } .guide summary::marker { content: ""; } details.guide summary::before, details.guide[open] summary::before { content: none; }
+    .guide summary h2 { justify-content: flex-start; margin: 0; } .guide summary h2::after { content: '▾'; margin-left: auto; color: var(--dim); } .guide:not([open]) summary h2::after { content: '▸'; }
+    .guide-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 8px 28px; margin-top: 6px; font-size: 13.5px; line-height: 1.55; }
+    .guide h3 { margin: 14px 0 6px; font-size: 14px; color: var(--gold); } .guide ul, .guide ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; } .guide p { margin: 0 0 8px; }
     .checklist { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 8px; }
     .checklist li { display: flex; gap: 12px; align-items: flex-start; padding: 11px 12px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,220,180,.025); }
     .checklist li.done { border-color: rgba(61,220,132,.3); background: rgba(61,220,132,.05); }
@@ -142,6 +146,44 @@
       </div>
       <p class="msg" id="action-msg" hidden></p>
 
+      <details class="card guide" id="guide" open>
+        <summary><h2>Le guide du lancement <small>ce qu'est WICK, qui fait quoi, et quoi faire, dans l'ordre</small></h2></summary>
+        <div class="guide-grid">
+          <div>
+            <h3>WICK, en 3 lignes</h3>
+            <p>Un launchpad Solana : n'importe qui lance son coin sur pump.fun depuis trywick.fun (image, nom, ticker), et ce coin reçoit <b>son agent IA</b> (son caractère, son cerveau, son objectif). L'agent répond aux holders, tient un journal public, et une part des fees rachète le coin et le brûle.</p>
+            <p>Chaque lancement <b>achète $WICK et le brûle</b>. $WICK, c'est ton token : plus le site sert, plus sa supply diminue.</p>
+            <h3>Où va l'argent</h3>
+            <ul>
+              <li><b>Ignition Fee</b>, 0,01 SOL par lancement : 50 % achète et brûle $WICK, 50 % pour l'équipe (ton dev wallet).</li>
+              <li><b>Creator fees de chaque coin</b>, partagées sur pump.fun, verrouillées on-chain : 60 % le créateur · 20 % son agent (payé via ton wallet d'équipe) · 10 % brûlent $WICK · 10 % l'équipe.</li>
+              <li><b>Les creator fees de $WICK</b> : 100 % à toi (le dev wallet), comme tout créateur pump.fun.</li>
+            </ul>
+            <h3>Les deux wallets</h3>
+            <ul>
+              <li><b>Dev wallet</b> <span class="mono" id="g-dev"></span> : le tien, dans Phantom. Il lance $WICK et reçoit l'argent de l'équipe. Le site ne dépense jamais depuis lui.</li>
+              <li><b>Burn wallet</b> (BUYBACK_SECRET_KEY) : il ne fait qu'acheter $WICK et le brûler. Rien d'autre.</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Le soir du lancement, dans l'ordre</h3>
+            <ol>
+              <li><b>Test everything</b> (plus bas) : pas de rouge. L'orange n'empêche rien.</li>
+              <li>Ouvre Phantom sur le <b>dev wallet</b> <span class="mono" id="g-dev2"></span>. Garde au moins <b>0,05 SOL</b> à côté du dev buy (frais + le lock).</li>
+              <li>Sur <b>pump.fun</b> → Create coin : nom <b>WICK</b>, ticker exactement <b id="g-tk">WICK</b>, ton logo, ta description, tes liens (X, Telegram, trywick.fun). Choisis ton dev buy, puis lance.</li>
+              <li><b>Dans la minute</b>, tout seul : le site détecte $WICK et passe en live, l'annonce part sur Telegram avec le CA et elle est épinglée. Regarde « Launch day » juste en dessous.</li>
+              <li><b>Post on X</b> (bouton dans « Launch day ») : ton post est écrit, avec le CA. Publie-le, puis épingle-le sur ton profil.</li>
+              <li><b>Lock</b> : sur app.streamflow.finance → Token Lock, depuis le dev wallet, verrouille tes $WICK (montant, date), copie le lien du contrat, puis remplis « Tokens locked » (plus bas) → <b>Post</b>. Il part sur Telegram (et X) et s'affiche sur la page Proof.</li>
+              <li>Fais ta pub avec <b>un seul CA</b> : celui affiché ici. Invite les gens à lancer leur coin sur trywick.fun.</li>
+            </ol>
+            <h3>Ensuite, tout seul</h3>
+            <p>Un post Telegram pour chaque nouveau coin (et sur X si ses clés sont réglées, sinon un bouton « Post on X » par coin dans « Latest launches »). Un buyback + burn de $WICK toutes les 30 minutes au plus. Les paliers de market cap et le DEX payé sont postés avec leur carte.</p>
+            <h3>En cas de souci</h3>
+            <p><b>Pause buyback</b> (en haut) arrête les achats tout de suite. Chaque carte a <b>Post now</b>, <b>Copy X text</b> et <b>Open X</b> pour poster à la main. Jamais : partager une clé privée ou la phrase secrète, changer le ticker, lancer depuis un autre wallet.</p>
+          </div>
+        </div>
+      </details>
+
       <div class="card">
         <h2>Launch day <small id="steps-sum"></small></h2>
         <ol class="checklist" id="steps"></ol>
@@ -180,7 +222,7 @@
       <div class="card">
         <h2>Latest launches <small>from the site</small></h2>
         <div class="scroll"><table>
-          <thead><tr><th>Coin</th><th>When</th><th>On-chain</th><th>Ignition Fee</th><th>Fee share</th><th>Telegram</th><th>Mcap</th></tr></thead>
+          <thead><tr><th>Coin</th><th>When</th><th>On-chain</th><th>Ignition Fee</th><th>Fee share</th><th>Telegram</th><th>X</th><th>Mcap</th></tr></thead>
           <tbody id="launches"></tbody>
         </table></div>
       </div>
@@ -253,7 +295,7 @@
     const cronAge = (d) => (d.heartbeat ? d.now - d.heartbeat : null);
     function tweet(d) {
       const t = d.checks.ticker, mint = mintOf(d);
-      return `$${t} is live. the only CA:\n\n${mint}\n\nevery coin launched on ${t} lights the same flame.\nlaunch a coin → generate ignition fees → buy $${t} → burn $${t}\n\nthe more ${t} is used, the more of its own supply disappears.\n\nthe launchpad that burns itself.\n${d.checks.site.replace(/\/?$/, '/')}`;
+      return soc?.texts?.live || `$${t} is live. the only CA:\n\n${mint}\n\nevery coin launched on ${t} gets its own AI agent.\nevery launch buys $${t} and burns it.\n\nlaunch a coin → give it an agent → its fees burn it, and $${t}.\n\n${d.checks.site.replace(/\/?$/, '/')}`;
     }
 
     // ------------------------------------------------------------ launch day checklist
@@ -293,6 +335,13 @@
       add(mint ? 'todo' : '', 'Post on X',
         mint ? 'Your post, with the CA filled in. One click, then Post.' : 'Once $WICK is live, this button opens X with your post and the CA filled in.',
         `<button class="btn small x" id="tweet"${mint ? '' : ' disabled'}>Post on X</button>`);
+      add(c.lock ? 'done' : mint ? 'todo' : '', 'Lock the team tokens',
+        c.lock ? `Locked${c.lock.amount ? `: ${num(c.lock.amount)} $${esc(c.ticker)}` : ''}. Shown on the Proof page, and posted.`
+          : 'On Streamflow (app.streamflow.finance → Token Lock), from the dev wallet. Then fill in "Tokens locked" below: one click posts it on Telegram (and X) and shows it on the Proof page.',
+        mint && !c.lock ? '<a class="btn small" href="#lock-form">Fill it in</a>' : '');
+      add(c.xPosts ? 'done' : '', 'X posts',
+        c.xPosts ? 'Every new coin and every big moment are posted on X by themselves.'
+          : 'Not automatic: X charges per post (add X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET in Cloudflare to switch it on). Until then, every coin has a "Post on X" button in Latest launches, text already written.');
       add(live(d) ? (d.paused ? 'todo' : 'done') : '', 'Buyback running',
         !live(d) ? 'Starts by itself once $WICK is live and the wallet key is set.' : d.paused ? 'Paused: press Resume to start buying back.' : 'Every breath buys back and burns $WICK.');
       add(d.market ? 'done' : mint ? 'todo' : '', 'Chart live (DexScreener)',
@@ -300,6 +349,16 @@
       add(d.totals.matchBurns > 0 ? 'done' : '', 'First Ignition Fee burned', d.totals.matchBurns > 0 ? `${d.totals.matchBurns} launch burns so far.` : 'After the first coin launched from the site.');
       add(d.totals.buybacks > 0 ? 'done' : '', 'First buyback burned', d.totals.buybacks > 0 ? `${d.totals.buybacks} buybacks so far.` : 'At the end of the first breath (30 min at most), or press Run buyback now.');
       return S;
+    }
+
+    // Le post X d'un coin : posté tout seul (son lien), sinon un bouton qui ouvre X avec le texte prêt.
+    function xCell(r) {
+      const open = `<a class="btn small x" href="https://x.com/intent/post?text=${encodeURIComponent(r.xText || '')}" target="_blank" rel="noopener">Post on X</a>`;
+      if (/^\d+$/.test(r.x_state || '')) return `${pill('posted', 'ok')} <a href="https://x.com/i/web/status/${esc(r.x_state)}" target="_blank" rel="noopener">↗</a>`;
+      if (r.x_state === 'posted') return pill('posted', 'ok');
+      if (r.x_state === 'posting') return pill('posting', 'work');
+      if (String(r.x_state || '').startsWith('error')) return `${pill('failed', 'bad')} ${open}`;
+      return r.seq == null ? '<span class="dim">—</span>' : r.x ? `${pill('soon', 'work')} ${open}` : open;
     }
 
     // ------------------------------------------------------------ render
@@ -317,6 +376,10 @@
       p.textContent = d.paused ? 'Resume buyback' : 'Pause buyback';
       p.className = `btn ${d.paused ? 'go' : 'danger'}`;
       $('run').disabled = !configured;
+
+      // Le guide : le dev wallet et le ticker.
+      $('g-dev').textContent = $('g-dev2').textContent = c.deployer ? short(c.deployer) : '';
+      $('g-tk').textContent = c.ticker;
 
       // Launch day
       const S = steps(d);
@@ -450,7 +513,8 @@
         <td>${r.seq != null ? `${pill(`#${r.seq} live`, 'ok')} ${tx(r.signature)}` : pill('confirming…', 'work')}</td>
         <td>${feeCell(r)}</td><td>${shareCell(r)}</td>
         <td>${r.tg_state === 'photo' || r.tg_state === 'text' ? pill('posted', 'ok') : r.tg_state === 'posting' ? pill('posting', 'work') : '<span class="dim">—</span>'}</td>
-        <td>${r.mcap ? usd(r.mcap) : '—'}</td></tr>`).join('') : '<tr><td colspan="7" class="dim">No launch yet.</td></tr>';
+        <td>${xCell(r)}</td>
+        <td>${r.mcap ? usd(r.mcap) : '—'}</td></tr>`).join('') : '<tr><td colspan="8" class="dim">No launch yet.</td></tr>';
 
       const NOTES = { not_live: 'WICK not live yet', paused: 'buyback paused', empty_pot: 'pot too small, carried over', nothing_bought: 'nothing bought', burn_failed: 'burn failed' };
       const STATUS = { queued: ['queued', 'work'], buying: ['buying…', 'work'], bought: ['bought, burning next', 'work'], burning_tx: ['burning…', 'work'], burned: ['burned', 'ok'], skipped: ['skipped', ''], failed: ['failed', 'bad'], ended: ['waiting', 'work'], burning: ['now', 'ok'] };

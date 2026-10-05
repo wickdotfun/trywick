@@ -49,9 +49,8 @@ test('finds the coin a wallet created, only its own and only on pump.fun', () =>
 
 test('the official message is the one of the first X post, with the CA', () => {
   const t = announceText('MintAddr111', { ticker: 'WICK', site: 'https://trywick.fun' });
-  assert.equal(t, '$WICK is live. the only CA:\n\n<code>MintAddr111</code>\n\nevery coin launched on WICK lights the same flame.\n'
-    + 'launch a coin → generate ignition fees → buy $WICK → burn $WICK\n\nthe more WICK is used, the more of its own supply disappears.\n\n'
-    + 'the launchpad that burns itself.\nhttps://trywick.fun/');
+  assert.equal(t, '$WICK is live. the only CA:\n\n<code>MintAddr111</code>\n\nevery coin launched on WICK gets its own AI agent.\n'
+    + 'every launch buys $WICK and burns it.\n\nlaunch a coin → give it an agent → its fees burn it, and $WICK.\n\nhttps://trywick.fun/');
 });
 
 test('announces the launch once, as soon as the dev wallet creates $WICK, and pins it', async () => {

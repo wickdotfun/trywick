@@ -1,31 +1,33 @@
 <!doctype html>
 <html><head><meta charset="utf-8">
+<!-- Le film de lancement de WICK (49,5 s, 1920×1080). Tout est vrai : les captures du site
+     (assets/shot-*.webp), les logos des labos d'IA, de Solana, de Telegram et de X, des images 3D
+     pour les coins. render.mjs appelle window.render(t) image par image. -->
 <style>
 @font-face { font-family: Geist; src: url(../../public/fonts/geist.woff2) format('woff2'); font-weight: 100 900; }
 @font-face { font-family: GMono; src: url(../../public/fonts/geist-mono.woff2) format('woff2'); font-weight: 100 900; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { width: 1920px; height: 1080px; overflow: hidden; background: #070403; color: #fbf3ea; font-family: Geist, sans-serif; }
 #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
-.bg { position: absolute; inset: 0; background: radial-gradient(1100px 700px at 50% 45%, rgba(255,140,30,.14), rgba(7,4,3,0) 65%), #070403; }
-.grid { position: absolute; inset: -200px; background-image: linear-gradient(rgba(255,210,160,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,210,160,.05) 1px, transparent 1px); background-size: 80px 80px;
+.bg { position: absolute; inset: 0; background: radial-gradient(1100px 700px at 50% 45%, rgba(255,140,30,.13), rgba(7,4,3,0) 65%), #070403; }
+.grid { position: absolute; inset: -200px; background-image: linear-gradient(rgba(255,210,160,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,210,160,.045) 1px, transparent 1px); background-size: 80px 80px;
   -webkit-mask-image: radial-gradient(900px 600px at 50% 50%, #000, transparent 75%); }
-.grain { position: absolute; inset: 0; opacity: .06; mix-blend-mode: overlay; pointer-events: none; z-index: 50;
+.grain { position: absolute; inset: 0; opacity: .05; mix-blend-mode: overlay; pointer-events: none; z-index: 50;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
-.vig { position: absolute; inset: 0; z-index: 49; pointer-events: none; background: radial-gradient(120% 100% at 50% 50%, transparent 55%, rgba(0,0,0,.65)); }
+.vig { position: absolute; inset: 0; z-index: 49; pointer-events: none; background: radial-gradient(120% 100% at 50% 50%, transparent 55%, rgba(0,0,0,.7)); }
+.flash { position: absolute; inset: 0; z-index: 48; pointer-events: none; background: radial-gradient(900px 600px at 50% 50%, rgba(255,200,120,.35), transparent 70%); opacity: 0; }
 .scene { position: absolute; inset: 0; opacity: 0; }
 .gold { background: linear-gradient(180deg, #ffe7a8 0%, #ffc04a 45%, #f08a1c 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .mono { font-family: GMono, monospace; }
 .kicker { font: 600 22px/1 GMono, monospace; letter-spacing: .3em; text-transform: uppercase; color: #ffc05a; }
 .h { font-weight: 800; letter-spacing: -.05em; line-height: .95; }
-.sub { font-size: 34px; color: #cdbca9; font-weight: 500; letter-spacing: -.01em; }
-.card { position: absolute; border-radius: 28px; border: 1.5px solid rgba(255,206,112,.28); background: linear-gradient(180deg, rgba(34,22,14,.92), rgba(16,10,7,.92)); box-shadow: 0 40px 100px rgba(0,0,0,.6); }
+.sub { font-size: 34px; color: #cdbca9; font-weight: 500; letter-spacing: -.01em; line-height: 1.35; }
+.card { position: absolute; border-radius: 28px; border: 1.5px solid rgba(255,206,112,.28); background: linear-gradient(180deg, rgba(34,22,14,.94), rgba(16,10,7,.94)); box-shadow: 0 40px 100px rgba(0,0,0,.6); }
 .ember { position: absolute; border-radius: 50%; background: radial-gradient(circle, #fff3c4, #ffb347 55%, rgba(255,120,20,0) 75%); box-shadow: 0 0 14px #ff9a2e; }
-.sat { position: absolute; width: 96px; height: 96px; margin: -48px 0 0 -48px; border-radius: 28px; display: grid; place-items: center; background: rgba(24,15,10,.92); border: 1.5px solid rgba(255,210,160,.2); box-shadow: 0 16px 40px rgba(0,0,0,.5); }
-.sat img { width: 48px; height: 48px; }
-.ring { position: absolute; left: 50%; top: 50%; border-radius: 50%; border: 1.5px solid rgba(255,200,140,.16); transform: translate(-50%,-50%); }
-.chip { display: inline-flex; align-items: center; gap: 12px; padding: 14px 24px; border-radius: 999px; font-size: 26px; font-weight: 600; border: 1.5px solid rgba(255,196,110,.35); background: rgba(255,190,90,.08); color: #f6e8d4; }
+.chip { display: inline-flex; align-items: center; gap: 14px; padding: 14px 26px; border-radius: 999px; font-size: 28px; font-weight: 600; border: 1.5px solid rgba(255,196,110,.35); background: rgba(255,190,90,.08); color: #f6e8d4; white-space: nowrap; }
+.chip img { width: 34px; height: 34px; }
 .chip.on { background: linear-gradient(180deg, #fff3cf, #ffd56e 35%, #f2ae3a 70%, #d98b1f); color: #1d1003; border-color: transparent; }
-.bubble { position: absolute; padding: 22px 30px; border-radius: 30px; font-size: 34px; line-height: 1.4; font-weight: 500; }
+.bubble { position: absolute; padding: 22px 30px; border-radius: 30px; font-size: 32px; line-height: 1.4; font-weight: 500; }
 .bubble.me { background: #2b1d13; color: #e9dccb; }
 .bubble.ag { background: rgba(255,190,90,.12); border: 1.5px solid rgba(255,196,110,.45); color: #fbf3ea; }
 .seg { position: absolute; top: 0; height: 100%; border-radius: 24px; display: grid; place-items: center; font-weight: 800; letter-spacing: -.03em; overflow: hidden; }
@@ -33,12 +35,36 @@ html, body { width: 1920px; height: 1080px; overflow: hidden; background: #07040
   background: linear-gradient(180deg, #fff3cf 0%, #ffd56e 30%, #f2ae3a 62%, #d98b1f 100%); box-shadow: 0 0 0 2px rgba(255,246,220,.75) inset, 0 24px 70px -10px rgba(255,150,30,.8); }
 .btn i { width: 72px; height: 72px; border-radius: 50%; background: #1d1003; display: grid; place-items: center; }
 .btn i svg { width: 32px; height: 32px; fill: none; stroke: #ffd36a; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+/* Un coin : son image 3D dans un jeton doré, son ticker dessous. */
+.tok { position: absolute; width: 0; height: 0; }
+.tok .disc { position: absolute; left: -84px; top: -84px; width: 168px; height: 168px; border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle at 35% 28%, #3a2516, #140b06 70%); box-shadow: 0 0 0 3px #f2b347, 0 0 0 7px rgba(255,190,90,.18), 0 30px 60px rgba(0,0,0,.6), inset 0 6px 18px rgba(255,220,160,.18); }
+.tok .disc img { width: 118px; height: 118px; filter: drop-shadow(0 10px 14px rgba(0,0,0,.45)); }
+.tok .tk { position: absolute; left: -90px; width: 180px; top: 100px; text-align: center; font: 700 26px/1 GMono, monospace; color: #ffd27a; letter-spacing: .02em; }
+/* La fenêtre du navigateur. */
+.win { position: absolute; border-radius: 22px; overflow: hidden; background: #0d0806; border: 1.5px solid rgba(255,206,140,.22); box-shadow: 0 70px 160px rgba(0,0,0,.75), 0 0 0 1px rgba(0,0,0,.6); }
+.bar { height: 54px; display: flex; align-items: center; gap: 10px; padding: 0 22px; background: linear-gradient(180deg, #1d140e, #150e0a); border-bottom: 1px solid rgba(255,206,140,.12); }
+.bar i { width: 14px; height: 14px; border-radius: 50%; display: block; }
+.url { margin: 0 auto; transform: translateX(-30px); display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 22px; border-radius: 10px; background: rgba(255,230,200,.06); font: 500 19px/1 Geist, sans-serif; color: #e7d9c8; }
+.url svg { width: 16px; height: 16px; fill: none; stroke: #9fdcb4; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.panel { position: absolute; border-radius: 26px; overflow: hidden; box-shadow: 0 60px 140px rgba(0,0,0,.7); }
+.panel img { display: block; width: 100%; }
+.step { position: absolute; left: 0; right: 0; top: -64px; text-align: center; font: 600 22px/1 GMono, monospace; letter-spacing: .24em; color: #ffc05a; text-transform: uppercase; }
+.tile { position: absolute; width: 196px; height: 176px; border-radius: 30px; display: grid; place-items: center; align-content: center; gap: 18px;
+  background: linear-gradient(180deg, rgba(40,27,18,.92), rgba(18,11,8,.92)); border: 1.5px solid rgba(255,210,160,.18); box-shadow: 0 30px 70px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,235,200,.08); }
+.tile img { width: 70px; height: 70px; }
+.tile b { font-size: 24px; font-weight: 600; color: #e9dccb; letter-spacing: -.01em; }
+.cursor { position: absolute; width: 46px; height: 46px; z-index: 30; filter: drop-shadow(0 6px 10px rgba(0,0,0,.6)); }
+.ripple { position: absolute; border-radius: 50%; border: 3px solid rgba(255,214,120,.9); }
+.post { position: absolute; display: flex; align-items: center; gap: 18px; padding: 18px 26px; border-radius: 22px; background: rgba(20,13,9,.95); border: 1.5px solid rgba(255,206,140,.2); box-shadow: 0 24px 60px rgba(0,0,0,.5); font-size: 26px; font-weight: 600; }
+.post img { width: 40px; height: 40px; }
+.post small { display: block; font-size: 21px; font-weight: 500; color: #b6a797; margin-top: 4px; }
 </style></head>
 <body><div id="stage">
   <div class="bg"></div><div class="grid" id="grid"></div>
   <div id="embers"></div>
 
-  <!-- 1. Le W -->
+  <!-- 1. Le W s'allume -->
   <div class="scene" id="s1">
     <div id="s1glow" style="position:absolute;left:50%;top:46%;width:900px;height:900px;margin:-450px 0 0 -450px;border-radius:50%;background:radial-gradient(circle, rgba(255,150,40,.55), rgba(255,110,20,.12) 45%, rgba(255,110,20,0) 70%);filter:blur(30px)"></div>
     <img id="s1logo" src="../../public/brand/logo.png" style="position:absolute;left:50%;top:44%;width:420px;margin:-210px 0 0 -210px;filter:drop-shadow(0 0 50px rgba(255,140,30,.7))">
@@ -46,126 +72,130 @@ html, body { width: 1920px; height: 1080px; overflow: hidden; background: #07040
     <div id="s1sweep" style="position:absolute;inset:0;background:linear-gradient(105deg, transparent 40%, rgba(255,240,200,.12) 50%, transparent 60%)"></div>
   </div>
 
-  <!-- 2. La phrase -->
+  <!-- 2. Chaque coin a son agent : un champ de coins -->
   <div class="scene" id="s2">
-    <div style="position:absolute;left:0;right:0;top:330px;text-align:center">
-      <div class="h" style="font-size:190px"><span class="w2" id="w1" style="display:inline-block">Every</span> <span class="w2" id="w2" style="display:inline-block">coin</span></div>
-      <div class="h" style="font-size:190px;margin-top:10px"><span class="w2" id="w3" style="display:inline-block">gets</span> <span class="w2" id="w4" style="display:inline-block">an</span> <span class="w2 gold" id="w5" style="display:inline-block">agent.</span></div>
-      <div class="mono" id="s2sub" style="margin-top:56px;font-size:28px;letter-spacing:.2em;color:#b6a797">LAUNCH ON PUMP.FUN · SOLANA</div>
+    <div id="field" style="position:absolute;inset:0"></div>
+    <div style="position:absolute;left:50%;top:50%;width:1500px;height:760px;margin:-380px 0 0 -750px;border-radius:50%;background:radial-gradient(closest-side, rgba(7,4,3,.92), rgba(7,4,3,.6) 60%, rgba(7,4,3,0))"></div>
+    <div style="position:absolute;left:0;right:0;top:320px;text-align:center">
+      <div class="h" style="font-size:186px"><span id="w1" style="display:inline-block">Every</span> <span id="w2" style="display:inline-block">coin</span></div>
+      <div class="h" style="font-size:186px;margin-top:10px"><span id="w3" style="display:inline-block">gets</span> <span id="w4" style="display:inline-block">an</span> <span class="gold" id="w5" style="display:inline-block">agent.</span></div>
+      <div class="mono" id="s2sub" style="margin-top:52px;font-size:28px;letter-spacing:.2em;color:#c4b29d;display:flex;justify-content:center;align-items:center;gap:18px">
+        LAUNCHED ON PUMP.FUN <span style="color:#6b5a49">·</span> <img src="assets/si-solana.svg" style="width:30px;height:30px"> SOLANA</div>
     </div>
   </div>
 
-  <!-- 3. L'orbite -->
-  <div class="scene" id="s3">
-    <div style="position:absolute;left:150px;top:390px;width:640px">
-      <div class="kicker" id="s3k">Its mind</div>
-      <div class="h" id="s3t" style="font-size:132px;margin-top:26px">Any <span class="gold">mind.</span></div>
-      <div class="sub" id="s3s" style="margin-top:30px">Hundreds of AI models.<br>Paid by the coin itself.</div>
+  <!-- 3. Le site -->
+  <div class="scene" id="s3" style="perspective:2200px">
+    <div style="position:absolute;left:0;right:0;top:70px;text-align:center">
+      <div class="kicker" id="s3k">trywick.fun</div>
     </div>
-    <div id="orbit" style="position:absolute;left:1300px;top:540px;width:0;height:0">
-      <div class="ring" style="width:820px;height:820px"></div>
-      <div class="ring" style="width:660px;height:660px;border-style:dashed"></div>
-      <div class="ring" style="width:420px;height:420px;border-color:rgba(255,200,140,.25)"></div>
-      <div style="position:absolute;left:-330px;top:-330px;width:660px;height:660px;border-radius:50%;background:radial-gradient(circle, rgba(255,150,40,.35), rgba(255,110,20,0) 65%);filter:blur(20px)"></div>
-      <img src="../../public/brand/logo.png" style="position:absolute;left:-150px;top:-150px;width:300px;filter:drop-shadow(0 0 40px rgba(255,140,30,.6))">
-      <div id="sats"></div>
+    <div class="win" id="win" style="left:240px;top:150px;width:1440px;transform-origin:50% 0">
+      <div class="bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i>
+        <div class="url"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>trywick.fun</div></div>
+      <img src="assets/shot-hero.webp" style="display:block;width:1440px">
+      <div class="ripple" id="rip" style="left:294px;top:580px;width:0;height:0"></div>
     </div>
+    <svg class="cursor" id="cur" viewBox="0 0 24 24"><path d="M5 3l14 8-6.5 1.6L9.6 19z" fill="#fff" stroke="#120a06" stroke-width="1.4" stroke-linejoin="round"/></svg>
   </div>
 
-  <!-- 4. Lancer en 3 étapes -->
-  <div class="scene" id="s4">
-    <div style="position:absolute;left:0;right:0;top:120px;text-align:center">
-      <div class="kicker" id="s4k">How it works</div>
-      <div class="h" id="s4t" style="font-size:110px;margin-top:22px">Launch in <span class="gold">3 steps.</span></div>
+  <!-- 4. Lancer en 3 étapes : les vraies étapes du site -->
+  <div class="scene" id="s4" style="perspective:2400px">
+    <div style="position:absolute;left:0;right:0;top:70px;text-align:center">
+      <div class="h" id="s4t" style="font-size:96px">Launch in <span class="gold">3 steps.</span></div>
     </div>
-    <div class="card" id="c1" style="left:150px;top:420px;width:500px;height:470px;padding:44px">
-      <div class="mono" style="font-size:26px;color:#ffc05a">01</div>
-      <div style="font-size:52px;font-weight:700;margin-top:18px">Create</div>
-      <div style="display:flex;align-items:center;gap:24px;margin-top:40px">
-        <div style="width:110px;height:110px;border-radius:30px;background:radial-gradient(circle at 35% 30%, #7dff9b, #1e9d55 60%, #0b4a26);display:grid;place-items:center;font-size:60px">🐸</div>
-        <div><div style="font-size:44px;font-weight:800">$FROG</div><div style="font-size:28px;color:#b6a797">Moon Frog</div></div>
-      </div>
-      <div style="font-size:28px;color:#cdbfae;margin-top:40px">Image, name, ticker.</div>
-    </div>
-    <div class="card" id="c2" style="left:710px;top:420px;width:500px;height:470px;padding:44px;border-color:rgba(255,196,110,.6)">
-      <div class="mono" style="font-size:26px;color:#ffc05a">02</div>
-      <div style="font-size:52px;font-weight:700;margin-top:18px">Its agent</div>
-      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:36px"><span class="chip on" id="ch1">Analyst</span><span class="chip">Degen</span></div>
-      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:14px"><span class="chip on" id="ch2">Claude</span><span class="chip">Kimi</span></div>
-      <div style="font-size:28px;color:#cdbfae;margin-top:30px">Character, mind, objective.</div>
-    </div>
-    <div class="card" id="c3" style="left:1270px;top:420px;width:500px;height:470px;padding:44px">
-      <div class="mono" style="font-size:26px;color:#ffc05a">03</div>
-      <div style="font-size:52px;font-weight:700;margin-top:18px">Launch</div>
-      <div id="c3btn" class="btn" style="margin-top:44px;height:86px;font-size:32px">Launch <i><svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg></i></div>
-      <div id="c3ok" style="display:flex;align-items:center;gap:14px;margin-top:34px;font-size:30px;color:#3ddc84;font-weight:600">
-        <span style="width:40px;height:40px;border-radius:50%;background:#3ddc84;display:grid;place-items:center"><svg viewBox="0 0 24 24" style="width:26px;height:26px;fill:none;stroke:#062b16;stroke-width:3;stroke-linecap:round;stroke-linejoin:round"><path d="M5 12.5 9.5 17 19 7.5"/></svg></span>Live on pump.fun</div>
-    </div>
+    <div class="panel" id="p1" style="left:230px;top:300px;width:440px"><div class="step">01 · Its identity</div><img src="assets/shot-m1.webp"></div>
+    <div class="panel" id="p2" style="left:740px;top:300px;width:440px;height:620px;padding:24px;background:#120b07;border:1.5px solid rgba(255,206,112,.3);overflow:visible">
+      <div class="step" style="top:-64px">02 · Its agent</div>
+      <div style="position:relative;height:572px;overflow:hidden;border-radius:14px"><img id="p2img" src="assets/shot-m2.webp" style="position:absolute;left:0;top:0;width:392px"></div></div>
+    <div class="panel" id="p3" style="left:1250px;top:300px;width:440px;overflow:visible"><div class="step">03 · Launch</div><img src="assets/shot-m3.webp" style="border-radius:26px"></div>
   </div>
 
-  <!-- 5. L'agent parle -->
-  <div class="scene" id="s5">
-    <div style="position:absolute;left:150px;top:380px;width:720px">
-      <div class="kicker" id="s5k">Its agent</div>
-      <div class="h" id="s5t" style="font-size:118px;margin-top:26px">It talks.<br>It posts.<br><span class="gold">It burns.</span></div>
+  <!-- 5. N'importe quel cerveau : les vrais labos -->
+  <div class="scene" id="s5" style="perspective:2000px">
+    <div style="position:absolute;left:150px;top:350px;width:700px">
+      <div class="kicker" id="s5k">Its mind</div>
+      <div class="h" id="s5t" style="font-size:136px;margin-top:26px">Any <span class="gold">mind.</span></div>
+      <div class="sub" id="s5s" style="margin-top:30px">Hundreds of AI models, from<br>every big lab. Paid by the coin itself.</div>
     </div>
-    <div class="card" id="chat" style="left:1000px;top:170px;width:780px;height:740px;background:#120a06">
-      <div style="display:flex;align-items:center;gap:22px;padding:36px 40px;border-bottom:1.5px solid rgba(255,196,110,.16)">
-        <div style="width:76px;height:76px;border-radius:22px;background:linear-gradient(180deg,#fff4d2,#ffd978 30%,#f1b440 62%,#d0821c);display:grid;place-items:center">
-          <svg viewBox="0 0 24 24" style="width:44px;height:44px;fill:none;stroke:#1d1003;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><rect x="5" y="9.5" width="14" height="10" rx="3"/><path d="M9.5 14.5h.01M14.5 14.5h.01M12 9.5V7M12 2.8c.8.9 1.2 1.6 1.2 2.2a1.2 1.2 0 0 1-2.4 0c0-.6.4-1.3 1.2-2.2z"/></svg></div>
-        <div><div style="font-size:38px;font-weight:700">$FROG agent</div><div class="mono" style="font-size:24px;color:#b6a797;margin-top:4px">Analyst · Claude Sonnet</div></div>
-        <div style="margin-left:auto;width:16px;height:16px;border-radius:50%;background:#3ddc84;box-shadow:0 0 14px #3ddc84"></div>
-      </div>
-      <div class="bubble me" id="b1" style="right:40px;top:180px">wen burn?</div>
-      <div class="bubble ag" id="dots" style="left:40px;top:300px;font-size:44px;letter-spacing:6px">•••</div>
-      <div class="bubble ag" id="b2" style="left:40px;top:300px;width:620px">Burned <b>1.2M $FROG</b> today.<br>3.4% of the supply, gone.</div>
-      <div id="rcpt" style="position:absolute;left:40px;top:500px;display:flex;align-items:center;gap:14px;padding:16px 24px;border-radius:999px;background:rgba(61,220,132,.1);border:1.5px solid rgba(61,220,132,.4);font-size:26px;color:#7ff0ad;font-weight:600">🔥 Burn receipt · Solscan ↗</div>
-      <div class="bubble me" id="b3" style="right:40px;top:610px">best agent on Solana 🔥</div>
-    </div>
+    <div id="tiles" style="position:absolute;left:930px;top:180px;width:856px;height:720px;transform-style:preserve-3d"></div>
   </div>
 
-  <!-- 6. Les fees -->
+  <!-- 6. L'agent parle, poste, brûle -->
   <div class="scene" id="s6">
-    <div style="position:absolute;left:150px;top:170px">
-      <div class="kicker" id="s6k">Where the fees go</div>
-      <div class="h" id="s6t" style="font-size:112px;margin-top:24px">Locked <span class="gold">on-chain.</span></div>
+    <div style="position:absolute;left:150px;top:250px;width:720px">
+      <div class="kicker" id="s6k">Its agent</div>
+      <div class="h" id="s6t" style="font-size:118px;margin-top:26px">It talks.<br>It posts.<br><span class="gold">It burns.</span></div>
     </div>
-    <div id="bar" style="position:absolute;left:150px;top:500px;width:1620px;height:200px"></div>
-    <div id="legend" style="position:absolute;left:150px;top:760px;width:1620px;display:grid;grid-template-columns:repeat(4,1fr);gap:20px"></div>
-  </div>
-
-  <!-- 7. $WICK brûle -->
-  <div class="scene" id="s7">
-    <div style="position:absolute;left:0;right:0;top:300px;text-align:center">
-      <div class="kicker" id="s7k">Every launch</div>
-      <div class="h" id="s7t" style="font-size:170px;margin-top:30px">burns <span class="gold">$WICK.</span></div>
-      <div id="flow" style="display:flex;justify-content:center;align-items:center;gap:26px;margin-top:70px;font-size:34px;font-weight:600;color:#e9dccb">
-        <span class="chip" id="f1">Launch</span><span id="a1" style="color:#ffc05a">→</span><span class="chip" id="f2">Ignition Fee</span><span id="a2" style="color:#ffc05a">→</span><span class="chip" id="f3">Buy $WICK</span><span id="a3" style="color:#ffc05a">→</span><span class="chip on" id="f4">🔥 Burned</span>
+    <div class="post" id="px" style="left:150px;top:760px"><img src="assets/si-x.svg" style="width:34px;height:34px"><span>Posts on X<small>its own updates</small></span></div>
+    <div class="post" id="ptg" style="left:470px;top:760px"><img src="assets/si-telegram.svg"><span>Telegram<small>answers holders</small></span></div>
+    <div class="card" id="chat" style="left:1000px;top:150px;width:780px;height:780px;background:#120a06">
+      <div style="display:flex;align-items:center;gap:22px;padding:32px 40px;border-bottom:1.5px solid rgba(255,196,110,.16)">
+        <div style="width:84px;height:84px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 35% 28%, #3a2516, #140b06 70%);box-shadow:0 0 0 2.5px #f2b347">
+          <img src="assets/3d-frog.webp" style="width:62px;height:62px"></div>
+        <div><div style="font-size:38px;font-weight:700">$FROG agent</div>
+          <div style="display:flex;align-items:center;gap:10px;font-size:24px;color:#b6a797;margin-top:6px">Analyst · <img src="assets/claude-color.svg" style="width:24px;height:24px"> Claude Sonnet 5.5</div></div>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:10px;font:600 20px/1 GMono, monospace;color:#7ff0ad"><span style="width:14px;height:14px;border-radius:50%;background:#3ddc84;box-shadow:0 0 14px #3ddc84"></span>LIVE</div>
       </div>
+      <div class="bubble me" id="b1" style="right:40px;top:190px">wen burn?</div>
+      <div class="bubble ag" id="dots" style="left:40px;top:310px;font-size:44px;letter-spacing:6px">•••</div>
+      <div class="bubble ag" id="b2" style="left:40px;top:310px;width:640px">Fees came in overnight. I bought back <b>1.2M $FROG</b> and burned them: 0.4% of the supply, gone.</div>
+      <div id="rcpt" style="position:absolute;left:40px;top:540px;display:flex;align-items:center;gap:12px;padding:14px 24px;border-radius:999px;background:rgba(61,220,132,.1);border:1.5px solid rgba(61,220,132,.4);font-size:26px;color:#7ff0ad;font-weight:600">
+        <img src="assets/3d-fire.webp" style="width:32px;height:32px">Burn receipt · Solscan ↗</div>
+      <div class="bubble me" id="b3" style="right:40px;top:650px;display:flex;align-items:center;gap:12px">best agent on Solana <img src="assets/3d-fire.webp" style="width:38px;height:38px"></div>
     </div>
   </div>
 
-  <!-- 8. La fin -->
+  <!-- 7. Les fees -->
+  <div class="scene" id="s7">
+    <div style="position:absolute;left:150px;top:160px">
+      <div class="kicker" id="s7k">Where the fees go</div>
+      <div class="h" id="s7t" style="font-size:112px;margin-top:24px">Locked <span class="gold">on-chain.</span></div>
+    </div>
+    <div class="chip" id="s7sol" style="position:absolute;right:150px;top:248px"><img src="assets/si-solana.svg" style="width:30px;height:30px">Solana · pump.fun</div>
+    <div id="bar" style="position:absolute;left:150px;top:480px;width:1620px;height:200px"></div>
+    <div id="legend" style="position:absolute;left:150px;top:740px;width:1620px;display:grid;grid-template-columns:repeat(4,1fr);gap:20px"></div>
+  </div>
+
+  <!-- 8. Chaque lancement brûle $WICK -->
   <div class="scene" id="s8">
-    <div id="s8glow" style="position:absolute;left:50%;top:36%;width:820px;height:820px;margin:-410px 0 0 -410px;border-radius:50%;background:radial-gradient(circle, rgba(255,150,40,.5), rgba(255,110,20,.1) 45%, rgba(255,110,20,0) 70%);filter:blur(30px)"></div>
-    <img id="s8logo" src="../../public/brand/logo.png" style="position:absolute;left:50%;top:15%;width:300px;margin-left:-150px;filter:drop-shadow(0 0 40px rgba(255,140,30,.6))">
-    <div style="position:absolute;left:0;right:0;top:560px;text-align:center">
-      <div class="h" id="s8t" style="font-size:96px">Your coin. Its agent. <span class="gold">On fire.</span></div>
-      <div id="s8btn" class="btn" style="margin-top:56px">Launch yours <i><svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg></i></div>
-      <div class="mono" id="s8url" style="margin-top:44px;font-size:40px;letter-spacing:.06em;color:#ffc05a">trywick.fun</div>
+    <div id="s8glow" style="position:absolute;left:50%;top:300px;width:700px;height:700px;margin:-350px 0 0 -350px;border-radius:50%;background:radial-gradient(circle, rgba(255,130,30,.55), rgba(255,90,10,0) 65%);filter:blur(20px)"></div>
+    <img id="s8fire" src="assets/3d-fire.webp" style="position:absolute;left:50%;top:150px;width:256px;margin-left:-128px;filter:drop-shadow(0 20px 40px rgba(255,100,20,.6))">
+    <div style="position:absolute;left:0;right:0;top:430px;text-align:center">
+      <div class="kicker" id="s8k">Every launch</div>
+      <div class="h" id="s8t" style="font-size:160px;margin-top:26px">burns <span class="gold">$WICK.</span></div>
+      <div style="display:flex;justify-content:center;align-items:center;gap:24px;margin-top:64px;font-size:34px;font-weight:600">
+        <span class="chip" id="f1"><img src="assets/3d-rocket.webp">Launch</span><span id="a1" style="color:#ffc05a">→</span>
+        <span class="chip" id="f2">Ignition Fee</span><span id="a2" style="color:#ffc05a">→</span>
+        <span class="chip" id="f3">Buys $WICK</span><span id="a3" style="color:#ffc05a">→</span>
+        <span class="chip on" id="f4"><img src="assets/3d-fire.webp">Burned</span></div>
     </div>
   </div>
 
+  <!-- 9. La fin -->
+  <div class="scene" id="s9">
+    <div id="s9glow" style="position:absolute;left:50%;top:36%;width:820px;height:820px;margin:-410px 0 0 -410px;border-radius:50%;background:radial-gradient(circle, rgba(255,150,40,.5), rgba(255,110,20,.1) 45%, rgba(255,110,20,0) 70%);filter:blur(30px)"></div>
+    <img id="s9logo" src="../../public/brand/logo.png" style="position:absolute;left:50%;top:12%;width:300px;margin-left:-150px;filter:drop-shadow(0 0 40px rgba(255,140,30,.6))">
+    <div style="position:absolute;left:0;right:0;top:520px;text-align:center">
+      <div class="h" id="s9t" style="font-size:96px">Your coin. Its agent. <span class="gold">On fire.</span></div>
+      <div id="s9btn" class="btn" style="margin-top:54px">Launch yours <i><svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg></i></div>
+      <div class="mono" id="s9url" style="margin-top:42px;font-size:40px;letter-spacing:.06em;color:#ffc05a">trywick.fun</div>
+      <div id="s9foot" style="margin-top:30px;display:flex;justify-content:center;align-items:center;gap:14px;font:500 24px/1 GMono, monospace;letter-spacing:.14em;color:#9c8b78">
+        <img src="assets/si-solana.svg" style="width:26px;height:26px"> SOLANA · PUMP.FUN</div>
+    </div>
+  </div>
+
+  <div class="flash" id="flash"></div>
   <div class="vig"></div><div class="grain"></div>
 </div>
 <script>
 const $ = (id) => document.getElementById(id);
 const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
 const p = (t, a, b) => clamp((t - a) / (b - a));
-const eo = (x) => 1 - Math.pow(1 - x, 3);            // ease-out cubic
+const eo = (x) => 1 - Math.pow(1 - x, 3);
 const eio = (x) => (x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
 const back = (x) => { const c = 1.6; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
-// La visibilité d'une scène : fondu entrant, fondu sortant (avec un léger zoom).
+const lerp = (a, b, k) => a + (b - a) * k;
+// Une scène : fondu entrant, fondu sortant (léger zoom et flou).
 function scene(el, t, a, b, fade = .6) {
   const v = Math.min(p(t, a, a + fade), 1 - p(t, b - fade, b));
   el.style.opacity = v;
@@ -176,103 +206,163 @@ function scene(el, t, a, b, fade = .6) {
 }
 const rise = (el, x, dy = 60) => { el.style.opacity = x; el.style.transform = `translateY(${(1 - eo(x)) * dy}px)`; };
 
-// Les braises : fixes d'une image à l'autre (graine), elles montent tout le film.
-const E = [];
 let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+// Les braises.
+const E = [];
 for (let i = 0; i < 70; i++) {
   const el = document.createElement('div'); el.className = 'ember';
   const s = 3 + rnd() * 6; el.style.width = el.style.height = `${s}px`;
   $('embers').appendChild(el);
   E.push({ el, x: rnd() * 1920, sp: 40 + rnd() * 90, ph: rnd() * 30, sw: 20 + rnd() * 50, f: .3 + rnd() });
 }
-// Les labos en orbite.
-const LABS = ['openai', 'anthropic', 'gemini', 'xai', 'deepseek', 'qwen', 'mistral', 'moonshot', 'zai', 'minimax'];
-const SATS = LABS.map((k) => { const d = document.createElement('div'); d.className = 'sat'; d.innerHTML = `<img src="../../public/brand/ai/${k}.svg">`; $('sats').appendChild(d); return d; });
+// Le champ de coins (scène 2) : chacun à sa profondeur.
+const COINS = [['frog', 'FROG'], ['dog', 'PUP'], ['cat', 'MEOW'], ['fox', 'FOX'], ['penguin', 'PENGU'], ['lion', 'KING'], ['owl', 'HOOT'], ['monkey', 'APE'], ['whale', 'WHALE'], ['gem', 'GEM'], ['rocket', 'MOON'], ['frog', 'RIBBIT'], ['cat', 'NYAN'], ['dog', 'WOOF']];
+const SPOTS = [[180, 220, .9], [470, 860, 1.05], [1760, 250, 1], [1500, 880, .95], [820, 140, .6], [1150, 960, .65], [90, 640, .7], [1830, 600, .75], [1290, 120, .55], [640, 980, .5], [380, 470, .45], [1580, 520, .5], [960, 60, .4], [260, 1000, .42]];
+const FIELD = COINS.map(([img, tk], i) => {
+  const d = document.createElement('div'); d.className = 'tok';
+  d.innerHTML = `<div class="disc"><img src="assets/3d-${img}.webp"></div><div class="tk">$${tk}</div>`;
+  $('field').appendChild(d);
+  const [x, y, z] = SPOTS[i];
+  return { d, x, y, z, ph: rnd() * 6, sp: 10 + rnd() * 14 };
+});
+// Les labos (scène 5) : leurs vrais logos.
+const LABS = [['claude-color', 'Anthropic'], ['openai', 'OpenAI'], ['gemini-color', 'Google'], ['grok', 'xAI'], ['deepseek-color', 'DeepSeek'], ['qwen-color', 'Qwen'],
+  ['kimi-color', 'Moonshot'], ['mistral-color', 'Mistral'], ['zhipu-color', 'Z.ai'], ['minimax-color', 'MiniMax'], ['meta-color', 'Meta'], [null, '+ hundreds']];
+const TILES = LABS.map(([logo, name], i) => {
+  const d = document.createElement('div'); d.className = 'tile';
+  d.innerHTML = logo ? `<img src="assets/${logo}.svg"><b>${name}</b>` : `<b style="font-size:30px;color:#ffc05a">+ hundreds</b><b style="font-size:22px;color:#9c8b78">more models</b>`;
+  const col = i % 4, row = Math.floor(i / 4);
+  d.style.left = `${col * 220}px`; d.style.top = `${row * 200 + 60}px`;
+  $('tiles').appendChild(d);
+  return { d, col, row, i };
+});
 // La barre des fees.
 const PARTS = [[60, 'Creator', 'the one who launched it', 'linear-gradient(180deg,#fff4d2,#ffd978 30%,#f1b440 62%,#d0821c)', '#1d1003'], [20, 'Its agent', 'its AI, its posts', '#ff8a1c', '#fff4e6'], [10, 'Burns $WICK', 'bought, then burned', '#d9480f', '#fff4e6'], [10, 'Team', 'builds WICK', '#8a2f0c', '#fff4e6']];
 const SEGS = []; let x0 = 0;
 PARTS.forEach(([pct, , , bg, fg]) => { const w = (1620 - 30) * pct / 100; const d = document.createElement('div'); d.className = 'seg'; d.style.left = `${x0}px`; d.style.width = `${w}px`; d.style.background = bg; d.style.color = fg; d.style.fontSize = pct >= 20 ? '96px' : '60px'; d.textContent = `${pct}%`; $('bar').appendChild(d); SEGS.push(d); x0 += w + 10; });
 const LEG = PARTS.map(([pct, label, sub, bg]) => { const d = document.createElement('div'); d.innerHTML = `<div style="display:flex;align-items:center;gap:14px;font-size:38px;font-weight:700"><span style="width:26px;height:26px;border-radius:8px;background:${bg}"></span>${pct}% ${label}</div><div style="font-size:28px;color:#b6a797;margin:10px 0 0 40px">${sub}</div>`; $('legend').appendChild(d); return d; });
 
+// Les coupes : un éclair doux à chaque changement de scène.
+const CUTS = [4.4, 9.4, 16.2, 24.2, 30.2, 35.8, 39.8, 43.2];
+
 window.render = function (t) {
-  // Le fond respire, la grille glisse.
   $('grid').style.transform = `translate(${-t * 6}px, ${-t * 4}px)`;
   for (const e of E) {
     const life = ((t + e.ph) * e.sp) % 1300;
     e.el.style.transform = `translate(${e.x + Math.sin((t + e.ph) * e.f) * e.sw}px, ${1150 - life}px)`;
     e.el.style.opacity = Math.min(1, life / 200) * (1 - life / 1300) * .9;
   }
+  $('flash').style.opacity = Math.max(...CUTS.map((c) => Math.max(0, 1 - Math.abs(t - c) / .35))) * .55;
 
   // 1. 0–4.6 : le W s'allume.
   if (scene($('s1'), t, 0, 4.6, .8)) {
-    const a = eo(p(t, .2, 2));
-    $('s1logo').style.opacity = a;
+    $('s1logo').style.opacity = eo(p(t, .2, 2));
     $('s1logo').style.transform = `scale(${.82 + .18 * back(p(t, .2, 2.2))}) translateY(${Math.sin(t * 1.4) * 6}px)`;
     $('s1glow').style.opacity = eo(p(t, 0, 2.4)) * (.85 + Math.sin(t * 2) * .15);
     $('s1glow').style.transform = `scale(${.6 + .4 * eo(p(t, 0, 2.6))})`;
     rise($('s1word'), p(t, 1.8, 3), 30);
     $('s1sweep').style.transform = `translateX(${(-1 + 2.2 * eio(p(t, 2.2, 3.8))) * 1920}px)`;
   }
-  // 2. 4.2–9 : la phrase, mot par mot.
-  if (scene($('s2'), t, 4.2, 9, .6)) {
-    ['w1', 'w2', 'w3', 'w4', 'w5'].forEach((id, i) => rise($(id), p(t, 4.5 + i * .28, 5.2 + i * .28), 110));
-    $('w5').style.transform += ` scale(${1 + .04 * Math.sin(p(t, 6, 9) * Math.PI)})`;
+  // 2. 4.2–9.6 : chaque coin a son agent, sur un champ de coins.
+  if (scene($('s2'), t, 4.2, 9.6, .6)) {
+    FIELD.forEach((c, i) => {
+      const k = eo(p(t, 4.3 + i * .07, 5.5 + i * .07));
+      const drift = (t - 4.2) * c.sp * c.z;
+      const s = c.z * (.7 + .3 * k) * (1 + (t - 4.2) * .02);
+      c.d.style.transform = `translate(${c.x + Math.sin(t * .6 + c.ph) * 14}px, ${c.y - drift + (1 - k) * 120}px) scale(${s}) rotate(${Math.sin(t * .5 + c.ph) * 6}deg)`;
+      c.d.style.opacity = k * (c.z < .6 ? .55 : .95);
+      c.d.style.filter = c.z < .6 ? `blur(${(.6 - c.z) * 9}px)` : 'none';
+    });
+    ['w1', 'w2', 'w3', 'w4', 'w5'].forEach((id, i) => rise($(id), p(t, 4.6 + i * .26, 5.3 + i * .26), 110));
+    $('w5').style.transform += ` scale(${1 + .04 * Math.sin(p(t, 6, 9.6) * Math.PI)})`;
     rise($('s2sub'), p(t, 6.4, 7.2), 20);
   }
-  // 3. 8.6–14.4 : n'importe quel cerveau.
-  if (scene($('s3'), t, 8.6, 14.4, .6)) {
-    rise($('s3k'), p(t, 8.9, 9.5), 20); rise($('s3t'), p(t, 9.1, 9.9), 50); rise($('s3s'), p(t, 9.5, 10.3), 30);
-    const spin = t * 18;
-    SATS.forEach((d, i) => {
-      const k = eo(p(t, 9 + i * .12, 10 + i * .12));
-      const ang = (i * 36 + spin) * Math.PI / 180;
-      const r = 330 * k + 700 * (1 - k);
-      d.style.transform = `translate(${Math.cos(ang) * r}px, ${Math.sin(ang) * r}px) scale(${.6 + .4 * k})`;
-      d.style.opacity = k;
+  // 3. 9.2–16.4 : le vrai site, dans son navigateur ; le curseur clique sur « Launch a coin ».
+  if (scene($('s3'), t, 9.2, 16.4, .6)) {
+    rise($('s3k'), p(t, 9.4, 10), 20);
+    const k = eio(p(t, 9.2, 12.4));
+    const push = eio(p(t, 12.6, 15.6));
+    $('win').style.opacity = eo(p(t, 9.2, 9.9));
+    // De l'inclinaison au plein écran, puis on s'approche du bouton.
+    $('win').style.transformOrigin = '294px 580px';
+    $('win').style.transform = `translateY(${(1 - k) * 160}px) rotateX(${(1 - k) * 22}deg) rotateY(${(1 - k) * -10}deg) scale(${lerp(.86, 1, k) * (1 + push * .45)})`;
+    // Le curseur.
+    const ck = eio(p(t, 12.8, 14.6));
+    const press = p(t, 14.7, 14.85) - p(t, 14.85, 15.05);
+    const cx = lerp(1500, 240 + 294, ck), cy = lerp(1000, 150 + 580, ck);
+    $('cur').style.opacity = p(t, 12.6, 13);
+    $('cur').style.transform = `translate(${cx}px, ${cy}px) scale(${1 - press * .2})`;
+    const r = p(t, 14.8, 15.6);
+    $('rip').style.width = $('rip').style.height = `${r * 220}px`;
+    $('rip').style.marginLeft = $('rip').style.marginTop = `${-r * 110}px`;
+    $('rip').style.opacity = r > 0 ? 1 - r : 0;
+  }
+  // 4. 16–24.4 : les trois vraies étapes de lancement.
+  if (scene($('s4'), t, 16, 24.4, .6)) {
+    rise($('s4t'), p(t, 16.2, 17), 40);
+    const focus = t < 19.4 ? 0 : t < 21.4 ? 1 : 2;
+    ['p1', 'p2', 'p3'].forEach((id, i) => {
+      const k = eo(p(t, 16.5 + i * .35, 17.6 + i * .35));
+      const on = t > 18.4 && focus === i;
+      const f = on ? eo(p(t, i === 0 ? 18.4 : 19.4 + (i - 1) * 2, (i === 0 ? 18.4 : 19.4 + (i - 1) * 2) + .5)) : 0;
+      const el = $(id);
+      el.style.opacity = k * (t > 18.4 && !on ? .45 : 1);
+      el.style.transform = `translateY(${(1 - k) * 120 - f * 24}px) rotateY(${(1 - k) * (i - 1) * 30}deg) scale(${1 + f * .06})`;
+      el.style.boxShadow = on ? `0 60px 140px rgba(0,0,0,.7), 0 0 0 2px rgba(255,200,110,${.7 * f}), 0 0 80px rgba(255,160,40,${.35 * f})` : '0 60px 140px rgba(0,0,0,.7)';
     });
-    $('orbit').style.transform = `scale(${.92 + .08 * eo(p(t, 8.6, 10))})`;
+    // L'étape 2 défile du caractère jusqu'au modèle choisi.
+    $('p2img').style.top = `${-269 * eio(p(t, 19.8, 21))}px`;
   }
-  // 4. 14–20.6 : lancer en 3 étapes.
-  if (scene($('s4'), t, 14, 20.6, .6)) {
-    rise($('s4k'), p(t, 14.2, 14.8), 20); rise($('s4t'), p(t, 14.4, 15.2), 40);
-    ['c1', 'c2', 'c3'].forEach((id, i) => rise($(id), p(t, 15 + i * .5, 15.8 + i * .5), 90));
-    const press = p(t, 18.2, 18.5) - p(t, 18.5, 18.8);
-    $('c3btn').style.transform = `scale(${1 - press * .06})`;
-    rise($('c3ok'), p(t, 18.7, 19.2), 16);
+  // 5. 24–30.4 : n'importe quel cerveau.
+  if (scene($('s5'), t, 24, 30.4, .6)) {
+    rise($('s5k'), p(t, 24.2, 24.8), 20); rise($('s5t'), p(t, 24.4, 25.2), 50); rise($('s5s'), p(t, 24.8, 25.6), 30);
+    TILES.forEach((c) => {
+      const k = eo(p(t, 24.4 + c.i * .1, 25.5 + c.i * .1));
+      const fl = Math.sin(t * 1.2 + c.i) * 6;
+      const lit = c.i === 0 ? eo(p(t, 27.8, 28.4)) : 0;
+      c.d.style.opacity = k;
+      c.d.style.transform = `translate3d(0, ${(1 - k) * 80 + fl}px, ${(1 - k) * -700}px) rotateX(${(1 - k) * 40}deg) scale(${1 + lit * .08})`;
+      c.d.style.borderColor = lit ? `rgba(255,200,110,${.2 + .7 * lit})` : 'rgba(255,210,160,.18)';
+      c.d.style.boxShadow = `0 30px 70px rgba(0,0,0,.55), 0 0 ${60 * lit}px rgba(255,160,40,${.45 * lit})`;
+    });
+    $('tiles').style.transform = `rotateY(${-10 + 6 * eio(p(t, 24, 30.4))}deg) rotateX(4deg)`;
   }
-  // 5. 20.2–26.4 : l'agent parle.
-  if (scene($('s5'), t, 20.2, 26.4, .6)) {
-    rise($('s5k'), p(t, 20.4, 21), 20); rise($('s5t'), p(t, 20.6, 21.4), 50);
-    rise($('chat'), p(t, 20.5, 21.3), 60);
-    rise($('b1'), p(t, 21.6, 22), 20);
-    const typing = t > 22.3 && t < 23.3;
-    $('dots').style.opacity = typing ? .6 + .4 * Math.sin(t * 12) : 0;
-    rise($('b2'), p(t, 23.3, 23.7), 20);
-    rise($('rcpt'), p(t, 24, 24.4), 14);
-    rise($('b3'), p(t, 24.9, 25.3), 20);
+  // 6. 30–36 : l'agent parle, poste et brûle.
+  if (scene($('s6'), t, 30, 36, .6)) {
+    rise($('s6k'), p(t, 30.2, 30.8), 20); rise($('s6t'), p(t, 30.4, 31.2), 50);
+    rise($('chat'), p(t, 30.3, 31.1), 60);
+    rise($('b1'), p(t, 31.4, 31.8), 20);
+    $('dots').style.opacity = t > 32 && t < 32.9 ? .6 + .4 * Math.sin(t * 12) : 0;
+    rise($('b2'), p(t, 32.9, 33.3), 20);
+    rise($('rcpt'), p(t, 33.5, 33.9), 14);
+    rise($('b3'), p(t, 34.3, 34.7), 20);
+    rise($('px'), p(t, 32.2, 32.7), 30); rise($('ptg'), p(t, 32.5, 33), 30);
   }
-  // 6. 26–31 : les fees.
-  if (scene($('s6'), t, 26, 31, .6)) {
-    rise($('s6k'), p(t, 26.2, 26.8), 20); rise($('s6t'), p(t, 26.4, 27.2), 40);
-    SEGS.forEach((d, i) => { const k = eo(p(t, 27 + i * .3, 27.8 + i * .3)); d.style.clipPath = `inset(0 ${(1 - k) * 100}% 0 0 round 24px)`; });
-    LEG.forEach((d, i) => rise(d, p(t, 27.6 + i * .3, 28.2 + i * .3), 20));
+  // 7. 35.6–40 : les fees.
+  if (scene($('s7'), t, 35.6, 40, .5)) {
+    rise($('s7k'), p(t, 35.8, 36.3), 20); rise($('s7t'), p(t, 36, 36.7), 40); rise($('s7sol'), p(t, 36.4, 37), 20);
+    SEGS.forEach((d, i) => { const k = eo(p(t, 36.5 + i * .28, 37.3 + i * .28)); d.style.clipPath = `inset(0 ${(1 - k) * 100}% 0 0 round 24px)`; });
+    LEG.forEach((d, i) => rise(d, p(t, 37 + i * .25, 37.6 + i * .25), 20));
   }
-  // 7. 30.6–34.6 : chaque lancement brûle $WICK.
-  if (scene($('s7'), t, 30.6, 34.6, .5)) {
-    rise($('s7k'), p(t, 30.8, 31.3), 20); rise($('s7t'), p(t, 31, 31.7), 60);
-    ['f1', 'a1', 'f2', 'a2', 'f3', 'a3', 'f4'].forEach((id, i) => rise($(id), p(t, 31.6 + i * .2, 32 + i * .2), 20));
-    $('f4').style.transform += ` scale(${1 + .08 * Math.max(0, Math.sin((t - 33) * 6)) * p(t, 33, 33.2)})`;
+  // 8. 39.6–43.4 : chaque lancement brûle $WICK.
+  if (scene($('s8'), t, 39.6, 43.4, .5)) {
+    const k = back(p(t, 39.7, 40.6));
+    $('s8fire').style.opacity = eo(p(t, 39.7, 40.2));
+    $('s8fire').style.transform = `scale(${(.5 + .5 * k) * (1 + .03 * Math.sin(t * 9))}) translateY(${Math.sin(t * 2.2) * 5}px)`;
+    $('s8glow').style.opacity = eo(p(t, 39.7, 40.6)) * (.8 + .2 * Math.sin(t * 7));
+    rise($('s8k'), p(t, 39.9, 40.4), 20); rise($('s8t'), p(t, 40.1, 40.8), 60);
+    ['f1', 'a1', 'f2', 'a2', 'f3', 'a3', 'f4'].forEach((id, i) => rise($(id), p(t, 40.6 + i * .18, 41 + i * .18), 20));
+    $('f4').style.transform += ` scale(${1 + .08 * Math.max(0, Math.sin((t - 41.9) * 6)) * p(t, 41.9, 42.1)})`;
   }
-  // 8. 34.2–40 : la fin.
-  if (scene($('s8'), t, 34.2, 40.5, .6)) {
-    $('s8glow').style.opacity = eo(p(t, 34.2, 35.6)) * (.85 + Math.sin(t * 2) * .15);
-    const k = back(p(t, 34.3, 35.5));
-    $('s8logo').style.opacity = eo(p(t, 34.3, 35));
-    $('s8logo').style.transform = `scale(${.8 + .2 * k}) translateY(${Math.sin(t * 1.4) * 6}px)`;
-    rise($('s8t'), p(t, 35.2, 36), 50); rise($('s8btn'), p(t, 35.8, 36.5), 30); rise($('s8url'), p(t, 36.3, 37), 20);
+  // 9. 43–49.5 : la fin.
+  if (scene($('s9'), t, 43, 49.5, .6)) {
+    $('s9glow').style.opacity = eo(p(t, 43, 44.4)) * (.85 + Math.sin(t * 2) * .15);
+    const k = back(p(t, 43.1, 44.3));
+    $('s9logo').style.opacity = eo(p(t, 43.1, 43.8));
+    $('s9logo').style.transform = `scale(${.8 + .2 * k}) translateY(${Math.sin(t * 1.4) * 6}px)`;
+    rise($('s9t'), p(t, 44, 44.8), 50); rise($('s9btn'), p(t, 44.6, 45.3), 30); rise($('s9url'), p(t, 45.1, 45.8), 20); rise($('s9foot'), p(t, 45.5, 46.2), 14);
   }
-  // Fondu au noir à la toute fin.
-  document.getElementById('stage').style.opacity = 1 - p(t, 39.6, 40.5);
+  $('stage').style.opacity = 1 - p(t, 48.6, 49.5);
 };
 window.render(0);
 </script>

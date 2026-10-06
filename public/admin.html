@@ -224,7 +224,7 @@
       </div>
 
       <div class="card lib" id="library">
-        <h2>Posts prêts à publier <small>l'image et le texte sont prêts : un clic, et c'est sur X et Telegram</small></h2>
+        <h2>Posts prêts à publier <span class="row" style="gap:10px"><small>l'image et le texte sont prêts : un clic, et c'est sur X et Telegram</small><button class="btn small" id="posts-reset" type="button">Remettre à zéro</button></span></h2>
         <p class="lib-how"><b>Post on X + Telegram</b> fait trois choses d'un coup : il <b>copie l'image</b>, il <b>ouvre X avec le texte</b>, et il <b>envoie le post dans ton canal Telegram</b>.
           Sur X, appuie juste sur <b>Ctrl+V</b> (Cmd+V sur Mac) pour coller l'image, puis sur <b>Post</b>. Sur téléphone : <b>Image</b> pour l'enregistrer, puis ajoute-la dans X.
           Tu peux modifier le texte avant de cliquer. Les posts « après le lancement » ajoutent le CA tout seuls dès que $WICK est en ligne.</p>
@@ -789,6 +789,17 @@
         const r = await call('/api/admin/post', { kind: 'relay', url: f.url, note: f.note });
         if (r.telegram) { flash('Relayé sur Telegram.', 'ok'); e.target.reset(); } else flash(`Telegram a refusé : ${r.telegramError || 'erreur'}`, 'bad');
       } catch (err) { flash(err.message === 'bad_url' ? 'Ce lien n\'est pas un post X (https://x.com/compte/status/123…).' : err.message, 'bad'); }
+    });
+    // Remettre à zéro : l'historique des posts d'essai (et un lock de test), et les textes modifiés.
+    $('posts-reset').addEventListener('click', async () => {
+      if (!confirm('Remettre à zéro les posts ?\n\nEfface les « Posté il y a… » de tes essais, un lock de test (il disparaît aussi de la page Proof), et tes textes modifiés dans ce navigateur.\nNe touche pas aux messages déjà envoyés sur Telegram (supprime-les toi-même dans le canal), ni aux posts automatiques.')) return;
+      try {
+        const r = await call('/api/admin/reset-posts', {});
+        try { Object.keys(localStorage).filter((k) => k.startsWith('wick.draft.')).forEach((k) => localStorage.removeItem(k)); } catch { /* pas de brouillons */ }
+        delete blobs.lock;
+        flash(`Remis à zéro (${r.deleted} entrée${r.deleted === 1 ? '' : 's'} effacée${r.deleted === 1 ? '' : 's'}). Tout est propre.`, 'ok');
+        loadSocial();
+      } catch (err) { flash(err.message, 'bad'); }
     });
     async function loadSocial() {
       try { soc = await call('/api/admin/social'); renderPosts(); } catch (err) { flash(`Posts : ${err.message}`, 'bad'); }

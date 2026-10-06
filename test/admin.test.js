@@ -117,3 +117,21 @@ test('post library: every post has its card and text; one click sends it to Tele
   assert.match(sent[1].body.text, /^new post\n\n𝕏 <a href="https:\/\/x.com\/trywickdotfun\/status\/123">/);
   assert.equal(sent[1].body.link_preview_options.url, 'https://x.com/trywickdotfun/status/123');
 });
+
+test('reset posts: the test history and a test lock go, the automatic posts stay', async () => {
+  const { adminResetPosts } = await import('../src/api/admin.js');
+  const { setSetting, getSetting } = await import('../lib/settings.js');
+  const env = await makeEnv();
+  await setSetting(env.DB, 'social.library.teaser.manual.1', { status: 'posted', at: 1 });
+  await setSetting(env.DB, 'social.lock.manual.2', { status: 'posted', at: 2 });
+  await setSetting(env.DB, 'social.relay.manual.3', { status: 'posted', at: 3 });
+  await setSetting(env.DB, 'team.lock', { url: 'https://x' });
+  await setSetting(env.DB, 'social.dexpaid', { status: 'posted', at: 4 });
+  await setSetting(env.DB, 'launch.announced', { mint: 'M' });
+  const r = await (await adminResetPosts({ request: req('/api/admin/reset-posts', { body: {} }), env })).json();
+  assert.equal(r.deleted, 4);
+  assert.equal(await getSetting(env.DB, 'team.lock', null), null);
+  assert.ok(await getSetting(env.DB, 'social.dexpaid', null), 'automatic posts keep their state');
+  assert.ok(await getSetting(env.DB, 'launch.announced', null), 'the launch announcement is never posted twice');
+  assert.equal((await adminResetPosts({ request: req('/api/admin/reset-posts', { key: 'wrong-key-1234567890', body: {} }), env })).status, 401);
+});

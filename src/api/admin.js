@@ -329,3 +329,14 @@ export const adminPost = guarded(async ({ request, env }) => {
   await setSetting(env.DB, `social.${tag}.manual.${Date.now()}`, { status: out.telegram || out.x ? 'posted' : 'failed', at: Date.now(), ...out });
   return json({ ...out, xText: post.x });
 });
+
+// POST /api/admin/reset-posts : efface l'historique des posts faits à la main depuis l'admin (les
+// essais), et un lock de test. Ne touche jamais aux posts automatiques (l'annonce de $WICK, le DEX
+// payé, les paliers) : leur état empêche qu'ils repartent deux fois.
+export const adminResetPosts = guarded(async ({ env }) => {
+  const db = env.DB;
+  const { meta } = await db.prepare(
+    "DELETE FROM settings WHERE k LIKE 'social.%.manual.%' OR k LIKE 'social.library.%' OR k LIKE 'social.relay.%' OR k = 'team.lock'",
+  ).run();
+  return json({ deleted: meta?.changes ?? 0 });
+});

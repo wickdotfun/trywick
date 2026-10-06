@@ -1,6 +1,6 @@
 // Point d'entrée du Worker Cloudflare. Les fichiers de public/ (le site) sont
 // servis directement ; tout le reste arrive ici, et seules les routes /api existent.
-import { adminPause, adminPost, adminRun, adminSelfTest, adminSocial, adminStatus, recordRun } from './api/admin.js';
+import { adminPause, adminPost, adminResetPosts, adminRun, adminSelfTest, adminSocial, adminStatus, recordRun } from './api/admin.js';
 import { candles, coin } from './api/candles.js';
 import { crew } from './api/crew.js';
 import { proof, proofCsv } from './api/proof.js';
@@ -65,6 +65,7 @@ const ROUTES = {
   'POST /api/admin/selftest': adminSelfTest,
   'GET /api/admin/social': adminSocial,
   'POST /api/admin/post': adminPost,
+  'POST /api/admin/reset-posts': adminResetPosts,
 };
 
 export default {

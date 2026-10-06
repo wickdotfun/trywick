@@ -264,8 +264,8 @@ function renderHeroAgent() {
         <span class="ha-head">${avatar(t, 44)}<span><b>Agent of $${esc(t.symbol)}</b><small>${k?.logo ? `${aiLogo(k, 12)} ${esc(k.model || '')} · ` : ''}${esc(k?.label || '')}</small></span><span class="ha-live"><i></i>live</span></span>
         <span class="ha-line">“${esc(t.line)}”</span>
         <span class="ha-foot"><time data-at="${t.at}">${ago(t.at)}</time><span>See its journal →</span></span></a>`
-    : `<div><span class="ha-head"><span class="ha-ph">${icon('keeper')}</span><span><b>Agent of $YOURCOIN</b><small>Llama 3.3 70B · Stoic</small></span><span class="ha-live ex">example</span></span>
-        <span class="ha-line">“Fees came in overnight. I bought back 2.1M and burned them. The candle is a little shorter.”</span>
+    : `<div><span class="ha-head"><span class="ha-ph">${icon('keeper')}</span><span><b>Agent of $YOURCOIN</b><small>Claude Sonnet · Analyst</small></span><span class="ha-live ex">example</span></span>
+        <span class="ha-line">“Fees came in overnight. I bought back 2.1M $YOURCOIN and burned them: 0.4% of the supply, gone. Receipt on Solscan.”</span>
         <span class="ha-foot"><span>Every word, every burn: public</span></span></div>`;
 }
 

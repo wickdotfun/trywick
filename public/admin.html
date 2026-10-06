@@ -94,6 +94,7 @@
     .soc .b b { font-size: 13px; } .soc .b small { color: var(--muted); font-size: 11.5px; }
     .soc .row .btn { height: 28px; padding: 0 9px; font-size: 12px; border-radius: 8px; }
     .lib .soc-grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+    .lib .soc video { display: block; width: 100%; aspect-ratio: 16 / 9; background: #070403; }
     .lib h3 { margin: 18px 0 0; font-size: 13px; color: var(--gold); letter-spacing: .02em; }
     .lib h3 { display: flex; align-items: center; gap: 10px; margin-top: 26px; } .lib h3 small { color: var(--dim); font-weight: 400; font-size: 12px; }
     .lib .ph { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--gold); color: #1d1003; font-size: 13px; font-weight: 800; }
@@ -189,7 +190,7 @@
             <h3>Le soir du lancement, dans l'ordre</h3>
             <ol>
               <li><b>Test everything</b> (plus bas) : pas de rouge. L'orange n'empêche rien.</li>
-              <li><b>OpenRouter</b> : crée une clé sur openrouter.ai (Keys), mets quelques $ de crédits (Credits), puis ajoute <b>OPENROUTER_API_KEY</b> (Secret) dans Cloudflare. C'est ce qui ouvre « Any model » au lancement.</li>
+              <li><b>OpenRouter</b> (gratuit, rien à avancer) : crée un compte et une clé sur openrouter.ai (Keys), puis ajoute <b>OPENROUTER_API_KEY</b> (Secret) dans Cloudflare. Ça ouvre « Any model » et le fuel au lancement. Pas besoin de crédits : tant qu'il n'y en a pas, les agents tournent sur les IA gratuites, et le fuel des créateurs s'accumule sur ton wallet. Ensuite seulement, tu convertis ce fuel en crédits (Credits) : ce sont les créateurs qui paient, jamais toi.</li>
               <li>Ouvre Phantom sur le <b>dev wallet</b> <span class="mono" id="g-dev2"></span>. Garde au moins <b>0,05 SOL</b> à côté du dev buy (frais + le lock).</li>
               <li>Sur <b>pump.fun</b> → Create coin : nom <b>WICK</b>, ticker exactement <b id="g-tk">WICK</b>, ton logo, ta description, tes liens (X, Telegram, trywick.fun). Choisis ton dev buy, puis lance.</li>
               <li><b>Dans la minute</b>, tout seul : le site détecte $WICK et passe en live, l'annonce part sur Telegram avec le CA et elle est épinglée. Regarde « Launch day » juste en dessous.</li>
@@ -224,7 +225,7 @@
       </div>
 
       <div class="card lib" id="library">
-        <h2>Posts prêts à publier <small>l'image et le texte sont prêts : un clic, et c'est sur X et Telegram</small></h2>
+        <h2>Posts prêts à publier <span class="row" style="gap:10px"><small>l'image et le texte sont prêts : un clic, et c'est sur X et Telegram</small><button class="btn small" id="posts-reset" type="button">Remettre à zéro</button></span></h2>
         <p class="lib-how"><b>Post on X + Telegram</b> fait trois choses d'un coup : il <b>copie l'image</b>, il <b>ouvre X avec le texte</b>, et il <b>envoie le post dans ton canal Telegram</b>.
           Sur X, appuie juste sur <b>Ctrl+V</b> (Cmd+V sur Mac) pour coller l'image, puis sur <b>Post</b>. Sur téléphone : <b>Image</b> pour l'enregistrer, puis ajoute-la dans X.
           Tu peux modifier le texte avant de cliquer. Les posts « après le lancement » ajoutent le CA tout seuls dès que $WICK est en ligne.</p>
@@ -371,8 +372,8 @@
           : 'On Streamflow (app.streamflow.finance → Token Lock), from the dev wallet. Then fill in card #8 "Tokens locked" in the posts below: one click posts it on X and Telegram and shows it on the Proof page.',
         mint && !c.lock ? '<a class="btn small" href="#post-lock">Fill it in</a>' : '');
       add(c.openrouter ? 'done' : 'todo', 'Any model for the agents (OpenRouter)',
-        c.openrouter ? 'OPENROUTER_API_KEY is set: creators can pick any model and add fuel at launch. Check the credits in Test everything, and top them up with the SOL the agents receive.'
-          : 'Optional but what makes WICK special: create a key on openrouter.ai (Keys), put a few $ of credits (Credits), and add OPENROUTER_API_KEY (Secret) in Cloudflare. Without it, agents use the free minds.');
+        c.openrouter ? 'OPENROUTER_API_KEY is set: creators can pick any model and add fuel at launch. When fuel comes in, turn it into OpenRouter credits: the creators pay, never you.'
+          : 'Free, nothing to pay up front: create a key on openrouter.ai (Keys) and add OPENROUTER_API_KEY (Secret) in Cloudflare. No credits needed to start: agents use the free minds until you top up with the fuel creators paid.');
       add(c.xPosts ? 'done' : '', 'X posts',
         c.xPosts ? 'Every new coin and every big moment are posted on X by themselves.'
           : 'Not automatic: X charges per post (add X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET in Cloudflare to switch it on). Until then, every coin has a "Post on X" button in Latest launches, text already written.');
@@ -655,11 +656,15 @@
     let libN = 0;
 
     // Une carte. key : son nom (brouillon, état) ; body : ce que le serveur poste sur Telegram.
-    function postCard({ key, file, img, label, slot, when, text, body, done = '', extra = '', locked = '' }) {
+    function postCard({ key, file, img, video, label, slot, when, text, body, done = '', extra = '', locked = '' }) {
       const draft = getDraft(key);
       const value = withCA(draft ?? text ?? '');
-      return `<div class="soc" id="post-${esc(key)}" data-key="${esc(key)}" data-file="${esc(file || '')}" data-body="${esc(JSON.stringify(body || {}))}" data-orig="${esc(withCA(text || ''))}">
-        <img src="${esc(img || `/cards/${file}`)}" alt="" loading="lazy"><div class="b">
+      // Une vidéo : le lecteur (avec son image), et « Video » pour la télécharger.
+      const media = video
+        ? `<video src="/cards/${esc(video)}" poster="${esc(img || `/cards/${file}`)}" controls preload="none" playsinline></video>`
+        : `<img src="${esc(img || `/cards/${file}`)}" alt="" loading="lazy">`;
+      return `<div class="soc" id="post-${esc(key)}" data-key="${esc(key)}" data-file="${esc(file || '')}" data-video="${esc(video || '')}" data-body="${esc(JSON.stringify(body || {}))}" data-orig="${esc(withCA(text || ''))}">
+        ${media}<div class="b">
         ${slot ? `<span class="slot">#${++libN} <i>·</i> ${esc(slot)}</span>` : ''}
         <b>${esc(label)}</b><span class="when">${when}</span>
         ${extra}
@@ -667,7 +672,7 @@
         <span class="row" style="justify-content:space-between"><span class="done">${done}</span>${draft != null ? '<button class="linkbtn" data-act="reset">↺ texte d\'origine</button>' : ''}</span>
         <div class="row">
           ${locked ? `<span class="dim small">${locked}</span>` : `<button class="btn both" data-act="both">Post on X + Telegram</button><button class="btn" data-act="x">X only</button><button class="btn" data-act="tg">Telegram only</button>`}
-          <a class="btn" data-act="img" href="${esc(img || `/cards/${file}`)}" download="wick-${esc(key)}.png">Image</a>
+          ${video ? `<a class="btn" data-act="img" href="/cards/${esc(video)}" download="wick-intro.mp4">Video</a>` : `<a class="btn" data-act="img" href="${esc(img || `/cards/${file}`)}" download="wick-${esc(key)}.png">Image</a>`}
         </div></div></div>`;
     }
     const posted = (p, auto) => (p ? `✓ Posté ${ago(p.at)}${p.telegram ? ' sur Telegram' : ''}${auto ? ' (tout seul)' : ''}` : '');
@@ -675,7 +680,7 @@
     function renderPosts() {
       const s = soc, L = s.library || [], T = s.ticker;
       libN = 0;
-      const lib = (p) => postCard({ key: p.id, file: p.file, label: p.label, slot: p.slot, when: p.when, text: p.text, body: { kind: 'library', id: p.id }, done: posted(lastPost(`library.${p.id}.`)) });
+      const lib = (p) => postCard({ key: p.id, file: p.file, video: p.video, label: p.label, slot: p.slot, when: p.when, text: p.text, body: { kind: 'library', id: p.id }, done: posted(lastPost(`library.${p.id}.`)) });
       $('lib-before').innerHTML = L.filter((p) => p.phase === 'before').map(lib).join('');
 
       // 2. Le lancement : le CA, puis le lock.
@@ -736,14 +741,17 @@
       const text = card.querySelector('textarea').value.trim();
       if (text.includes('[CA]')) { flash('Le CA n\'existe pas encore : ce post sera prêt dès que $WICK sera lancé.', 'bad'); return; }
       if (/\[(montant|date|lien)/.test(text)) { flash('Remplace d\'abord les [crochets] du texte par tes vrais chiffres.', 'bad'); return; }
-      const src = card.querySelector('img').src;
+      const video = card.dataset.video;
+      const src = card.querySelector('img')?.src;
       let copied = false;
       if (act !== 'tg') {
-        const copying = copyImage(src);
+        // Une vidéo ne se colle pas : elle se télécharge, puis on l'ajoute dans X.
+        const copying = video ? Promise.resolve(false) : copyImage(src);
         window.open(xIntent(text), '_blank', 'noopener');
+        if (video) { const a = document.createElement('a'); a.href = `/cards/${video}`; a.download = 'wick-intro.mp4'; document.body.appendChild(a); a.click(); a.remove(); }
         copied = await copying;
       }
-      const onX = copied ? 'Sur X : Ctrl+V pour coller l\'image, puis Post.' : 'Sur X : ajoute l\'image (bouton Image), puis Post.';
+      const onX = video ? 'Sur X : la vidéo est téléchargée, ajoute-la (icône image), puis Post. Épingle le post.' : copied ? 'Sur X : Ctrl+V pour coller l\'image, puis Post.' : 'Sur X : ajoute l\'image (bouton Image), puis Post.';
       if (act === 'x') { flash(`X est ouvert avec le texte. ${onX}`, 'ok'); return; }
       if (!soc.telegram) { flash('Telegram n\'est pas connecté (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID).', 'bad'); return; }
       if ((key === 'live' || key === 'dexpaid' || key.startsWith('mcap-')) && card.querySelector('.done').textContent.includes('tout seul')
@@ -789,6 +797,17 @@
         const r = await call('/api/admin/post', { kind: 'relay', url: f.url, note: f.note });
         if (r.telegram) { flash('Relayé sur Telegram.', 'ok'); e.target.reset(); } else flash(`Telegram a refusé : ${r.telegramError || 'erreur'}`, 'bad');
       } catch (err) { flash(err.message === 'bad_url' ? 'Ce lien n\'est pas un post X (https://x.com/compte/status/123…).' : err.message, 'bad'); }
+    });
+    // Remettre à zéro : l'historique des posts d'essai (et un lock de test), et les textes modifiés.
+    $('posts-reset').addEventListener('click', async () => {
+      if (!confirm('Remettre à zéro les posts ?\n\nEfface les « Posté il y a… » de tes essais, un lock de test (il disparaît aussi de la page Proof), et tes textes modifiés dans ce navigateur.\nNe touche pas aux messages déjà envoyés sur Telegram (supprime-les toi-même dans le canal), ni aux posts automatiques.')) return;
+      try {
+        const r = await call('/api/admin/reset-posts', {});
+        try { Object.keys(localStorage).filter((k) => k.startsWith('wick.draft.')).forEach((k) => localStorage.removeItem(k)); } catch { /* pas de brouillons */ }
+        delete blobs.lock;
+        flash(`Remis à zéro (${r.deleted} entrée${r.deleted === 1 ? '' : 's'} effacée${r.deleted === 1 ? '' : 's'}). Tout est propre.`, 'ok');
+        loadSocial();
+      } catch (err) { flash(err.message, 'bad'); }
     });
     async function loadSocial() {
       try { soc = await call('/api/admin/social'); renderPosts(); } catch (err) { flash(`Posts : ${err.message}`, 'bad'); }

@@ -96,3 +96,20 @@ test('no fuel until the launch fee is paid, and a daily safety cap for the whole
   assert.equal(await orThink({ DB, OPENROUTER_API_KEY: 'k' }, { mint: 'MintOR' }, { system: 's', prompt: 'p', maxTokens: 100, temperature: 0.5, now: NOW }), null);
   assert.equal(called, false, '$3 spent today: nothing more until tomorrow');
 });
+
+test('no credits on the account: the agent answers on a free mind, its budget stays whole, and OpenRouter rests 15 minutes', async () => {
+  const DB = await world();
+  await coin(DB);
+  let orCalls = 0;
+  globalThis.fetch = async (url) => {
+    if (String(url).includes('openrouter.ai')) { orCalls++; return Response.json({ error: { message: 'Insufficient credits' } }, { status: 402 }); }
+    return Response.json({});
+  };
+  const env = { DB, OPENROUTER_API_KEY: 'sk-or', AI: { run: async () => ({ response: 'free mind' }) } };
+  const a = await thinkWith(env, { model: 'gpt-oss', system: 's', prompt: 'p', now: NOW, coin: { mint: 'MintOR' } });
+  assert.equal(a.text, 'free mind');
+  const b = await thinkWith(env, { model: 'gpt-oss', system: 's', prompt: 'p', now: NOW + 60_000, coin: { mint: 'MintOR' } });
+  assert.equal(b.text, 'free mind');
+  assert.equal(orCalls, 1, 'paused after the first 402');
+  assert.equal((await DB.prepare("SELECT mind_spent FROM matches WHERE mint = 'MintOR'").first()).mind_spent, 0, 'nothing charged to the coin');
+});

@@ -242,7 +242,7 @@ export const adminSocial = guarded(async ({ env }) => {
   return json({
     ...status, mint, ticker, supply: CONFIG.pumpSupply,
     // La bibliothèque de posts : la carte, le texte prêt (avec le CA une fois $WICK lancé).
-    library: LIBRARY.map((p) => ({ id: p.id, slot: p.slot, phase: p.phase, label: p.label, when: p.when, file: libraryFile(p.id), text: libraryText(p, { ticker, site, mint }) })),
+    library: LIBRARY.map((p) => ({ id: p.id, video: p.video || null, slot: p.slot, phase: p.phase, label: p.label, when: p.when, file: libraryFile(p.id), text: libraryText(p, { ticker, site, mint }) })),
     texts: {
       // Avant le lancement, [CA] tient la place de l'adresse (l'admin la remplace dès qu'elle existe).
       live: announceText(mint || '[CA]', { ticker, site }).replace(/<\/?code>/g, ''),
@@ -281,7 +281,9 @@ export const adminPost = guarded(async ({ request, env }) => {
     const p = libraryPost(body.id);
     if (!p) return json({ error: 'bad_post' }, 400);
     const text = libraryText(p, { ticker, site, mint });
-    post = { image: await cardBytes(env, libraryFile(p.id)), caption: esc(text), x: text, mint };
+    post = p.video
+      ? { video: await cardBytes(env, p.video), caption: esc(text), x: text, mint }
+      : { image: await cardBytes(env, libraryFile(p.id)), caption: esc(text), x: text, mint };
   } else if (kind === 'relay') {
     // Un post X publié à la main : relayé dans le canal Telegram (son lien, avec l'aperçu de X).
     const url = String(body.url || '').trim().replace('twitter.com/', 'x.com/').split('?')[0];
@@ -328,4 +330,15 @@ export const adminPost = guarded(async ({ request, env }) => {
   const out = await publish(e, `${tag}.manual.${Date.now()}`, post, { once: false });
   await setSetting(env.DB, `social.${tag}.manual.${Date.now()}`, { status: out.telegram || out.x ? 'posted' : 'failed', at: Date.now(), ...out });
   return json({ ...out, xText: post.x });
+});
+
+// POST /api/admin/reset-posts : efface l'historique des posts faits à la main depuis l'admin (les
+// essais), et un lock de test. Ne touche jamais aux posts automatiques (l'annonce de $WICK, le DEX
+// payé, les paliers) : leur état empêche qu'ils repartent deux fois.
+export const adminResetPosts = guarded(async ({ env }) => {
+  const db = env.DB;
+  const { meta } = await db.prepare(
+    "DELETE FROM settings WHERE k LIKE 'social.%.manual.%' OR k LIKE 'social.library.%' OR k LIKE 'social.relay.%' OR k = 'team.lock'",
+  ).run();
+  return json({ deleted: meta?.changes ?? 0 });
 });

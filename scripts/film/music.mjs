@@ -1,7 +1,7 @@
-// Une petite musique d'ambiance pour le film (49,5 s) : des nappes chaudes, une basse douce, un
+// Une petite musique d'ambiance pour le film (47 s) : des nappes chaudes, une basse douce, un
 // arpège léger, un battement feutré, une montée et un impact à la fin. Tout est synthétisé ici.
 import { writeFileSync } from 'node:fs';
-const SR = 44100, DUR = 49.5, N = Math.floor(SR * DUR);
+const SR = 44100, DUR = 47, N = Math.floor(SR * DUR);
 const L = new Float32Array(N), R = new Float32Array(N);
 const BPM = 96, BEAT = 60 / BPM, BAR = BEAT * 4;
 const hz = (m) => 440 * 2 ** ((m - 69) / 12);
@@ -32,15 +32,15 @@ for (let i = 0; i < 4.8 * SR; i++) {
   add(i, v, v * 0.8);
 }
 // 3. La basse (à partir de 4,2 s), la fondamentale une octave en dessous.
-for (let i = Math.floor(4.2 * SR); i < Math.floor(48.5 * SR); i++) {
+for (let i = Math.floor(4.2 * SR); i < Math.floor(46 * SR); i++) {
   const t = i / SR, m = chordAt(t)[0] - 12, tb = (t % BAR);
   const v = Math.sin(2 * Math.PI * hz(m) * t) * env(tb, 0.05, 1.6) * 0.07;
   add(i, v, v);
 }
-// 4. Le battement feutré (9,2–39,6 s) et un léger charleston (16–36 s).
+// 4. Le battement feutré (8,4–37,4 s) et un léger charleston (15–33,6 s).
 for (let k = 0; k * BEAT < DUR; k++) {
   const t0 = k * BEAT;
-  if (t0 >= 9.2 && t0 < 39.6) {
+  if (t0 >= 8.4 && t0 < 37.4) {
     for (let j = 0; j < 0.35 * SR; j++) {
       const t = j / SR, f = 50 + 70 * Math.exp(-t * 30);
       const v = Math.sin(2 * Math.PI * f * t) * Math.exp(-t * 9) * 0.16;
@@ -48,17 +48,17 @@ for (let k = 0; k * BEAT < DUR; k++) {
     }
   }
   const th = t0 + BEAT / 2;
-  if (th >= 16 && th < 36) {
+  if (th >= 15 && th < 33.6) {
     for (let j = 0; j < 0.06 * SR; j++) {
       const v = (Math.random() * 2 - 1) * Math.exp(-j / SR * 70) * 0.012;
       add(Math.floor(th * SR) + j, v * 0.7, v);
     }
   }
 }
-// 5. L'arpège (9,2–39,6 s) : les notes de l'accord, en croches, une octave au-dessus.
+// 5. L'arpège (8,4–37,4 s) : les notes de l'accord, en croches, une octave au-dessus.
 for (let k = 0; k * BEAT / 2 < DUR; k++) {
   const t0 = k * BEAT / 2;
-  if (t0 < 9.2 || t0 >= 39.6) continue;
+  if (t0 < 8.4 || t0 >= 37.4) continue;
   const notes = chordAt(t0), m = notes[[0, 2, 1, 3, 2, 1, 3, 2][k % 8]] + 12, f = hz(m);
   const pan = k % 2 ? 0.7 : 1;
   for (let j = 0; j < 0.9 * SR; j++) {
@@ -67,10 +67,10 @@ for (let k = 0; k * BEAT / 2 < DUR; k++) {
     add(Math.floor(t0 * SR) + j, v * pan, v * (1.7 - pan));
   }
 }
-// 6. La montée (39,8–43 s) puis l'impact (43 s) sur la fin.
+// 6. La montée (37,6–40,6 s) puis l'impact (40,6 s) sur la fin.
 let lp = 0;
-for (let i = Math.floor(39.8 * SR); i < Math.floor(43 * SR); i++) {
-  const t = i / SR - 39.8, a = (t / 3.2) ** 2;
+for (let i = Math.floor(37.6 * SR); i < Math.floor(40.6 * SR); i++) {
+  const t = i / SR - 37.6, a = (t / 3) ** 2;
   lp += (Math.random() * 2 - 1 - lp) * (0.02 + 0.3 * a);
   const v = lp * a * 0.09 + Math.sin(2 * Math.PI * (200 + 600 * a) * t) * a * 0.012;
   add(i, v, v);
@@ -78,10 +78,10 @@ for (let i = Math.floor(39.8 * SR); i < Math.floor(43 * SR); i++) {
 for (let j = 0; j < 3 * SR; j++) {
   const t = j / SR, f = 40 + 60 * Math.exp(-t * 12);
   const v = Math.sin(2 * Math.PI * f * t) * Math.exp(-t * 2.2) * 0.13 + (Math.random() * 2 - 1) * Math.exp(-t * 14) * 0.05;
-  add(Math.floor(43 * SR) + j, v, v);
+  add(Math.floor(40.6 * SR) + j, v, v);
 }
 // 7. Un souffle doux à chaque changement de scène.
-for (const c of [9.4, 16.2, 24.2, 30.2, 35.8]) {
+for (const c of [8.4, 15.2, 23.2, 28.4, 33.6]) {
   let lp2 = 0;
   for (let j = 0; j < 1.2 * SR; j++) {
     const t = j / SR - 0.6, a = Math.exp(-(t * t) / 0.06);

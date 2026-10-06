@@ -159,6 +159,9 @@ function renderStats() {
   $('st-burned').textContent = t.burned ? compact(t.burned) : '0';
   $('st-sol').textContent = (t.sol || 0).toLocaleString('en-US', { maximumFractionDigits: t.sol >= 10 ? 1 : 3 });
   $('st-launches').textContent = fmt(t.launches ?? world.total ?? 0);
+  // La bande de chiffres de l'accueil.
+  if ($('hs-coins')) $('hs-coins').textContent = fmt(t.launches ?? world.total ?? 0);
+  if ($('hs-burned')) $('hs-burned').textContent = t.burned ? compact(t.burned) : '0';
 }
 
 // Le fil : chaque lancement (et son Ignition Fee ajoutée au feu), chaque burn, le buyback en cours.
@@ -230,7 +233,31 @@ function agentCard(m) {
       ${m.candle ? `<span class="tag burn">burns ${m.candle.bps / 100}%</span>` : ''}<time data-at="${m.at}">${ago(m.at)}</time></span>
   </a>`;
 }
+// L'accueil vivant : l'orbite suit un peu la souris, les sections apparaissent au défilement.
+let homeFx = false;
+function homeEffects() {
+  if (homeFx) return;
+  homeFx = true;
+  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const art = document.querySelector('.h-hero-art');
+  const orbit = document.querySelector('.h-orbit');
+  if (art && orbit && !calm && matchMedia('(pointer: fine)').matches) {
+    art.addEventListener('pointermove', (e) => {
+      const r = art.getBoundingClientRect();
+      orbit.style.setProperty('--ry', `${((e.clientX - r.left) / r.width - 0.5) * 14}deg`);
+      orbit.style.setProperty('--rx', `${((e.clientY - r.top) / r.height - 0.5) * -14}deg`);
+    });
+    art.addEventListener('pointerleave', () => { orbit.style.setProperty('--rx', '0deg'); orbit.style.setProperty('--ry', '0deg'); });
+  }
+  const items = document.querySelectorAll('.reveal');
+  if (calm || !('IntersectionObserver' in window)) { items.forEach((el) => el.classList.add('in')); return; }
+  const io = new IntersectionObserver((entries) => entries.forEach((en) => {
+    if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); }
+  }), { rootMargin: '0px 0px -8% 0px' });
+  items.forEach((el) => io.observe(el));
+}
 function renderHome() {
+  homeEffects();
   const coins = world.recent.slice().reverse().slice(0, 6);
   const live = $('feed');
   if (live) {
@@ -241,12 +268,15 @@ function renderHome() {
   const minds = $('h-minds');
   if (minds && world.launch?.keepers && !minds.dataset.done) {
     minds.dataset.done = '1';
-    minds.innerHTML = world.launch.keepers.models.map((m) => `<span class="h-mind">${aiLogo(m, 22)}<b>${esc(m.by)}</b><small>${esc(m.name)} · free</small></span>`).join('');
+    // Un défilé sans fin : la liste, deux fois (la seconde cachée aux lecteurs d'écran).
+    const loop = (html) => { minds.innerHTML = `${html}<span class="h-track-dup" aria-hidden="true">${html}</span>`; };
+    loop(world.launch.keepers.models.map((m) => `<span class="h-mind">${aiLogo(m, 22)}<b>${esc(m.by)}</b><small>${esc(m.name)} · free</small></span>`).join(''));
     loadModels().then((d) => {
       if (!d.models.length) return;
-      const labs = labCounts(d.models).filter((l) => l.logo).slice(0, 10);
-      minds.innerHTML = labs.map((l) => `<a class="h-mind" href="#models" data-go="models">${aiLogo({ logo: l.logo, by: l.name }, 22)}<b>${esc(l.name)}</b><small>${l.n} model${l.n === 1 ? "" : "s"}</small></a>`).join('');
+      const labs = labCounts(d.models).filter((l) => l.logo);
+      loop(labs.map((l) => `<a class="h-mind" href="#models">${aiLogo({ logo: l.logo, by: l.name }, 22)}<b>${esc(l.name)}</b><small>${l.n} model${l.n === 1 ? '' : 's'}</small></a>`).join(''));
       $('h-minds-sub').textContent = `${d.models.length} models from every big AI lab, paid by your coin's own fees. Or a free one.`;
+      if ($('hs-models')) $('hs-models').textContent = String(d.models.length);
     }).catch(() => {});
   }
   renderHeroAgent();

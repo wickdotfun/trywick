@@ -1759,7 +1759,6 @@ body.home::after {
 .h-trust { list-style: none; margin: 26px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 22px; }
 .h-trust li { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--muted); }
 .h-trust .ico { width: 16px; height: 16px; fill: none; stroke: #3ddc84; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
-.home #strike-btn { box-shadow: 0 10px 40px rgba(255, 160, 40, .35), 0 0 0 1px rgba(255, 230, 170, .5) inset; }
 .h-ghost { border-color: var(--line-2); background: rgba(255, 220, 180, .04); }
 .h-ghost:hover { border-color: var(--gold-line); background: rgba(255, 220, 180, .08); }
 
@@ -1810,3 +1809,78 @@ body.home::after {
   .h-agent { position: relative; right: auto; bottom: auto; transform: none; margin-top: -40px; }
 }
 @media (max-width: 520px) { .h-sat { width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 12px; } .h-sat img { width: 20px; height: 20px; } .h-chip { display: none; } }
+
+/* ======================================================================
+   L'accueil, version 3 : le bouton, les braises, la profondeur, les chiffres.
+   ====================================================================== */
+/* Le bouton « Launch a coin » : de l'or poli, un reflet qui passe, une flèche dans un sceau sombre. */
+.cta.cta-x { height: 62px; padding: 0 8px 0 30px; gap: 18px; font-size: 17px; font-weight: 700; letter-spacing: -.015em; text-transform: none;
+  overflow: hidden; isolation: isolate;
+  background: linear-gradient(180deg, #fff3cf 0%, #ffd56e 30%, #f2ae3a 62%, #d98b1f 100%);
+  box-shadow: 0 0 0 1px rgba(255, 246, 220, .75) inset, 0 -3px 0 rgba(140, 80, 15, .35) inset, 0 18px 50px -10px rgba(255, 150, 30, .7), 0 0 0 6px rgba(255, 190, 80, .08);
+  animation: cx-glow 3.2s ease-in-out infinite; }
+.cta.cta-x::after { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, .65) 46%, transparent 62%); transform: translateX(-120%); animation: cx-shine 4.5s ease-in-out infinite; }
+.cx-label { position: relative; }
+.cx-arrow { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; flex: none; background: #1d1003;
+  box-shadow: 0 0 0 1px rgba(255, 210, 120, .25) inset, 0 4px 12px rgba(60, 25, 0, .4); transition: transform .25s cubic-bezier(.2, .8, .2, 1); }
+.cx-arrow svg { width: 20px; height: 20px; fill: none; stroke: #ffd36a; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; transition: transform .25s cubic-bezier(.2, .8, .2, 1); }
+.cta.cta-x:hover { transform: translateY(-2px); box-shadow: 0 0 0 1px rgba(255, 246, 220, .85) inset, 0 -3px 0 rgba(140, 80, 15, .35) inset, 0 24px 60px -10px rgba(255, 150, 30, .85), 0 0 0 8px rgba(255, 190, 80, .12); }
+.cta.cta-x:hover .cx-arrow { transform: scale(1.06); }
+.cta.cta-x:hover .cx-arrow svg { transform: translateX(3px); }
+@keyframes cx-shine { 0%, 55% { transform: translateX(-120%); } 85%, 100% { transform: translateX(120%); } }
+@keyframes cx-glow { 0%, 100% { box-shadow: 0 0 0 1px rgba(255, 246, 220, .75) inset, 0 -3px 0 rgba(140, 80, 15, .35) inset, 0 18px 50px -10px rgba(255, 150, 30, .7), 0 0 0 6px rgba(255, 190, 80, .08); }
+  50% { box-shadow: 0 0 0 1px rgba(255, 246, 220, .75) inset, 0 -3px 0 rgba(140, 80, 15, .35) inset, 0 20px 60px -8px rgba(255, 150, 30, .85), 0 0 0 9px rgba(255, 190, 80, .05); } }
+.h-ghost { height: 62px; padding: 0 26px; }
+.h-final .cta.cta-x { height: 62px; }
+
+/* L'orbite en relief : elle suit un peu la souris. */
+.h-hero-art { perspective: 1200px; }
+.h-orbit { transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); transform-style: preserve-3d; transition: transform .6s cubic-bezier(.2, .8, .2, 1); }
+.h-core { transform: translateZ(40px); }
+/* Les braises : de petites étincelles qui montent du W. */
+.h-embers { position: absolute; left: 50%; top: 50%; width: 0; height: 0; z-index: 3; pointer-events: none; }
+.h-embers i { position: absolute; left: var(--x); top: 40px; width: var(--s); height: var(--s); border-radius: 50%;
+  background: radial-gradient(circle, #fff3c4, #ffb347 55%, rgba(255, 120, 20, 0) 75%); box-shadow: 0 0 10px #ff9a2e;
+  opacity: 0; animation: h-ember var(--d) ease-out var(--t) infinite; }
+@keyframes h-ember { 0% { opacity: 0; transform: translate(0, 0) scale(1); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(calc(var(--x) * -.25), -220px) scale(.3); } }
+@media (prefers-reduced-motion: reduce) { .cta.cta-x, .cta.cta-x::after, .h-embers i { animation: none; } .h-embers { display: none; } }
+
+/* Les chiffres, en direct */
+.h-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 10px 0 0; border-radius: 22px; overflow: hidden;
+  border: 1px solid rgba(255, 200, 140, .14); background: linear-gradient(180deg, rgba(255, 220, 180, .05), rgba(255, 220, 180, .015)); }
+.h-stats > div { display: flex; flex-direction: column; gap: 4px; padding: 22px 24px; border-left: 1px solid rgba(255, 200, 140, .1); }
+.h-stats > div:first-child { border-left: 0; }
+.h-stats b { font-size: clamp(26px, 3vw, 36px); font-weight: 750; letter-spacing: -.04em; line-height: 1;
+  background: var(--gold-sheen); background-size: 220% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; }
+.h-stats span { font-size: 13px; color: var(--muted); }
+
+/* Les titres de section : un petit repère, comme un sommaire */
+.h-kicker { display: inline-block; margin-bottom: 10px; font: 600 11.5px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--gold); opacity: .85; }
+.h-sec-head > div { display: flex; flex-direction: column; }
+
+/* Les 3 étapes : une icône, un grand numéro en filigrane */
+.h-steps li { position: relative; overflow: hidden; }
+.h-steps .h-n { width: 44px; height: 44px; border-radius: 13px; }
+.h-steps .h-n svg { width: 22px; height: 22px; fill: none; stroke: #1d1003; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.h-num { position: absolute; right: 18px; top: 8px; font: 800 64px/1 var(--sans); letter-spacing: -.06em; font-style: normal; color: rgba(255, 210, 150, .06); }
+
+/* Les labos d'IA : un défilé sans fin */
+.h-marquee { position: relative; overflow: hidden; padding: 4px 0; -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+.h-track { display: flex; flex-wrap: nowrap; gap: 10px; width: max-content; animation: h-marquee 40s linear infinite; }
+.h-track-dup { display: contents; }
+.h-marquee:hover .h-track { animation-play-state: paused; }
+.h-track .h-mind { flex: none; }
+@keyframes h-marquee { to { transform: translateX(calc(-50% - 5px)); } }
+@media (prefers-reduced-motion: reduce) { .h-track { animation: none; flex-wrap: wrap; width: auto; } .h-track-dup { display: none; } }
+
+/* L'apparition au défilement */
+.reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s cubic-bezier(.2, .8, .2, 1); }
+.reveal.in { opacity: 1; transform: none; }
+.h-steps li.reveal:nth-child(2) { transition-delay: .08s; } .h-steps li.reveal:nth-child(3) { transition-delay: .16s; }
+
+@media (max-width: 900px) { .h-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .h-stats > div:nth-child(3) { border-left: 0; } .h-stats > div:nth-child(n+3) { border-top: 1px solid rgba(255, 200, 140, .1); } }
+@media (max-width: 760px) { .cta.cta-x { justify-content: space-between; } }
+/* (l'id du bouton de l'accueil a ses anciennes règles : celles-ci passent devant) */
+.home #strike-btn.cta-x { height: 62px; padding: 0 8px 0 30px; font-size: 17px; font-weight: 700; letter-spacing: -.015em; text-transform: none; }
+@media (max-width: 760px) { .home #strike-btn.cta-x, .home .h-final .cta-x { justify-content: space-between; width: 100%; } }

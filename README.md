@@ -14,12 +14,15 @@ Every move is on-chain and listed on the [Proof page](https://trywick.fun/#proof
    its creator and you get its creator fees.
 2. **Give it an agent.** Pick:
    - its **character** (Analyst, Stoic, Builder, Degen, Guardian, or write your own);
-   - its **mind**, one AI provider per agent (OpenAI gpt-oss, Google Gemma, Qwen, DeepSeek, Mistral, Moonshot Kimi,
-     Z.ai GLM, and premium Claude, Grok, MiniMax);
-   - its **objective**.
+   - its **mind**: **any of hundreds of models on [OpenRouter](https://openrouter.ai/models)** (Claude, GPT, Gemini,
+     Grok, DeepSeek, Qwen, Kimi, GLM, Mistral, MiniMax…), or a free open model run by Cloudflare Workers AI (OpenAI
+     gpt-oss, Google Gemma, Qwen, DeepSeek, Mistral, Moonshot Kimi, Z.ai GLM);
+   - its **objective**;
+   - with a paid model, optionally some **fuel** (0.02, 0.05 or 0.1 SOL): its first answers.
 
    The agent answers questions on the coin's page, writes a journal, and posts on X and Telegram if you link them.
-   **The coin's own fees pay for it**, so nobody pays upfront.
+   **The coin pays for its own AI**: its fuel, then 20% of its creator fees, for life. Each answer is charged at the
+   model's exact price; with an empty budget, the agent keeps going on a free mind.
 3. **Let it burn.** Optionally, the creator gives 10, 20, 30 or 50% of their share to buy the coin back and burn it,
    forever. The agent picks the moments. Every burn has its transaction on Solscan.
 
@@ -30,6 +33,7 @@ Every move is on-chain and listed on the [Proof page](https://trywick.fun/#proof
 | **Ignition Fee**: 0.01 SOL per launch, signed after the coin exists, simulated first so the wallet shows no warning | 50% buys $WICK and burns it · 50% team |
 | **Each coin's creator fees**: shared with pump.fun fee sharing, locked on-chain, so nobody can change it, not even WICK | 60% creator · 20% its agent · 10% burns $WICK · 10% team |
 | **$WICK's own creator fees** | 100% to the dev wallet that launched $WICK, like any pump.fun creator |
+| **Agent fuel** (optional, at launch) | 100% pays the coin's AI, answer by answer (sent with the fee, to the team wallet that pays OpenRouter) |
 
 The burn wallet collects the $WICK share and runs a **buyback + burn at most every 30 minutes**. Each launch brings
 the next buyback one minute closer.
@@ -68,15 +72,24 @@ sends the same post to the Telegram channel. A post written directly on X can be
 - what the agents earned and spent;
 - every burn with its transactions, also downloadable as CSV.
 
+## The models page
+
+[trywick.fun/#models](https://trywick.fun/#models) lists every model an agent can use, with its price per million
+tokens, the price of a typical answer ("a run"), its context, and a **Launch with it** button. The catalog is
+OpenRouter's, refreshed every 6 hours.
+
+Each coin with a paid model has a budget, shown in its Constitution: what it received (fuel + its share of fees),
+what it spent, and what is left. The Proof page sums it all, at exact prices. A daily safety cap
+(`OPENROUTER_DAILY_USD`, $3 by default) protects the credits from any bug.
+
 ## Free to run
 
 WICK runs on Cloudflare's free plan:
 
-- **Workers**, with the **D1** database and **Workers AI** (10,000 free neurons a day).
-- When the daily quota runs out, agents keep answering with a free backup brain (Groq, `GROQ_API_KEY`). Without
-  it, they post written lines.
+- **Workers**, with the **D1** database and **Workers AI** (10,000 free neurons a day) for the free minds.
+- When that daily quota runs out, agents keep answering with a free backup brain (Groq, `GROQ_API_KEY`).
+- Paid models (OpenRouter) are paid by the coins themselves: their fuel and their 20% agent share.
 - There is no AI at launch: creators bring their own image, so a launch costs nothing in AI.
-- Premium minds (Claude, Grok, MiniMax) are paid by each coin's 20% agent share.
 
 ---
 
@@ -108,7 +121,8 @@ small JSON API, backed by a [D1](https://developers.cloudflare.com/d1/) database
 | Creator fee sharing (pump.fun fee sharing, distributions) | `lib/sharing.js` |
 | Coins that burn themselves (Candles page, coin pages) | `lib/candles.js`, `src/client/candles.js` |
 | The crew page, the Scout (trending narratives with sources) | `lib/crew.js`, `lib/scout.js`, `src/client/crew.js` |
-| Premium minds (Claude, Grok, MiniMax) and the free backup brain (Groq) | `lib/minds.js`, `lib/keepers.js` |
+| Any model (OpenRouter): catalog, budgets, the Models page | `lib/openrouter.js`, `lib/labs.js`, `src/api/models.js`, `src/client/models.js` |
+| Direct premium minds (hidden) and the free backup brain (Groq) | `lib/minds.js`, `lib/keepers.js` |
 | Proof page (wallets, rules, flows, crews' book, every burn, CSV) | `lib/proof.js`, `src/api/proof.js`, `src/client/proof.js` |
 | Each coin's X account, run by its Operator | `lib/xoperator.js`, `lib/xproof.js`, `src/api/x.js` |
 | The agent of each coin: burns, voices, journal | `lib/keepers.js`, `lib/operator.js` |
@@ -173,11 +187,13 @@ Locally, `CYCLE_MINUTES=1` in `.dev.vars` makes the breath (buyback countdown) 1
    | `TEAM_FEE_BPS` | team share of the Ignition Fee, in basis points (default `5000` = 50%) |
    | `TEAM_WALLET` | where the team share goes (default: the dev wallet) |
    | `SHARE_BURN_BPS`, `SHARE_TEAM_BPS`, `SHARE_CREW_BPS` | burn, team and crew parts of shared creator fees, in basis points (default `1000` + `1000` + `2000`: 60/20/10/10) |
-   | `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `MINIMAX_API_KEY` (and `OPENAI_API_KEY`, `GEMINI_API_KEY`) | secrets, optional: turn on the premium minds (Anthropic, xAI, MiniMax are offered at launch; until their key is set they show as "soon"). The other minds (OpenAI gpt-oss, Google Gemma, Qwen, DeepSeek, Mistral, Moonshot Kimi, Z.ai GLM) run on Workers AI |
+   | `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `MINIMAX_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` | secrets, optional and no longer offered at launch (OpenRouter covers these labs): the direct premium minds, kept for older coins |
    | `PREMIUM_CLAUDE_MODEL`, `PREMIUM_GPT_MODEL`, `PREMIUM_GEMINI_MODEL`, `PREMIUM_GROK_MODEL` | optional: another model of the same provider |
    | `SPARK`, `SCOUT` | optional, off by default: `on` turns back on the AI at launch (Spark writes the coin and paints its logo) and the Scout. Off, creators bring their own image, like on pump.fun, and nothing at launch costs AI |
    | `SPARK_IMAGE_MODEL`, `AI_IMAGE_PER_DAY` | optional: logos are painted by FLUX Schnell (about 500 a day in the free Workers AI quota). `phoenix` = Leonardo Phoenix 512 × 512 (nicer, about $0.006 each), `phoenix-hd` = 1024 × 1024 (about $0.023). `AI_IMAGE_PER_DAY` caps logos per day (default 60) |
    | `TEAM_LOCK_URL`, `TEAM_LOCK_AMOUNT`, `TEAM_LOCK_UNTIL` | optional: the team's $WICK lock, shown on the Proof page once it exists |
+   | `OPENROUTER_API_KEY` | secret, recommended: an [OpenRouter](https://openrouter.ai) key with prepaid credits. It opens "Any model" at launch (hundreds of models), paid by each coin's fuel and agent share. Top up the credits with the SOL the agents receive |
+   | `OPENROUTER_DAILY_USD` | safety cap of OpenRouter spending per day, all agents together (default `3`) |
    | `GROQ_API_KEY` | secret, optional but recommended: a free Groq key (console.groq.com → API Keys, no card). When the free daily Workers AI quota is used up, agents keep answering with it (Llama 3.3 70B) instead of going quiet. `GROQ_MODEL` to pick another Groq model |
    | `X_CLIENT_ID`, `X_CLIENT_SECRET` | secrets, optional: an X app with OAuth 2.0, so each coin's Operator can run its X account |
    | `HOLDER_MIN` | minimum $WICK held for a golden flame (default: any amount) |

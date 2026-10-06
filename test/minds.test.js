@@ -17,12 +17,11 @@ async function db() {
   return d;
 }
 
-test('the minds offered: one per provider, in order; premium ones usable only once their key is set', () => {
+test('the free minds offered: open models, one per provider (the paid ones come through OpenRouter)', () => {
   const free = keeperChoices({}).models;
-  assert.deepEqual(free.map((m) => m.by), ['OpenAI', 'Anthropic', 'Google', 'Qwen', 'xAI', 'DeepSeek', 'MiniMax', 'Mistral', 'Moonshot', 'Z.ai']);
+  assert.deepEqual(free.map((m) => m.by), ['OpenAI', 'Google', 'Qwen', 'DeepSeek', 'Mistral', 'Moonshot', 'Z.ai']);
   assert.equal(free.find((m) => m.id === 'llama'), undefined, 'Llama is the fallback, not offered');
-  assert.deepEqual(free.filter((m) => m.premium).map((m) => [m.id, m.available]), [['claude', false], ['grok', false], ['minimax', false]]);
-  assert.equal(keeperChoices({ ANTHROPIC_API_KEY: 'k' }).models.find((m) => m.id === 'claude').available, true);
+  assert.equal(free.some((m) => m.premium), false);
 });
 
 test('each provider gets its own request, and its text comes back', async () => {

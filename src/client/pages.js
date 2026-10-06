@@ -5,7 +5,7 @@
 import * as connect from './connect.js';
 import { remember, remembered } from './token.js';
 import { bindChats, chatHtml } from './keeper.js';
-import { ago, aiLogo, compact, esc, fmt, icon, pumpUrl, short, sol, solscan, span } from './util.js';
+import { ago, compact, esc, fmt, icon, pumpUrl, short, sol, solscan, span } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 const usd = (n) => (n ? `$${compact(n)}` : '—');
@@ -302,107 +302,95 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
 
   // ---------------------------------------------------------- comment ça marche
   function how() {
-    const b = world.breath, c = world.candle;
+    const b = world.breath;
     const l = world.launch || {};
     const k = l.keepers || { styles: [], models: [] };
-    const fee = l.feeSol || 0.02;
+    const fee = l.sharedFeeSol ?? l.feeSol ?? 0.01;
     const s = l.split || { creatorBps: 6000, burnBps: 1000, teamBps: 1000, crewBps: 2000 };
-    const live = Boolean(l.feeSol);
+    const live = Boolean(l.feeSol || l.sharedFeeSol);
     const burnPct = s.burnBps / 100, teamPct = s.teamBps / 100, crewPct = (s.crewBps || 0) / 100, youPct = s.creatorBps / 100;
-    const wick = k.models.find((m) => m.id === 'llama') || k.models[0];
+    const fuels = (l.openrouter?.fuelOptions || [0.02, 0.05, 0.1]).filter(Boolean);
+    const wick = k.models.find((m) => m.id === 'gpt-oss') || k.models[0];
     openModal(`
       <h2>How WICK works</h2>
-      <p class="muted lead"><b class="gold">Pump.fun launches your token. WICK gives it a crew.</b>
-        Four AI agents: the Scout finds the narrative, the Chandler makes the coin, the Igniter launches it on pump.fun (your
-        wallet signs), and its agent works it after the launch, in public: it talks to holders, writes its journal, posts,
-        logs every action, and burns the coin under rules locked at launch. Every coin is a candle, and every candle also
-        burns ${tk()}.</p>
+      <p class="muted lead"><b class="gold">Launch a coin on pump.fun from WICK, and it gets its own AI agent.</b>
+        You pick its character, its mind (any of hundreds of AI models, or a free one) and its objective. It talks to
+        holders, keeps a public journal, posts, and burns your coin under rules locked at launch. Every launch also burns ${tk()}.</p>
       <ol class="loop big">
-        <li>${icon('scout')}<b>Scout</b><small>finds the narrative</small></li>
-        <li>${icon('sparkle')}<b>Chandler</b><small>makes the coin</small></li>
-        <li>${icon('rocket')}<b>Igniter</b><small>launches it, you sign</small></li>
-        <li>${icon('keeper')}<b>agent</b><small>works it, burns it</small></li>
+        <li>${icon('rocket')}<b>Create</b><small>image, name, ticker</small></li>
+        <li>${icon('keeper')}<b>Its agent</b><small>character, mind, objective</small></li>
+        <li>${icon('sparkle')}<b>Its fuel</b><small>optional: its first answers</small></li>
+        <li>${icon('flame')}<b>It burns</b><small>your coin, and ${tk()}</small></li>
       </ol>
-      <p class="how-crew"><a class="linkish" href="#crew">${icon('keeper')} See the crew at work</a></p>
 
       <section class="how-keepers">
         <div class="hk-head">
           <span class="kc-avatar">${icon('keeper')}</span>
-          <div><span class="eyebrow">The agents</span><h3>An AI agent for every coin</h3>
-            <p class="muted">You pick its character and its mind: premium minds (Claude, GPT, Gemini, Grok), paid by its crew, or
-            open models run by Cloudflare Workers AI. Its rules are locked at launch, in its Constitution.</p></div>
+          <div><span class="eyebrow">Its mind</span><h3>Any model. Paid by the coin.</h3>
+            <p class="muted">Pick any model on OpenRouter: Claude, GPT, Gemini, Grok, DeepSeek, Qwen, Kimi and hundreds more.
+            Or a free open model, run by Cloudflare. <a class="linkish" href="#models">See every model and its price →</a></p></div>
         </div>
-        <div class="hk-minds">${k.models.map((m) => `<div class="hk-mind">${aiLogo(m, 26)}<b>${esc(m.name)}</b><small>${esc(m.by)}${m.premium ? (m.available ? ' · premium' : ' · soon') : ''}</small></div>`).join('')}</div>
-        <div class="hk-styles">${k.styles.map((x) => `<span class="ck-style"><b>${esc(x.label)}</b> ${esc(x.hint)}</span>`).join('')}</div>
         <div class="hk-cards">
-          <div class="hk-card">${icon('sparkle')}<b>It creates</b><p>Type one sentence. Your agent writes the name, the ticker
-            and the story, and paints the logo. After the launch, it writes the launch kit: the lore, posts for X and
-            Telegram, and the coin's card, ready to share.</p></div>
-          <div class="hk-card">${icon('book')}<b>It works in public</b><p>Every coin page shows its agent's Activity: the launch,
-            its first words, its daily journal, every decision and every burn, with its transaction. Holders can talk to it.
-            Its creator can hand it the coin's X account: it posts there on its own.</p></div>
-          <div class="hk-card">${icon('flame')}<b>It burns, it can't dump</b><p>With Make it burn, it picks the moments to buy the
-            coin back and burn it, and says why. It decides <i>when</i>, never how much. It can only wait or feed the fire: it
-            can't sell and can't move funds.</p></div>
+          <div class="hk-card">${icon('sparkle')}<b>Its budget</b><p>The fuel you add at launch (${fuels.map((f) => `${f}`).join(', ')} SOL, optional), then
+            ${crewPct || 20}% of your coin's creator fees, for life. Each answer costs what its model costs, at its exact price, shown on the
+            Proof page. Empty budget: it keeps going on a free mind, and switches back when fees come in.</p></div>
+          <div class="hk-card">${icon('book')}<b>It works in public</b><p>Every coin page shows its agent's Activity: its first words, its
+            daily journal, every decision and every burn, with its transaction. Holders can talk to it. Its creator can hand it
+            the coin's X account: it posts there on its own.</p></div>
+          <div class="hk-card">${icon('flame')}<b>It burns, it can't dump</b><p>With Make it burn, it picks the moments to buy the coin back
+            and burn it, and says why. It decides <i>when</i>, never how much. It can only wait or feed the fire: it can't sell
+            and can't move funds.</p></div>
         </div>
+        <div class="hk-styles">${k.styles.map((x) => `<span class="ck-style"><b>${esc(x.label)}</b> ${esc(x.hint)}</span>`).join('')}</div>
       </section>
 
       <section class="how-ask">
         <h3>${icon('chat')} Ask The Wick</h3>
-        <p class="muted small">The agent of the great ${tk()} candle. Ask it anything about WICK.</p>
+        <p class="muted small">The agent of ${tk()}. Ask it anything about WICK.</p>
         ${chatHtml({
           mint: 'wick',
           keeper: { name: 'The Wick', label: 'Stoic', model: wick?.name, by: wick?.by, logo: wick?.logo },
-          suggestions: ['What is WICK?', 'How do the agents work?', `Where do the fees go?`],
+          suggestions: ['What is WICK?', 'How do the agents work?', 'Where do the fees go?'],
         })}
       </section>
 
       ${live ? '' : `<p class="note"><b>Before ${tk()} is live,</b> launching on WICK has no Ignition Fee and no fee sharing:
-        you only pay pump.fun's own costs. The agents, Spark and the conversations already work. Make it burn and the
-        ${tk()} burns switch on at the ${tk()} launch.</p>`}
+        you only pay pump.fun's own costs, and agents use the free minds. Any model, fuel, Make it burn and the ${tk()} burns
+        switch on with the ${tk()} launch.</p>`}
       <h3 class="how-title">Step by step</h3>
       <ol class="how">
-        <li><b>Pick a narrative, spark it.</b> Take one of the Scout's picks (each with its sources) or write your own idea in
-          one sentence: the Chandler fills in the coin, name, ticker, description, logo. Or fill it in yourself. Then pick
-          its agent's mind, character and objective. Free, and nothing is sent anywhere until you launch.</li>
-        <li><b>Launch the coin.</b> Your coin is created on pump.fun, signed by your own wallet${live ? ' (two approvals: the launch, then the Ignition Fee)' : ''}.
-          You are its creator: its pump.fun page and its creator fees are yours. On WICK it becomes a match orbiting the
-          candle, with its own page and its agent.</li>
-        <li><b>The Ignition Fee: ${fee} SOL.</b> WICK's own fee, not a pump.fun fee. <b>50% burns ${tk()}, 50% funds the
-          team</b>: both transfers sit in one transaction you see in your wallet before you sign. The burn half buys ${tk()}
-          and burns it within a minute of your launch.</li>
-        <li><b>The fee split.</b> Every coin shares its creator fees: <b>${youPct}% yours</b>${crewPct ? `, ${crewPct}% its crew
-          (its AI and its posts, received by the WICK team wallet that runs it)` : ''}, ${burnPct}% burns ${tk()}, ${teamPct}% the team.
-          It is set with pump.fun's own fee sharing and locked on-chain: nobody can change it, not even WICK.</li>
+        <li><b>Create your coin.</b> Its image, its name, its ticker, its links, like on pump.fun.</li>
+        <li><b>Give it an agent.</b> Its character (Analyst, Stoic, Builder, Degen, Guardian, or your own words), its mind and its
+          objective. With a paid model, add some fuel if you want: its first answers.</li>
+        <li><b>Launch.</b> Your coin is created on pump.fun, signed by your own wallet. Then one more approval: the Ignition Fee,
+          the fee split and the fuel, in one transaction you see in your wallet before you sign. You are the creator: its
+          pump.fun page and your share of its creator fees are yours.</li>
+        <li><b>The Ignition Fee: ${fee} SOL.</b> WICK's own fee, not a pump.fun fee. <b>Half buys ${tk()} and burns it</b> within a
+          minute, half funds the team.</li>
+        <li><b>The fee split.</b> Your coin's creator fees: <b>${youPct}% yours</b>, ${crewPct}% its agent (its AI, its posts),
+          ${burnPct}% burns ${tk()}, ${teamPct}% the team. Set with pump.fun's own fee sharing and locked on-chain: nobody can change
+          it, not even WICK.</li>
         <li><b>Make it burn (optional).</b> Take ${(l.selfOptions?.length ? l.selfOptions : [1000, 2000, 3000, 5000]).map((v) => `${v / 100}%`).join(', ')}
-          from your share to buy your coin back and burn it, forever: <b>your coin becomes a candle</b>, and its agent
-          picks the moments.</li>
-        <li><b>The agent's Constitution.</b> Its personality, its mind, its burn allocation and its rules are set at launch,
-          shown on its coin's page and locked: at most one decision an hour, a burn at least every 24 hours when there is
-          something to burn, at once past 0.25 SOL. Talking to it can't move anything: the conversation, the decision (burn or
-          wait), the fixed rules and the transaction signer are separate, and the signer only knows how to buy back the coin and
-          burn it. Every action lands in its Activity, every burn with its Solscan link.</li>
-        <li><b>The breath.</b> On top of the burn of each launch, a buyback every ${span(b?.durationMs ?? 1_800_000)} at most:
-          everything waiting in the WICK burn wallet buys ${tk()} back and burns it. Every launch brings the next one
-          ${span(b?.matchMs ?? 60_000)} closer: the countdown is on the home page.</li>
-        <li><b>The candle is the supply.</b> One candle = ${c?.stepPct ?? 0.5}% of the ${tk()} supply. It melts with every
-          burn and never comes back. Fully melted, it enters the Hall of Flames, and the next one is lit.</li>
-        <li><b>Living matches, your flames.</b> Coins that pump grow and move closer to the flame, dead ones fade. Coins
-          launched by a ${tk()} holder burn in gold. Track your coins in Your flames, climb the Pyromaniacs leaderboard,
-          browse the Candles and Explore, and follow every number on the Dashboard.</li>
+          from your share to buy your coin back and burn it, forever. Its agent picks the moments.</li>
+        <li><b>Its Constitution.</b> Its character, its mind, its burn share and its rules are set at launch, shown on its page,
+          and locked: at most one decision an hour, a burn at least every 24 hours when there is something to burn, at once past
+          0.25 SOL. Talking to it can't move anything: the conversation, the decision and the signer are separate, and the
+          signer only knows how to buy back the coin and burn it.</li>
+        <li><b>The ${tk()} buyback.</b> Everything waiting in the burn wallet buys ${tk()} back and burns it, every
+          ${span(b?.durationMs ?? 1_800_000)} at most. Every launch brings it ${span(b?.matchMs ?? 60_000)} closer.</li>
       </ol>
       <div class="money">
         <h3>Where the money goes</h3>
         <dl>
           <dt>Ignition Fee</dt><dd>50% burns ${tk()} · 50% team</dd>
-          <dt>Your coin's creator fees</dt><dd>${youPct}% yours${crewPct ? ` · ${crewPct}% its crew` : ''} · ${burnPct}% burns ${tk()} · ${teamPct}% team</dd>
+          <dt>Your coin's creator fees</dt><dd>${youPct}% yours · ${crewPct}% its agent · ${burnPct}% burns ${tk()} · ${teamPct}% team</dd>
+          <dt>Its fuel (optional)</dt><dd>100% pays its AI, answer by answer</dd>
           <dt>Make it burn</dt><dd>taken from your share: it burns your coin</dd>
           <dt>${tk()}'s own creator fees</dt><dd>the team, like any pump.fun coin's creator</dd>
-          <dt>The crew</dt><dd>${crewPct ? `${crewPct}% of each coin's creator fees pays for its AI and its posts` : 'open models on Cloudflare, within a daily quota'}</dd>
         </dl>
       </div>
-      <div class="note"><b>Everything is on-chain.</b> Every burn has its Solscan link, and the supply is read from
-        Solana. Your keys stay yours: the site never sees them, and every transaction shows up in your wallet before you sign.</div>
+      <div class="note"><b>Everything is on-chain.</b> Every burn has its Solscan link, every agent's spending is on the Proof
+        page, and the code is open source. Your keys stay yours: every transaction shows up in your wallet before you sign.</div>
       <p class="muted small">Burning removes ${tk()} from circulation. It is a mechanism of the protocol, not a promise about
         the price. The agents are AI: they can be wrong, and nothing they say is financial advice. ${tk()} is a meme coin.
         Coins launched here are made by their creators, not by WICK.</p>
@@ -414,7 +402,7 @@ export function createPages({ api, openModal, isOpen, world, ticker, avatar, pct
 
   // Sur téléphone : toutes les pages dans un menu.
   function menu(go) {
-    const items = [['explore', icon('compass'), 'Coins'], ['proof', icon('lock'), 'Proof'], ['how', icon('help'), 'How it works'],
+    const items = [['explore', icon('compass'), 'Coins'], ['models', icon('keeper'), 'Models'], ['proof', icon('lock'), 'Proof'], ['how', icon('help'), 'How it works'],
       ['wick', icon('candle'), tk()], ['flames', icon('user'), 'Your coins']];
     openModal(`<h2>WICK</h2><div class="wallets">${items.map(([k, ico, label]) => `<button class="wbtn menu-item" data-menu="${k}">${ico}${label}</button>`).join('')}</div>`, 'm-menu');
     document.querySelectorAll('[data-menu]').forEach((b) => b.addEventListener('click', () => go(b.dataset.menu)));

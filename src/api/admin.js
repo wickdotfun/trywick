@@ -134,7 +134,7 @@ export const adminStatus = guarded(async ({ env }) => {
     soft(potSol(env, now)),
     soft(devInfo(env, wallet.address)),
     db.prepare(`SELECT m.seq, m.mint, m.symbol, m.name, m.creator, m.created_at, m.lit_at, m.signature, m.fee_lamports, m.fee_state,
-        m.fee_sig, m.share_bps, m.share_state, m.tg_state, m.x_state, m.holder, m.mcap, m.keeper_style, m.keeper_model,
+        m.fee_sig, m.share_bps, m.share_state, m.tg_state, m.x_state, m.holder, m.mcap, m.keeper_style, m.keeper_model, m.mind_or, m.mind_name,
         b.status AS burn_status, b.burned_ui AS burned, b.burn_sig
       FROM matches m LEFT JOIN burns b ON b.kind = 'match' AND b.ref = m.mint
       WHERE m.seq IS NOT NULL OR m.signature IS NOT NULL ORDER BY m.created_at DESC LIMIT 15`).all(),
@@ -158,6 +158,7 @@ export const adminStatus = guarded(async ({ env }) => {
       xApp: Boolean(env.X_CLIENT_ID && env.X_CLIENT_SECRET),
       // Le X de WICK : poster tout seul (ses 4 clés), sinon les boutons « Post on X ».
       xPosts: xReady(env),
+      openrouter: Boolean(env.OPENROUTER_API_KEY),
       lock: await getSetting(db, 'team.lock', null),
       xLinks: (await db.prepare('SELECT COUNT(*) AS n, COALESCE(SUM(posts), 0) AS posts FROM x_links').first().catch(() => null)) || { n: 0, posts: 0 },
       customRpc: Boolean(env.SOLANA_RPC),

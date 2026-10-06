@@ -2,6 +2,7 @@
 import { CONFIG } from '../../lib/config.js';
 import { feeSummary } from '../../lib/buyback.js';
 import { keeperChoices } from '../../lib/keepers.js';
+import { orReady } from '../../lib/openrouter.js';
 import { json, tokenInfo } from '../../lib/http.js';
 import { worldState } from '../../lib/matches.js';
 import { ensureSchema } from '../../lib/schema.js';
@@ -17,6 +18,10 @@ export async function state({ request, env }) {
     token: tokenInfo(env),
     // L'Ignition Fee (50 % burn, 50 % équipe), et celle réduite avec le partage des creator fees
     // (split : créateur / burn / équipe).
-    launch: { maxDevBuy: CONFIG.maxDevBuySol, ...fees, keepers: keeperChoices(env) },
+    launch: {
+      maxDevBuy: CONFIG.maxDevBuySol, ...fees, keepers: keeperChoices(env),
+      // N'importe quel modèle sur OpenRouter (GET /api/models), et le fuel au lancement.
+      openrouter: orReady(env) ? { fuelOptions: CONFIG.openrouter.fuelOptions } : null,
+    },
   });
 }

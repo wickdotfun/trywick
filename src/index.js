@@ -29,9 +29,12 @@ import { runTelegram } from '../lib/telegram.js';
 import { sweep } from '../lib/matches.js';
 import { ensureSchema } from '../lib/schema.js';
 import { setSetting } from '../lib/settings.js';
+import { runOpenRouter } from '../lib/openrouter.js';
+import { models } from './api/models.js';
 
 const ROUTES = {
   'GET /api/state': state,
+  'GET /api/models': models,
   'GET /api/leaderboard': board,
   'GET /api/launches': launches,
   'GET /api/profile': profile,
@@ -129,6 +132,8 @@ export default {
       runScout(env, Date.now()),
       // L'Operator de chaque coin poste sur son compte X (si son créateur l'a relié).
       runXPosts(env, Date.now()),
+      // Le catalogue d'OpenRouter (toutes les 6 heures) et le prix du SOL (les budgets des agents).
+      runOpenRouter(env, Date.now()),
     ];
     for (const r of await Promise.allSettled(steps)) {
       if (r.status === 'rejected') console.error('cron', r.reason?.message ?? r.reason);

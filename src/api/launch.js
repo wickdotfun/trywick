@@ -18,6 +18,7 @@ import { ensureSchema } from '../../lib/schema.js';
 import { buildShareTx, checkSignedShareTx } from '../../lib/sharing.js';
 import { keeperGoal, keeperModel, keeperPrompt, keeperStyle } from '../../lib/keepers.js';
 import { isPremium, premiumReady } from '../../lib/minds.js';
+import { findModel, isModelId, orReady } from '../../lib/openrouter.js';
 import {
   base64FromBytes, buildFeeTx, bytesFromBase64, checkFeeTx, checkSignedLaunch, getLatestBlockhash,
   sendTransaction, signatureOf, simulateTransaction,
@@ -57,10 +58,17 @@ export async function prepare({ request, env }) {
   const selfBps = selfBpsOf(Math.round(Number(fields.burn) * 100));
   const shared = fields.share === '1' || selfBps > 0;
   const fee = (shared && (await launchFee(env, { shared: true, selfBps }))) || (await launchFee(env));
+  // Son modèle sur OpenRouter (au choix), et son fuel : du SOL envoyé avec la fee, vers le wallet de
+  // l'équipe, qui paie ses réponses. Seulement avec une fee (le wallet de l'équipe est connu).
+  const orModel = orReady(env) && isModelId(fields.mind_or) ? await findModel(env.DB, fields.mind_or) : null;
+  if (fields.mind_or && !orModel) return json({ error: 'bad_model' }, 400);
+  const fuelSol = Number(fields.fuel) || 0;
+  if (!CONFIG.openrouter.fuelOptions.includes(fuelSol)) return json({ error: 'bad_fuel' }, 400);
+  const fuel = orModel && fee?.teamWallet ? Math.round(fuelSol * 1e9) : 0;
 
   // Le wallet doit pouvoir tout payer AVANT qu'on lui propose de signer (et avant d'envoyer
   // l'image sur l'IPFS) : l'achat du créateur, l'Ignition Fee, la création du coin.
-  const short = await shortOfFunds(env, launch.creator, launchNeedSol(launch.devBuy, fee?.lamports ?? 0));
+  const short = await shortOfFunds(env, launch.creator, launchNeedSol(launch.devBuy, (fee?.lamports ?? 0) + fuel));
   if (short) return json({ error: 'no_funds', ...short }, 409);
 
   // Un nouvel essai avec le même mint (transaction expirée, wallet fermé…) :
@@ -120,10 +128,13 @@ export async function prepare({ request, env }) {
   const goal = keeperGoal(fields.keeper_goal) || (fee?.selfBps > 0 ? 'deflation' : 'survive');
   await env.DB.prepare('UPDATE matches SET keeper_style = ?, keeper_model = ?, keeper_goal = ?, keeper_prompt = ?, description = ? WHERE mint = ? AND seq IS NULL')
     .bind(style, mindOf(env, fields.keeper_model), goal, character, launch.description || null, launch.mint).run();
+  await env.DB.prepare('UPDATE matches SET mind_or = ?, mind_name = ?, fuel_lamports = ? WHERE mint = ? AND seq IS NULL')
+    .bind(orModel?.id ?? null, orModel?.name ?? null, fuel, launch.mint).run();
   return json({
     tx: base64FromBytes(tx),
     fee: Boolean(fee),
     feeSol: fee ? fee.lamports / 1e9 : 0,
+    fuelSol: fuel / 1e9,
     burnSol: fee ? fee.burn / 1e9 : 0,
     teamSol: fee?.team ? fee.team.lamports / 1e9 : 0,
     shareBps,
@@ -226,7 +237,7 @@ export async function feeTx({ request, env }) {
     if (/insufficient|InsufficientFunds|0x1\b/i.test(text)) return json({ error: 'no_funds' }, 409);
     return json({ error: 'fee_not_ready' }, 409);
   }
-  return json({ feeTx: base64FromBytes(bytes), feeSol: row.fee_lamports / 1e9 });
+  return json({ feeTx: base64FromBytes(bytes), feeSol: row.fee_lamports / 1e9, fuelSol: (row.fuel_lamports || 0) / 1e9 });
 }
 
 export async function feeSubmit({ request, env }) {

@@ -6,7 +6,7 @@ import { mkdirSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '/opt/node-tools/node_modules/playwright/index.mjs';
 
-const FPS = 30, DUR = 49.5, N = Math.round(FPS * DUR);
+const FPS = 30, DUR = 47, N = Math.round(FPS * DUR);
 const dir = fileURLToPath(new URL('.', import.meta.url));
 const frames = `${dir}frames`, cards = fileURLToPath(new URL('../../public/cards/', import.meta.url));
 rmSync(frames, { recursive: true, force: true }); mkdirSync(frames);
@@ -21,7 +21,7 @@ for (let f = 0; f < N; f++) {
   if (f % 150 === 0) console.log(f, '/', N, `${Math.round((Date.now() - t0) / 1000)}s`);
 }
 // L'image du post : le titre, toutes les pièces en place.
-await p.evaluate(() => window.render(7.6));
+await p.evaluate(() => window.render(7.4));
 await p.screenshot({ path: `${dir}poster.png` });
 await b.close();
 

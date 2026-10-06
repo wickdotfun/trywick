@@ -39,7 +39,7 @@ test('the admin test lifts the AI pause as soon as the AI answers again (after u
   assert.equal(await getSetting(db, 'ai.out', 'gone'), null);
 });
 
-test('a used-up AI quota and a busy DEX Screener are notes, not failures; Telegram says how to fix its token', async () => {
+test('a used-up AI quota is a note, a busy DEX Screener is fine; Telegram says how to fix its token', async () => {
   const { getSetting } = await import('../lib/settings.js');
   const { dexReset } = await import('../lib/dex.js');
   dexReset();
@@ -60,7 +60,9 @@ test('a used-up AI quota and a busy DEX Screener are notes, not failures; Telegr
   assert.equal(by['AI binding (Workers AI)'].warn, true);
   assert.match(by['AI binding (Workers AI)'].detail, /00:00 UTC/);
   assert.equal(await getSetting(db, 'ai.out', null), Math.floor(now / 86_400_000));
-  assert.equal(by['DEX Screener (markets, Scout)'].warn, true);
+  assert.equal(by['DEX Screener (markets, Scout)'].ok, true);
+  assert.equal(by['DEX Screener (markets, Scout)'].warn, undefined);
+  assert.match(by['DEX Screener (markets, Scout)'].detail, /reachable/);
   assert.equal(dexCalls, 2, 'one retry, then a pause');
   assert.equal(by['Telegram bot'].ok, false);
   assert.match(by['Telegram bot'].detail, /revoked[\s\S]*@BotFather/);
@@ -96,4 +98,21 @@ test('with the free backup brain set, a used-up Workers AI quota is green: agent
   assert.match(by['AI binding (Workers AI)'].detail, /backup brain/);
   assert.equal(by['Backup brain (Groq, free)'].ok, true);
   assert.match(by['Backup brain (Groq, free)'].detail, /OK/);
+});
+
+test('OpenRouter: says where the key goes, spots a misnamed one, and cleans what is pasted around it', async () => {
+  const { orKey } = await import('../lib/openrouter.js');
+  for (const raw of ['sk-or-v1-abc', ' sk-or-v1-abc\n', '"sk-or-v1-abc"', 'Bearer sk-or-v1-abc']) assert.equal(orKey({ OPENROUTER_API_KEY: raw }), 'sk-or-v1-abc', raw);
+  const db = fakeD1();
+  await ensureSchema(db);
+  globalThis.fetch = async (url) => (String(url).includes('openrouter.ai/api/v1/models')
+    ? Response.json({ data: [{ id: 'anthropic/claude-x', name: 'Claude X', pricing: { prompt: '0.000001', completion: '0.000005' } }] })
+    : Response.json({}));
+  const run = async (env) => Object.fromEntries((await selfTest({ DB: db, AI: { run: async () => ({ response: 'OK' }) }, ...env }, Date.UTC(2026, 9, 6))).steps.map((s) => [s.name, s]))['OpenRouter (any model)'];
+  const none = await run({});
+  assert.equal(none.warn, true);
+  assert.match(none.detail, /Secret[\s\S]*exactly OPENROUTER_API_KEY[\s\S]*Deploy/);
+  assert.match(none.detail, /No credits needed/);
+  const typo = await run({ OPENROUTER_KEY: 'sk-or-v1-abc' });
+  assert.match(typo.detail, /named OPENROUTER_KEY: rename it to exactly OPENROUTER_API_KEY/);
 });

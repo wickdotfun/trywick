@@ -16,6 +16,7 @@ import { announceText, deployer } from '../../lib/announce.js';
 import { MILESTONES, milestoneFile } from '../../lib/cards.js';
 import { LIBRARY, libraryFile, libraryPost, libraryText } from '../../lib/posts.js';
 import { cardBytes, coinXText, postText, publish, socialStatus } from '../../lib/social.js';
+import { orReady } from '../../lib/openrouter.js';
 import { xReady } from '../../lib/x.js';
 import { PUMP, PUMP_AMM, shareTotals } from '../../lib/sharing.js';
 import { buybackPaused, getSetting, setSetting } from '../../lib/settings.js';
@@ -158,7 +159,7 @@ export const adminStatus = guarded(async ({ env }) => {
       xApp: Boolean(env.X_CLIENT_ID && env.X_CLIENT_SECRET),
       // Le X de WICK : poster tout seul (ses 4 clés), sinon les boutons « Post on X ».
       xPosts: xReady(env),
-      openrouter: Boolean(env.OPENROUTER_API_KEY),
+      openrouter: orReady(env),
       lock: await getSetting(db, 'team.lock', null),
       xLinks: (await db.prepare('SELECT COUNT(*) AS n, COALESCE(SUM(posts), 0) AS posts FROM x_links').first().catch(() => null)) || { n: 0, posts: 0 },
       customRpc: Boolean(env.SOLANA_RPC),

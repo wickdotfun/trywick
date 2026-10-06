@@ -242,7 +242,7 @@ export const adminSocial = guarded(async ({ env }) => {
   return json({
     ...status, mint, ticker, supply: CONFIG.pumpSupply,
     // La bibliothèque de posts : la carte, le texte prêt (avec le CA une fois $WICK lancé).
-    library: LIBRARY.map((p) => ({ id: p.id, slot: p.slot, phase: p.phase, label: p.label, when: p.when, file: libraryFile(p.id), text: libraryText(p, { ticker, site, mint }) })),
+    library: LIBRARY.map((p) => ({ id: p.id, video: p.video || null, slot: p.slot, phase: p.phase, label: p.label, when: p.when, file: libraryFile(p.id), text: libraryText(p, { ticker, site, mint }) })),
     texts: {
       // Avant le lancement, [CA] tient la place de l'adresse (l'admin la remplace dès qu'elle existe).
       live: announceText(mint || '[CA]', { ticker, site }).replace(/<\/?code>/g, ''),
@@ -281,7 +281,9 @@ export const adminPost = guarded(async ({ request, env }) => {
     const p = libraryPost(body.id);
     if (!p) return json({ error: 'bad_post' }, 400);
     const text = libraryText(p, { ticker, site, mint });
-    post = { image: await cardBytes(env, libraryFile(p.id)), caption: esc(text), x: text, mint };
+    post = p.video
+      ? { video: await cardBytes(env, p.video), caption: esc(text), x: text, mint }
+      : { image: await cardBytes(env, libraryFile(p.id)), caption: esc(text), x: text, mint };
   } else if (kind === 'relay') {
     // Un post X publié à la main : relayé dans le canal Telegram (son lien, avec l'aperçu de X).
     const url = String(body.url || '').trim().replace('twitter.com/', 'x.com/').split('?')[0];

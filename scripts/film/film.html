@@ -1,0 +1,279 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face { font-family: Geist; src: url(../../public/fonts/geist.woff2) format('woff2'); font-weight: 100 900; }
+@font-face { font-family: GMono; src: url(../../public/fonts/geist-mono.woff2) format('woff2'); font-weight: 100 900; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: #070403; color: #fbf3ea; font-family: Geist, sans-serif; }
+#stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+.bg { position: absolute; inset: 0; background: radial-gradient(1100px 700px at 50% 45%, rgba(255,140,30,.14), rgba(7,4,3,0) 65%), #070403; }
+.grid { position: absolute; inset: -200px; background-image: linear-gradient(rgba(255,210,160,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,210,160,.05) 1px, transparent 1px); background-size: 80px 80px;
+  -webkit-mask-image: radial-gradient(900px 600px at 50% 50%, #000, transparent 75%); }
+.grain { position: absolute; inset: 0; opacity: .06; mix-blend-mode: overlay; pointer-events: none; z-index: 50;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+.vig { position: absolute; inset: 0; z-index: 49; pointer-events: none; background: radial-gradient(120% 100% at 50% 50%, transparent 55%, rgba(0,0,0,.65)); }
+.scene { position: absolute; inset: 0; opacity: 0; }
+.gold { background: linear-gradient(180deg, #ffe7a8 0%, #ffc04a 45%, #f08a1c 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.mono { font-family: GMono, monospace; }
+.kicker { font: 600 22px/1 GMono, monospace; letter-spacing: .3em; text-transform: uppercase; color: #ffc05a; }
+.h { font-weight: 800; letter-spacing: -.05em; line-height: .95; }
+.sub { font-size: 34px; color: #cdbca9; font-weight: 500; letter-spacing: -.01em; }
+.card { position: absolute; border-radius: 28px; border: 1.5px solid rgba(255,206,112,.28); background: linear-gradient(180deg, rgba(34,22,14,.92), rgba(16,10,7,.92)); box-shadow: 0 40px 100px rgba(0,0,0,.6); }
+.ember { position: absolute; border-radius: 50%; background: radial-gradient(circle, #fff3c4, #ffb347 55%, rgba(255,120,20,0) 75%); box-shadow: 0 0 14px #ff9a2e; }
+.sat { position: absolute; width: 96px; height: 96px; margin: -48px 0 0 -48px; border-radius: 28px; display: grid; place-items: center; background: rgba(24,15,10,.92); border: 1.5px solid rgba(255,210,160,.2); box-shadow: 0 16px 40px rgba(0,0,0,.5); }
+.sat img { width: 48px; height: 48px; }
+.ring { position: absolute; left: 50%; top: 50%; border-radius: 50%; border: 1.5px solid rgba(255,200,140,.16); transform: translate(-50%,-50%); }
+.chip { display: inline-flex; align-items: center; gap: 12px; padding: 14px 24px; border-radius: 999px; font-size: 26px; font-weight: 600; border: 1.5px solid rgba(255,196,110,.35); background: rgba(255,190,90,.08); color: #f6e8d4; }
+.chip.on { background: linear-gradient(180deg, #fff3cf, #ffd56e 35%, #f2ae3a 70%, #d98b1f); color: #1d1003; border-color: transparent; }
+.bubble { position: absolute; padding: 22px 30px; border-radius: 30px; font-size: 34px; line-height: 1.4; font-weight: 500; }
+.bubble.me { background: #2b1d13; color: #e9dccb; }
+.bubble.ag { background: rgba(255,190,90,.12); border: 1.5px solid rgba(255,196,110,.45); color: #fbf3ea; }
+.seg { position: absolute; top: 0; height: 100%; border-radius: 24px; display: grid; place-items: center; font-weight: 800; letter-spacing: -.03em; overflow: hidden; }
+.btn { display: inline-flex; align-items: center; gap: 22px; height: 96px; padding: 0 12px 0 46px; border-radius: 999px; font-size: 36px; font-weight: 700; color: #1d1003;
+  background: linear-gradient(180deg, #fff3cf 0%, #ffd56e 30%, #f2ae3a 62%, #d98b1f 100%); box-shadow: 0 0 0 2px rgba(255,246,220,.75) inset, 0 24px 70px -10px rgba(255,150,30,.8); }
+.btn i { width: 72px; height: 72px; border-radius: 50%; background: #1d1003; display: grid; place-items: center; }
+.btn i svg { width: 32px; height: 32px; fill: none; stroke: #ffd36a; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+</style></head>
+<body><div id="stage">
+  <div class="bg"></div><div class="grid" id="grid"></div>
+  <div id="embers"></div>
+
+  <!-- 1. Le W -->
+  <div class="scene" id="s1">
+    <div id="s1glow" style="position:absolute;left:50%;top:46%;width:900px;height:900px;margin:-450px 0 0 -450px;border-radius:50%;background:radial-gradient(circle, rgba(255,150,40,.55), rgba(255,110,20,.12) 45%, rgba(255,110,20,0) 70%);filter:blur(30px)"></div>
+    <img id="s1logo" src="../../public/brand/logo.png" style="position:absolute;left:50%;top:44%;width:420px;margin:-210px 0 0 -210px;filter:drop-shadow(0 0 50px rgba(255,140,30,.7))">
+    <img id="s1word" src="../../public/brand/wordmark.png" style="position:absolute;left:50%;top:74%;width:360px;margin-left:-180px">
+    <div id="s1sweep" style="position:absolute;inset:0;background:linear-gradient(105deg, transparent 40%, rgba(255,240,200,.12) 50%, transparent 60%)"></div>
+  </div>
+
+  <!-- 2. La phrase -->
+  <div class="scene" id="s2">
+    <div style="position:absolute;left:0;right:0;top:330px;text-align:center">
+      <div class="h" style="font-size:190px"><span class="w2" id="w1" style="display:inline-block">Every</span> <span class="w2" id="w2" style="display:inline-block">coin</span></div>
+      <div class="h" style="font-size:190px;margin-top:10px"><span class="w2" id="w3" style="display:inline-block">gets</span> <span class="w2" id="w4" style="display:inline-block">an</span> <span class="w2 gold" id="w5" style="display:inline-block">agent.</span></div>
+      <div class="mono" id="s2sub" style="margin-top:56px;font-size:28px;letter-spacing:.2em;color:#b6a797">LAUNCH ON PUMP.FUN · SOLANA</div>
+    </div>
+  </div>
+
+  <!-- 3. L'orbite -->
+  <div class="scene" id="s3">
+    <div style="position:absolute;left:150px;top:390px;width:640px">
+      <div class="kicker" id="s3k">Its mind</div>
+      <div class="h" id="s3t" style="font-size:132px;margin-top:26px">Any <span class="gold">mind.</span></div>
+      <div class="sub" id="s3s" style="margin-top:30px">Hundreds of AI models.<br>Paid by the coin itself.</div>
+    </div>
+    <div id="orbit" style="position:absolute;left:1300px;top:540px;width:0;height:0">
+      <div class="ring" style="width:820px;height:820px"></div>
+      <div class="ring" style="width:660px;height:660px;border-style:dashed"></div>
+      <div class="ring" style="width:420px;height:420px;border-color:rgba(255,200,140,.25)"></div>
+      <div style="position:absolute;left:-330px;top:-330px;width:660px;height:660px;border-radius:50%;background:radial-gradient(circle, rgba(255,150,40,.35), rgba(255,110,20,0) 65%);filter:blur(20px)"></div>
+      <img src="../../public/brand/logo.png" style="position:absolute;left:-150px;top:-150px;width:300px;filter:drop-shadow(0 0 40px rgba(255,140,30,.6))">
+      <div id="sats"></div>
+    </div>
+  </div>
+
+  <!-- 4. Lancer en 3 étapes -->
+  <div class="scene" id="s4">
+    <div style="position:absolute;left:0;right:0;top:120px;text-align:center">
+      <div class="kicker" id="s4k">How it works</div>
+      <div class="h" id="s4t" style="font-size:110px;margin-top:22px">Launch in <span class="gold">3 steps.</span></div>
+    </div>
+    <div class="card" id="c1" style="left:150px;top:420px;width:500px;height:470px;padding:44px">
+      <div class="mono" style="font-size:26px;color:#ffc05a">01</div>
+      <div style="font-size:52px;font-weight:700;margin-top:18px">Create</div>
+      <div style="display:flex;align-items:center;gap:24px;margin-top:40px">
+        <div style="width:110px;height:110px;border-radius:30px;background:radial-gradient(circle at 35% 30%, #7dff9b, #1e9d55 60%, #0b4a26);display:grid;place-items:center;font-size:60px">🐸</div>
+        <div><div style="font-size:44px;font-weight:800">$FROG</div><div style="font-size:28px;color:#b6a797">Moon Frog</div></div>
+      </div>
+      <div style="font-size:28px;color:#cdbfae;margin-top:40px">Image, name, ticker.</div>
+    </div>
+    <div class="card" id="c2" style="left:710px;top:420px;width:500px;height:470px;padding:44px;border-color:rgba(255,196,110,.6)">
+      <div class="mono" style="font-size:26px;color:#ffc05a">02</div>
+      <div style="font-size:52px;font-weight:700;margin-top:18px">Its agent</div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:36px"><span class="chip on" id="ch1">Analyst</span><span class="chip">Degen</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:14px"><span class="chip on" id="ch2">Claude</span><span class="chip">Kimi</span></div>
+      <div style="font-size:28px;color:#cdbfae;margin-top:30px">Character, mind, objective.</div>
+    </div>
+    <div class="card" id="c3" style="left:1270px;top:420px;width:500px;height:470px;padding:44px">
+      <div class="mono" style="font-size:26px;color:#ffc05a">03</div>
+      <div style="font-size:52px;font-weight:700;margin-top:18px">Launch</div>
+      <div id="c3btn" class="btn" style="margin-top:44px;height:86px;font-size:32px">Launch <i><svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg></i></div>
+      <div id="c3ok" style="display:flex;align-items:center;gap:14px;margin-top:34px;font-size:30px;color:#3ddc84;font-weight:600">
+        <span style="width:40px;height:40px;border-radius:50%;background:#3ddc84;display:grid;place-items:center"><svg viewBox="0 0 24 24" style="width:26px;height:26px;fill:none;stroke:#062b16;stroke-width:3;stroke-linecap:round;stroke-linejoin:round"><path d="M5 12.5 9.5 17 19 7.5"/></svg></span>Live on pump.fun</div>
+    </div>
+  </div>
+
+  <!-- 5. L'agent parle -->
+  <div class="scene" id="s5">
+    <div style="position:absolute;left:150px;top:380px;width:720px">
+      <div class="kicker" id="s5k">Its agent</div>
+      <div class="h" id="s5t" style="font-size:118px;margin-top:26px">It talks.<br>It posts.<br><span class="gold">It burns.</span></div>
+    </div>
+    <div class="card" id="chat" style="left:1000px;top:170px;width:780px;height:740px;background:#120a06">
+      <div style="display:flex;align-items:center;gap:22px;padding:36px 40px;border-bottom:1.5px solid rgba(255,196,110,.16)">
+        <div style="width:76px;height:76px;border-radius:22px;background:linear-gradient(180deg,#fff4d2,#ffd978 30%,#f1b440 62%,#d0821c);display:grid;place-items:center">
+          <svg viewBox="0 0 24 24" style="width:44px;height:44px;fill:none;stroke:#1d1003;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><rect x="5" y="9.5" width="14" height="10" rx="3"/><path d="M9.5 14.5h.01M14.5 14.5h.01M12 9.5V7M12 2.8c.8.9 1.2 1.6 1.2 2.2a1.2 1.2 0 0 1-2.4 0c0-.6.4-1.3 1.2-2.2z"/></svg></div>
+        <div><div style="font-size:38px;font-weight:700">$FROG agent</div><div class="mono" style="font-size:24px;color:#b6a797;margin-top:4px">Analyst · Claude Sonnet</div></div>
+        <div style="margin-left:auto;width:16px;height:16px;border-radius:50%;background:#3ddc84;box-shadow:0 0 14px #3ddc84"></div>
+      </div>
+      <div class="bubble me" id="b1" style="right:40px;top:180px">wen burn?</div>
+      <div class="bubble ag" id="dots" style="left:40px;top:300px;font-size:44px;letter-spacing:6px">•••</div>
+      <div class="bubble ag" id="b2" style="left:40px;top:300px;width:620px">Burned <b>1.2M $FROG</b> today.<br>3.4% of the supply, gone.</div>
+      <div id="rcpt" style="position:absolute;left:40px;top:500px;display:flex;align-items:center;gap:14px;padding:16px 24px;border-radius:999px;background:rgba(61,220,132,.1);border:1.5px solid rgba(61,220,132,.4);font-size:26px;color:#7ff0ad;font-weight:600">🔥 Burn receipt · Solscan ↗</div>
+      <div class="bubble me" id="b3" style="right:40px;top:610px">best agent on Solana 🔥</div>
+    </div>
+  </div>
+
+  <!-- 6. Les fees -->
+  <div class="scene" id="s6">
+    <div style="position:absolute;left:150px;top:170px">
+      <div class="kicker" id="s6k">Where the fees go</div>
+      <div class="h" id="s6t" style="font-size:112px;margin-top:24px">Locked <span class="gold">on-chain.</span></div>
+    </div>
+    <div id="bar" style="position:absolute;left:150px;top:500px;width:1620px;height:200px"></div>
+    <div id="legend" style="position:absolute;left:150px;top:760px;width:1620px;display:grid;grid-template-columns:repeat(4,1fr);gap:20px"></div>
+  </div>
+
+  <!-- 7. $WICK brûle -->
+  <div class="scene" id="s7">
+    <div style="position:absolute;left:0;right:0;top:300px;text-align:center">
+      <div class="kicker" id="s7k">Every launch</div>
+      <div class="h" id="s7t" style="font-size:170px;margin-top:30px">burns <span class="gold">$WICK.</span></div>
+      <div id="flow" style="display:flex;justify-content:center;align-items:center;gap:26px;margin-top:70px;font-size:34px;font-weight:600;color:#e9dccb">
+        <span class="chip" id="f1">Launch</span><span id="a1" style="color:#ffc05a">→</span><span class="chip" id="f2">Ignition Fee</span><span id="a2" style="color:#ffc05a">→</span><span class="chip" id="f3">Buy $WICK</span><span id="a3" style="color:#ffc05a">→</span><span class="chip on" id="f4">🔥 Burned</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. La fin -->
+  <div class="scene" id="s8">
+    <div id="s8glow" style="position:absolute;left:50%;top:36%;width:820px;height:820px;margin:-410px 0 0 -410px;border-radius:50%;background:radial-gradient(circle, rgba(255,150,40,.5), rgba(255,110,20,.1) 45%, rgba(255,110,20,0) 70%);filter:blur(30px)"></div>
+    <img id="s8logo" src="../../public/brand/logo.png" style="position:absolute;left:50%;top:15%;width:300px;margin-left:-150px;filter:drop-shadow(0 0 40px rgba(255,140,30,.6))">
+    <div style="position:absolute;left:0;right:0;top:560px;text-align:center">
+      <div class="h" id="s8t" style="font-size:96px">Your coin. Its agent. <span class="gold">On fire.</span></div>
+      <div id="s8btn" class="btn" style="margin-top:56px">Launch yours <i><svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg></i></div>
+      <div class="mono" id="s8url" style="margin-top:44px;font-size:40px;letter-spacing:.06em;color:#ffc05a">trywick.fun</div>
+    </div>
+  </div>
+
+  <div class="vig"></div><div class="grain"></div>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const p = (t, a, b) => clamp((t - a) / (b - a));
+const eo = (x) => 1 - Math.pow(1 - x, 3);            // ease-out cubic
+const eio = (x) => (x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const back = (x) => { const c = 1.6; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+// La visibilité d'une scène : fondu entrant, fondu sortant (avec un léger zoom).
+function scene(el, t, a, b, fade = .6) {
+  const v = Math.min(p(t, a, a + fade), 1 - p(t, b - fade, b));
+  el.style.opacity = v;
+  const out = p(t, b - fade, b);
+  el.style.transform = `scale(${1 + out * .04})`;
+  el.style.filter = out > 0 ? `blur(${out * 8}px)` : 'none';
+  return t >= a && t <= b;
+}
+const rise = (el, x, dy = 60) => { el.style.opacity = x; el.style.transform = `translateY(${(1 - eo(x)) * dy}px)`; };
+
+// Les braises : fixes d'une image à l'autre (graine), elles montent tout le film.
+const E = [];
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+for (let i = 0; i < 70; i++) {
+  const el = document.createElement('div'); el.className = 'ember';
+  const s = 3 + rnd() * 6; el.style.width = el.style.height = `${s}px`;
+  $('embers').appendChild(el);
+  E.push({ el, x: rnd() * 1920, sp: 40 + rnd() * 90, ph: rnd() * 30, sw: 20 + rnd() * 50, f: .3 + rnd() });
+}
+// Les labos en orbite.
+const LABS = ['openai', 'anthropic', 'gemini', 'xai', 'deepseek', 'qwen', 'mistral', 'moonshot', 'zai', 'minimax'];
+const SATS = LABS.map((k) => { const d = document.createElement('div'); d.className = 'sat'; d.innerHTML = `<img src="../../public/brand/ai/${k}.svg">`; $('sats').appendChild(d); return d; });
+// La barre des fees.
+const PARTS = [[60, 'Creator', 'the one who launched it', 'linear-gradient(180deg,#fff4d2,#ffd978 30%,#f1b440 62%,#d0821c)', '#1d1003'], [20, 'Its agent', 'its AI, its posts', '#ff8a1c', '#fff4e6'], [10, 'Burns $WICK', 'bought, then burned', '#d9480f', '#fff4e6'], [10, 'Team', 'builds WICK', '#8a2f0c', '#fff4e6']];
+const SEGS = []; let x0 = 0;
+PARTS.forEach(([pct, , , bg, fg]) => { const w = (1620 - 30) * pct / 100; const d = document.createElement('div'); d.className = 'seg'; d.style.left = `${x0}px`; d.style.width = `${w}px`; d.style.background = bg; d.style.color = fg; d.style.fontSize = pct >= 20 ? '96px' : '60px'; d.textContent = `${pct}%`; $('bar').appendChild(d); SEGS.push(d); x0 += w + 10; });
+const LEG = PARTS.map(([pct, label, sub, bg]) => { const d = document.createElement('div'); d.innerHTML = `<div style="display:flex;align-items:center;gap:14px;font-size:38px;font-weight:700"><span style="width:26px;height:26px;border-radius:8px;background:${bg}"></span>${pct}% ${label}</div><div style="font-size:28px;color:#b6a797;margin:10px 0 0 40px">${sub}</div>`; $('legend').appendChild(d); return d; });
+
+window.render = function (t) {
+  // Le fond respire, la grille glisse.
+  $('grid').style.transform = `translate(${-t * 6}px, ${-t * 4}px)`;
+  for (const e of E) {
+    const life = ((t + e.ph) * e.sp) % 1300;
+    e.el.style.transform = `translate(${e.x + Math.sin((t + e.ph) * e.f) * e.sw}px, ${1150 - life}px)`;
+    e.el.style.opacity = Math.min(1, life / 200) * (1 - life / 1300) * .9;
+  }
+
+  // 1. 0–4.6 : le W s'allume.
+  if (scene($('s1'), t, 0, 4.6, .8)) {
+    const a = eo(p(t, .2, 2));
+    $('s1logo').style.opacity = a;
+    $('s1logo').style.transform = `scale(${.82 + .18 * back(p(t, .2, 2.2))}) translateY(${Math.sin(t * 1.4) * 6}px)`;
+    $('s1glow').style.opacity = eo(p(t, 0, 2.4)) * (.85 + Math.sin(t * 2) * .15);
+    $('s1glow').style.transform = `scale(${.6 + .4 * eo(p(t, 0, 2.6))})`;
+    rise($('s1word'), p(t, 1.8, 3), 30);
+    $('s1sweep').style.transform = `translateX(${(-1 + 2.2 * eio(p(t, 2.2, 3.8))) * 1920}px)`;
+  }
+  // 2. 4.2–9 : la phrase, mot par mot.
+  if (scene($('s2'), t, 4.2, 9, .6)) {
+    ['w1', 'w2', 'w3', 'w4', 'w5'].forEach((id, i) => rise($(id), p(t, 4.5 + i * .28, 5.2 + i * .28), 110));
+    $('w5').style.transform += ` scale(${1 + .04 * Math.sin(p(t, 6, 9) * Math.PI)})`;
+    rise($('s2sub'), p(t, 6.4, 7.2), 20);
+  }
+  // 3. 8.6–14.4 : n'importe quel cerveau.
+  if (scene($('s3'), t, 8.6, 14.4, .6)) {
+    rise($('s3k'), p(t, 8.9, 9.5), 20); rise($('s3t'), p(t, 9.1, 9.9), 50); rise($('s3s'), p(t, 9.5, 10.3), 30);
+    const spin = t * 18;
+    SATS.forEach((d, i) => {
+      const k = eo(p(t, 9 + i * .12, 10 + i * .12));
+      const ang = (i * 36 + spin) * Math.PI / 180;
+      const r = 330 * k + 700 * (1 - k);
+      d.style.transform = `translate(${Math.cos(ang) * r}px, ${Math.sin(ang) * r}px) scale(${.6 + .4 * k})`;
+      d.style.opacity = k;
+    });
+    $('orbit').style.transform = `scale(${.92 + .08 * eo(p(t, 8.6, 10))})`;
+  }
+  // 4. 14–20.6 : lancer en 3 étapes.
+  if (scene($('s4'), t, 14, 20.6, .6)) {
+    rise($('s4k'), p(t, 14.2, 14.8), 20); rise($('s4t'), p(t, 14.4, 15.2), 40);
+    ['c1', 'c2', 'c3'].forEach((id, i) => rise($(id), p(t, 15 + i * .5, 15.8 + i * .5), 90));
+    const press = p(t, 18.2, 18.5) - p(t, 18.5, 18.8);
+    $('c3btn').style.transform = `scale(${1 - press * .06})`;
+    rise($('c3ok'), p(t, 18.7, 19.2), 16);
+  }
+  // 5. 20.2–26.4 : l'agent parle.
+  if (scene($('s5'), t, 20.2, 26.4, .6)) {
+    rise($('s5k'), p(t, 20.4, 21), 20); rise($('s5t'), p(t, 20.6, 21.4), 50);
+    rise($('chat'), p(t, 20.5, 21.3), 60);
+    rise($('b1'), p(t, 21.6, 22), 20);
+    const typing = t > 22.3 && t < 23.3;
+    $('dots').style.opacity = typing ? .6 + .4 * Math.sin(t * 12) : 0;
+    rise($('b2'), p(t, 23.3, 23.7), 20);
+    rise($('rcpt'), p(t, 24, 24.4), 14);
+    rise($('b3'), p(t, 24.9, 25.3), 20);
+  }
+  // 6. 26–31 : les fees.
+  if (scene($('s6'), t, 26, 31, .6)) {
+    rise($('s6k'), p(t, 26.2, 26.8), 20); rise($('s6t'), p(t, 26.4, 27.2), 40);
+    SEGS.forEach((d, i) => { const k = eo(p(t, 27 + i * .3, 27.8 + i * .3)); d.style.clipPath = `inset(0 ${(1 - k) * 100}% 0 0 round 24px)`; });
+    LEG.forEach((d, i) => rise(d, p(t, 27.6 + i * .3, 28.2 + i * .3), 20));
+  }
+  // 7. 30.6–34.6 : chaque lancement brûle $WICK.
+  if (scene($('s7'), t, 30.6, 34.6, .5)) {
+    rise($('s7k'), p(t, 30.8, 31.3), 20); rise($('s7t'), p(t, 31, 31.7), 60);
+    ['f1', 'a1', 'f2', 'a2', 'f3', 'a3', 'f4'].forEach((id, i) => rise($(id), p(t, 31.6 + i * .2, 32 + i * .2), 20));
+    $('f4').style.transform += ` scale(${1 + .08 * Math.max(0, Math.sin((t - 33) * 6)) * p(t, 33, 33.2)})`;
+  }
+  // 8. 34.2–40 : la fin.
+  if (scene($('s8'), t, 34.2, 40.5, .6)) {
+    $('s8glow').style.opacity = eo(p(t, 34.2, 35.6)) * (.85 + Math.sin(t * 2) * .15);
+    const k = back(p(t, 34.3, 35.5));
+    $('s8logo').style.opacity = eo(p(t, 34.3, 35));
+    $('s8logo').style.transform = `scale(${.8 + .2 * k}) translateY(${Math.sin(t * 1.4) * 6}px)`;
+    rise($('s8t'), p(t, 35.2, 36), 50); rise($('s8btn'), p(t, 35.8, 36.5), 30); rise($('s8url'), p(t, 36.3, 37), 20);
+  }
+  // Fondu au noir à la toute fin.
+  document.getElementById('stage').style.opacity = 1 - p(t, 39.6, 40.5);
+};
+window.render(0);
+</script>
+</body></html>

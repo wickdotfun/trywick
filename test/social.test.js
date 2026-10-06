@@ -63,8 +63,9 @@ test('the cards: one per moment, milestones named and drawn from the same templa
   assert.equal(milestoneFile(1_000_000), 'mcap-1m.png');
   const files = staticCards().map((c) => c.file);
   assert.deepEqual(files.slice(0, 3), ['live.png', 'dex-paid.png', 'mcap-50k.png']);
-  assert.equal(files.length, 2 + MILESTONES.length + LIBRARY.length);
-  assert.ok(files.includes('post-teaser.png'));
+  assert.equal(files.length, 2 + MILESTONES.length + LIBRARY.filter((p) => !p.video).length);
+  assert.ok(files.includes('post-what.png'));
+  assert.ok(!files.includes('post-intro.png'), 'the video post has its own image, from the film');
   const lock = cardSvg('lock', { ticker: 'WICK', amount: 34029058, pct: 3.4, until: 'Oct 30, 2027', where: 'Stream<flow>' });
   assert.match(lock, /34,029,058/);
   assert.match(lock, /\$WICK LOCKED/);

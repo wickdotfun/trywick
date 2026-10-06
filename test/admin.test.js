@@ -81,12 +81,13 @@ test('post library: every post has its card and text; one click sends it to Tele
   const { existsSync } = await import('node:fs');
   for (const p of LIBRARY) {
     assert.ok(existsSync(new URL(`../public/cards/post-${p.id}.png`, import.meta.url)), `card for ${p.id}`);
+    if (p.video) assert.ok(existsSync(new URL(`../public/cards/${p.video}`, import.meta.url)), `video for ${p.id}`);
     assert.ok(libraryText(p, { mint: 'M'.repeat(44) }).length <= 280, `${p.id} fits in a post on X, with the CA`);
     assert.match(p.slot, /^H|Quand/, 'posted by the hour, around the launch');
     assert.doesNotMatch(libraryText(p), /\$\{|\{site/, 'placeholders are filled');
   }
   assert.match(libraryText(LIBRARY.find((p) => p.id === 'open'), { mint: 'MintW' }), /CA: MintW$/);
-  assert.doesNotMatch(libraryText(LIBRARY.find((p) => p.id === 'teaser'), { mint: 'MintW' }), /MintW/);
+  assert.doesNotMatch(libraryText(LIBRARY.find((p) => p.id === 'what'), { mint: 'MintW' }), /MintW/);
 
   const env = await makeEnv({
     TELEGRAM_BOT_TOKEN: '123456789:AAbbccddeeffgghhiijjkkllmmnnooppqq', TELEGRAM_CHAT_ID: '@wick', TOKEN_MINT: 'MintW',
@@ -95,7 +96,7 @@ test('post library: every post has its card and text; one click sends it to Tele
   const sent = [];
   globalThis.fetch = async (url, init) => {
     const method = String(url).split('/').pop();
-    const body = init.body instanceof FormData ? Object.fromEntries([...init.body.entries()].filter(([k]) => k !== 'photo')) : JSON.parse(init.body);
+    const body = init.body instanceof FormData ? Object.fromEntries([...init.body.entries()].filter(([k]) => k !== 'photo' && k !== 'video')) : JSON.parse(init.body);
     sent.push({ method, body });
     return Response.json({ ok: true, result: { message_id: 5 } });
   };
@@ -109,6 +110,12 @@ test('post library: every post has its card and text; one click sends it to Tele
   assert.equal(sent[0].body.caption, 'gm &lt;3\n\nCA: <code>MintW</code>');
   assert.equal(r.x, undefined, 'X stays with the button: nothing posted there without keys');
 
+  // La vidéo de lancement part comme une vraie vidéo sur Telegram.
+  const vid = await (await adminPost({ request: req('/api/admin/post', { body: { kind: 'library', id: 'intro', channels: ['telegram'] } }), env })).json();
+  assert.equal(vid.telegram, 5);
+  assert.equal(sent.at(-1).method, 'sendVideo');
+  assert.match(sent.at(-1).body.caption, /meet WICK/);
+  sent.length = 1;
   const bad = await adminPost({ request: req('/api/admin/post', { body: { kind: 'relay', url: 'https://evil.test/x' } }), env });
   assert.equal(bad.status, 400);
   const relay = await (await adminPost({ request: req('/api/admin/post', { body: { kind: 'relay', url: 'https://twitter.com/trywickdotfun/status/123?s=20', note: 'new post' } }), env })).json();

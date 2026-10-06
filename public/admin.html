@@ -55,6 +55,7 @@
     .guide summary { display: block; cursor: pointer; list-style: none; } .guide summary::-webkit-details-marker { display: none; } .guide summary::marker { content: ""; } details.guide summary::before, details.guide[open] summary::before { content: none; }
     .guide summary h2 { justify-content: flex-start; margin: 0; } .guide summary h2::after { content: '▾'; margin-left: auto; color: var(--dim); } .guide:not([open]) summary h2::after { content: '▸'; }
     .guide-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 8px 28px; margin-top: 6px; font-size: 13.5px; line-height: 1.55; }
+    .guide a { color: var(--gold); text-decoration: underline; text-underline-offset: 2px; } .guide .btn.small { height: 28px; padding: 0 10px; font-size: 12px; vertical-align: middle; } .guide-how { margin-top: 14px; padding-top: 6px; border-top: 1px solid var(--line-2); }
     .guide h3 { margin: 14px 0 6px; font-size: 14px; color: var(--gold); } .guide ul, .guide ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; } .guide p { margin: 0 0 8px; }
     .checklist { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 8px; }
     .checklist li { display: flex; gap: 12px; align-items: flex-start; padding: 11px 12px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,220,180,.025); }
@@ -187,21 +188,56 @@
             </ul>
           </div>
           <div>
-            <h3>Le soir du lancement, dans l'ordre</h3>
+            <h3>Avant le soir J (une seule fois)</h3>
             <ol>
               <li><b>Test everything</b> (plus bas) : pas de rouge. L'orange n'empêche rien.</li>
-              <li><b>OpenRouter</b> (gratuit, rien à avancer) : crée un compte et une clé sur openrouter.ai (Keys), puis ajoute <b>OPENROUTER_API_KEY</b> (Secret) dans Cloudflare. Ça ouvre « Any model » et le fuel au lancement. Pas besoin de crédits : tant qu'il n'y en a pas, les agents tournent sur les IA gratuites, et le fuel des créateurs s'accumule sur ton wallet. Ensuite seulement, tu convertis ce fuel en crédits (Credits) : ce sont les créateurs qui paient, jamais toi.</li>
-              <li>Ouvre Phantom sur le <b>dev wallet</b> <span class="mono" id="g-dev2"></span>. Garde au moins <b>0,05 SOL</b> à côté du dev buy (frais + le lock).</li>
-              <li>Sur <b>pump.fun</b> → Create coin : nom <b>WICK</b>, ticker exactement <b id="g-tk">WICK</b>, ton logo, ta description, tes liens (X, Telegram, trywick.fun). Choisis ton dev buy, puis lance.</li>
-              <li><b>Dans la minute</b>, tout seul : le site détecte $WICK et passe en live, l'annonce part sur Telegram avec le CA et elle est épinglée. Regarde « Launch day » juste en dessous.</li>
-              <li><b>Post on X</b> (bouton dans « Launch day ») : ton post est écrit, avec le CA. Publie-le, puis épingle-le sur ton profil.</li>
-              <li><b>Lock</b> : sur app.streamflow.finance → Token Lock, depuis le dev wallet, verrouille tes $WICK (montant, date), copie le lien du contrat, puis remplis « Tokens locked » (plus bas) → <b>Post</b>. Il part sur Telegram (et X) et s'affiche sur la page Proof.</li>
-              <li>Fais ta pub avec <b>un seul CA</b> : celui affiché ici. Invite les gens à lancer leur coin sur trywick.fun.</li>
+              <li><b>Clé OpenRouter</b> (gratuite, rien à payer) : sur <a href="https://openrouter.ai" target="_blank" rel="noopener">openrouter.ai</a> → <b>API Keys</b> → <b>Create Key</b>, copie-la. Puis <a href="https://dash.cloudflare.com" target="_blank" rel="noopener">Cloudflare</a> → Workers &amp; Pages → <b>wick</b> → Settings → <b>Variables and Secrets</b> → Add : type <b>Secret</b>, nom <b>OPENROUTER_API_KEY</b>, colle, <b>Deploy</b>. Pas de crédits à acheter : les créateurs paient avec leur fuel.</li>
+              <li><b>Phantom</b> sur le <b>dev wallet</b> <span class="mono" id="g-dev2"></span> : ton dev buy + au moins <b>0,05 SOL</b> en plus (frais pump.fun, puis le lock Streamflow).</li>
+              <li>Prépare sur ton ordi : le logo (<a href="/brand/logo.png" download="wick-logo.png">télécharger le logo</a>), la description, et tes liens X + Telegram + trywick.fun.</li>
+            </ol>
+            <h3>Le soir du lancement, dans l'ordre</h3>
+            <ol>
+              <li>Publie les posts « avant » (plus bas, de H-3 à H-30 min). <b>Ne donne jamais l'heure exacte</b> : les snipers attendent ça.</li>
+              <li>Ouvre <a href="https://pump.fun/create" target="_blank" rel="noopener">pump.fun → Create coin</a>, connecte Phantom (le <b>dev wallet</b>). Nom <b>WICK</b>, ticker exactement <b id="g-tk">WICK</b>, le logo, la description, les liens. Choisis ton dev buy → <b>Create</b> → signe dans Phantom.</li>
+              <li><b>Dans la minute, tout seul</b> : le site voit $WICK, passe en live, et l'annonce part sur Telegram avec le CA (épinglée). Vérifie « Launch day » juste en dessous. CA : <span class="g-ca"></span></li>
+              <li><b>Sur X</b> : dans les posts, carte « $WICK is live » → bouton X : le texte est prêt avec le CA. Publie, puis <b>épingle</b>-le.</li>
+              <li><b>Le lock</b> (pas à pas juste en dessous), puis la carte « Tokens locked » → Post.</li>
+              <li>Ensuite : partage un seul CA, celui d'ici, et invite les gens à lancer leur coin sur trywick.fun.</li>
+            </ol>
+          </div>
+        </div>
+        <div class="guide-grid guide-how">
+          <div>
+            <h3>Le lock sur Streamflow, pas à pas</h3>
+            <p>Bloquer une partie de tes $WICK montre que tu ne vends pas. Ça se fait <b>après</b> le lancement, depuis le dev wallet.</p>
+            <ol>
+              <li>Ouvre <a href="https://app.streamflow.finance" target="_blank" rel="noopener">app.streamflow.finance</a> → <b>Connect wallet</b> → Phantom (le dev wallet). Réseau : Solana mainnet.</li>
+              <li>Menu <b>Token Lock</b> → <b>Create lock</b> (le nom exact du bouton peut varier).</li>
+              <li><b>Token</b> : colle le CA de $WICK <span class="g-ca"></span></li>
+              <li><b>Montant</b> : ce que tu bloques (par exemple tout ton dev buy). Ton solde $WICK est visible dans Phantom.</li>
+              <li><b>Date de déblocage</b> : par exemple dans 3 ou 6 mois. <b>Destinataire</b> : ton propre dev wallet (les tokens te reviennent à cette date).</li>
+              <li><b>Annulation</b> : personne (désactive « cancelable » et « transferable »). C'est ce qui rend le lock crédible.</li>
+              <li>Vérifie les frais affichés par Streamflow, puis <b>Create</b> → signe dans Phantom.</li>
+              <li>Sur la page du contrat, <b>copie le lien</b> (il commence par <span class="mono">app.streamflow.finance/contract/…</span>).</li>
+              <li>Ici, carte <b>« Tokens locked »</b> (dans les posts, plus bas) : montant, date, lien → <b>Dessiner la carte</b> → <b>Post</b>. Ça part sur X et Telegram et s'affiche sur la page Proof.</li>
+            </ol>
+          </div>
+          <div>
+            <h3>DEX Screener payé (optionnel), pas à pas</h3>
+            <p>Pas obligatoire pour lancer. C'est payant (le prix s'affiche chez DEX Screener avant de payer) : à faire seulement si tu veux le badge et le profil complet.</p>
+            <ol>
+              <li>Attends que $WICK apparaisse sur DEX Screener (quelques minutes après le lancement) : <span class="g-dex"></span></li>
+              <li>Ouvre <a href="https://marketplace.dexscreener.com/product/token-info" target="_blank" rel="noopener">DEX Screener → Enhanced Token Info</a>. Chaîne <b>Solana</b>, colle le CA <span class="g-ca"></span></li>
+              <li><b>Icône</b> : <a href="/cards/dex-icon.png" download="wick-dex-icon.png">télécharger l'icône</a> (512 × 512). <b>Bannière</b> : <a href="/cards/dex-banner.png" download="wick-dex-banner.png">télécharger la bannière</a> (1500 × 500).</li>
+              <li><b>Description</b> : <button class="btn small" type="button" data-copy="WICK is a launchpad on Solana where every coin gets its own AI agent. Launch a coin on pump.fun from trywick.fun: its agent talks to holders, posts for the coin and burns its supply. Every launch burns $WICK.">Copier la description</button></li>
+              <li><b>Liens</b> : site <span class="mono">https://trywick.fun</span>, ton X, ton Telegram.</li>
+              <li>Paie et valide. DEX Screener vérifie, puis le profil passe en ligne.</li>
+              <li><b>Rien d'autre à faire</b> : le site voit le profil payé et poste tout seul la carte « DEX PAID » sur Telegram (et X si ses clés sont réglées). Sinon, bouton « DEX payé » dans les posts.</li>
             </ol>
             <h3>Ensuite, tout seul</h3>
-            <p>Un post Telegram pour chaque nouveau coin (et sur X si ses clés sont réglées, sinon un bouton « Post on X » par coin dans « Latest launches »). Un buyback + burn de $WICK toutes les 30 minutes au plus. Les paliers de market cap et le DEX payé sont postés avec leur carte.</p>
+            <p>Un post Telegram pour chaque nouveau coin. Un buyback + burn de $WICK toutes les 30 minutes au plus. Les paliers de market cap sont postés avec leur carte.</p>
             <h3>En cas de souci</h3>
-            <p><b>Pause buyback</b> (en haut) arrête les achats tout de suite. Chaque carte a <b>Post now</b>, <b>Copy X text</b> et <b>Open X</b> pour poster à la main. Jamais : partager une clé privée ou la phrase secrète, changer le ticker, lancer depuis un autre wallet.</p>
+            <p><b>Pause buyback</b> (en haut) arrête les achats tout de suite. Jamais : partager une clé privée ou la phrase secrète, changer le ticker, lancer depuis un autre wallet.</p>
           </div>
         </div>
       </details>
@@ -266,9 +302,9 @@
       </div>
 
       <div class="card">
-        <h2>Breaths <small>the 30-minute buyback cycles</small></h2>
+        <h2>Buybacks of $WICK <small>every 30 minutes, the pot buys $WICK and burns it. Empty rounds are hidden</small></h2>
         <div class="scroll"><table>
-          <thead><tr><th>#</th><th>Ended</th><th>Launches</th><th>Status</th><th>Bought</th><th>Burned</th></tr></thead>
+          <thead><tr><th>#</th><th>Ended</th><th>Launches</th><th>Status</th><th>SOL used</th><th>$WICK burned</th></tr></thead>
           <tbody id="cycles"></tbody>
         </table></div>
       </div>
@@ -415,6 +451,8 @@
       // Le guide : le dev wallet et le ticker.
       $('g-dev').textContent = $('g-dev2').textContent = c.deployer ? short(c.deployer) : '';
       $('g-tk').textContent = c.ticker;
+      document.querySelectorAll('.g-ca').forEach((el) => { el.innerHTML = mint ? `<span class="mono">${esc(short(mint))}</span> <button class="btn small" type="button" data-copy="${esc(mint)}">Copy CA</button>` : '<i class="dim">(il s\'affiche ici dès que $WICK est lancé)</i>'; });
+      document.querySelectorAll('.g-dex').forEach((el) => { el.innerHTML = mint ? `<a href="https://dexscreener.com/solana/${esc(mint)}" target="_blank" rel="noopener">voir $${esc(c.ticker)} sur DEX Screener</a>` : '<i class="dim">(le lien s\'affiche ici après le lancement)</i>'; });
 
       // Launch day
       const S = steps(d);
@@ -552,7 +590,7 @@
         <td>${r.mcap ? usd(r.mcap) : '—'}</td></tr>`).join('') : '<tr><td colspan="8" class="dim">No launch yet.</td></tr>';
 
       const NOTES = { not_live: 'WICK not live yet', paused: 'buyback paused', empty_pot: 'pot too small, carried over', nothing_bought: 'nothing bought', burn_failed: 'burn failed' };
-      const STATUS = { queued: ['queued', 'work'], buying: ['buying…', 'work'], bought: ['bought, burning next', 'work'], burning_tx: ['burning…', 'work'], burned: ['burned', 'ok'], skipped: ['skipped', ''], failed: ['failed', 'bad'], ended: ['waiting', 'work'], burning: ['now', 'ok'] };
+      const STATUS = { queued: ['queued', 'work'], buying: ['buying…', 'work'], bought: ['bought, burning next', 'work'], burning_tx: ['burning…', 'work'], burned: ['burned', 'ok'], skipped: ['nothing to buy', ''], failed: ['failed', 'bad'], ended: ['waiting', 'work'], burning: ['now', 'ok'] };
       const status = (s, note) => `${pill(...(STATUS[s] || [s]))}${note ? ` <small class="dim">${esc(NOTES[note] || note)}</small>` : ''}`;
       $('burns').innerHTML = d.burns.length ? d.burns.map((b) => `<tr>
         <td>${b.id}</td><td>${b.kind === 'candle' ? `Buyback · breath #${esc(b.ref)}` : b.kind === 'coin' ? `Its own candle · $${esc(b.symbol || '?')}` : `Ignition Fee · $${esc(b.symbol || '?')}`}</td>
@@ -560,7 +598,10 @@
         <td>${b.sol != null ? `${num(b.sol)} ${tx(b.buy_sig, '↗')}` : ''}</td>
         <td>${b.burned_ui != null ? `<b>${num(b.burned_ui, 0)}</b>${b.kind === 'coin' ? ` <small class="dim">$${esc(b.symbol || '?')}</small>` : ''} ${tx(b.burn_sig, '↗')}` : tx(b.burn_sig, 'pending ↗')}</td>
         <td>${ago(b.created_at)}</td></tr>`).join('') : '<tr><td colspan="6" class="dim">No burn yet.</td></tr>';
-      $('cycles').innerHTML = d.cycles.map((r) => `<tr>
+      // Seuls les tours où il s'est passé quelque chose (un lancement, un achat, un burn, une erreur).
+      const rounds = d.cycles.filter((r) => !r.ended_at || r.matches > 0 || r.buy_sol != null || r.burned_ui != null || r.status === 'failed');
+      const none = rounds.some((r) => r.buy_sol != null) ? '' : '<tr><td colspan="6" class="dim">No buyback yet: they start once $WICK is live and the pot has SOL.</td></tr>';
+      $('cycles').innerHTML = none + rounds.map((r) => `<tr>
         <td>${r.id}</td><td>${r.ended_at ? ago(r.ended_at) : '<span class="ok">now</span>'}</td><td>${r.matches}</td>
         <td>${status(r.status, r.note)}</td>
         <td>${r.buy_sol != null ? `${num(r.buy_sol)} SOL ${tx(r.buy_sig, '↗')}` : ''}</td>

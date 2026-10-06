@@ -128,22 +128,22 @@ function renderMeter() {
   const off = span(b.matchMs);
   const fee = world.launch?.feeSol || 0;
   const tk = `$${world.token?.ticker || 'WICK'}`;
-  $('candle-no').textContent = `#${pad(c.number)}`;
-  $('candle-melt').textContent = `${Math.floor(c.melted * 100)}% melted`;
-  $('bar').style.width = `${(c.melted * 100).toFixed(2)}%`;
+  // La barre : le temps jusqu'au prochain buyback.
+  $('candle-melt').textContent = live ? 'Buyback every 30 min' : world.buyback.paused ? 'Paused' : 'Starts at launch';
+  $('bar').style.width = `${live && b.durationMs ? (Math.min(1, 1 - p.remaining / b.durationMs) * 100).toFixed(2) : 0}%`;
   $('supply-pct').textContent = pct(c.burnedPct);
   $('supply-label').textContent = `of the ${tk} supply burned forever`;
   $('count-label').textContent = p.remaining > 0
-    ? (live ? 'Next buyback in' : world.buyback.paused ? 'Buybacks paused · next breath in' : 'Next breath in')
-    : (live ? `Buying back ${tk}…` : 'Breathing…');
+    ? (live ? 'Next buyback in' : world.buyback.paused ? 'Buybacks paused · next round in' : 'Next round in')
+    : (live ? `Buying back ${tk}…` : 'Next round…');
   $('countdown').textContent = clockText(p.remaining);
   $('countdown').classList.toggle('hot', p.remaining < 60_000);
   const from = world.launch?.shareBps && world.launch.sharedFeeSol != null ? world.launch.sharedFeeSol : fee;
   $('meter-sub').innerHTML = live
     ? `Every launch removes <b>${esc(tk)}</b> from circulation and brings the buyback <b>${off}</b> closer.`
     : world.buyback.paused
-      ? 'Buybacks are paused for now. The candle waits.'
-      : `The candle starts melting once ${esc(tk)} is live.`;
+      ? 'Buybacks are paused for now.'
+      : `Buybacks of ${esc(tk)} start once it is live.`;
   $('cta-sub').innerHTML = fee
     ? `Launch a coin. Give it an AI agent. Let it burn. · <b>Ignition Fee ${from < fee ? `from ${from}` : fee} SOL</b>, ${world.launch.teamSol ? 'half of it burns' : 'burns'} ${esc(tk)}`
     : 'Launch a coin. Give it an AI agent. Let it burn.';

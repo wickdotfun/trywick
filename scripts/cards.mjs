@@ -3,7 +3,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { initWasm, Resvg } from '@resvg/resvg-wasm';
-import { FONTS, W, cardSvg, staticCards } from '../lib/cards.js';
+import { FONTS, W, cardSvg, dexBannerSvg, dexIconSvg, staticCards } from '../lib/cards.js';
 
 const require = createRequire(import.meta.url);
 const root = new URL('../public/', import.meta.url);
@@ -27,4 +27,12 @@ for (const card of [...staticCards(process.env.TOKEN_TICKER || 'WICK'), example]
   const png = new Resvg(svg, { font: { fontBuffers, loadSystemFonts: false, defaultFontFamily: 'Geist' }, fitTo: { mode: 'width', value: W } }).render().asPng();
   await writeFile(new URL(`cards/${card.file}`, root), png);
   console.log(card.file, `${Math.round(png.length / 1024)} KB`);
+}
+
+// Le profil DEX Screener : la bannière (1500 × 500) et l'icône (512 × 512), à envoyer si on le paie.
+for (const [file, svg, width] of [['dex-banner.png', dexBannerSvg(assets, process.env.TOKEN_TICKER || 'WICK'), 1500], ['dex-icon.png', dexIconSvg(assets), 512]]) {
+  if (only && !file.includes(only)) continue;
+  const png = new Resvg(svg, { font: { fontBuffers, loadSystemFonts: false, defaultFontFamily: 'Geist' }, fitTo: { mode: 'width', value: width } }).render().asPng();
+  await writeFile(new URL(`cards/${file}`, root), png);
+  console.log(file, `${Math.round(png.length / 1024)} KB`);
 }

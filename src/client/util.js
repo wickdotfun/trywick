@@ -12,6 +12,13 @@ export function span(ms) {
 }
 export const solscan = (sig) => `https://solscan.io/tx/${sig}`;
 export const pumpUrl = (mint) => `https://pump.fun/coin/${mint}`;
+// Le logo d'un coin : une image sur l'IPFS passe par le site (/api/img, en cache), plus rapide et
+// plus sûr que la passerelle publique. Les autres adresses https restent telles quelles.
+export function imgSrc(url) {
+  const cid = /\/ipfs\/([A-Za-z0-9]{46,100})(?:[/?#]|$)/.exec(String(url || ''))?.[1];
+  if (cid) return `/api/img?cid=${cid}`;
+  return /^(https:|blob:)/.test(url || '') ? url : null;
+}
 
 export function ago(at, now = Date.now()) {
   const s = Math.max(0, Math.round((now - at) / 1000));

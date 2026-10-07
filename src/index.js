@@ -31,10 +31,12 @@ import { ensureSchema } from '../lib/schema.js';
 import { setSetting } from '../lib/settings.js';
 import { runOpenRouter } from '../lib/openrouter.js';
 import { models } from './api/models.js';
+import { img } from './api/img.js';
 
 const ROUTES = {
   'GET /api/state': state,
   'GET /api/models': models,
+  'GET /api/img': img,
   'GET /api/leaderboard': board,
   'GET /api/launches': launches,
   'GET /api/profile': profile,

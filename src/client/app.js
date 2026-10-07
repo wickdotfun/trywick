@@ -8,7 +8,7 @@ import { createPages } from './pages.js';
 import { createScene, headColor } from './scene.js';
 import * as connect from './connect.js';
 import { createTokenPage, remember } from './token.js';
-import { ago, aiLogo, compact, esc, fmt, icon, pumpUrl, short, sol, solscan, span } from './util.js';
+import { ago, aiLogo, compact, esc, fmt, icon, imgSrc, pumpUrl, short, sol, solscan, span } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 const DEMO = new URLSearchParams(location.search).has('demo');
@@ -48,7 +48,7 @@ const api = DEMO ? createDemo() : {
 
 function avatar(m, size = 34) {
   const color = headColor(m.mint, m.holder);
-  const safe = m.image && /^(https:|blob:)/.test(m.image) ? m.image : null;
+  const safe = imgSrc(m.image);
   const initials = esc((m.symbol || '?').slice(0, 2));
   return `<span class="av" style="--c:${color};width:${size}px;height:${size}px">${
     safe ? `<img src="${esc(safe)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ''

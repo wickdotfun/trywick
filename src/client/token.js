@@ -2,7 +2,7 @@
 // ses plus gros holders, ce que WICK en a brûlé, et l'achat / la vente directement ici
 // (PumpPortal construit la transaction, le wallet du visiteur la signe, le serveur la relaie).
 import * as connect from './connect.js';
-import { compact, esc, fmt, icon, pumpUrl, short, solscan } from './util.js';
+import { compact, esc, fmt, icon, imgSrc, pumpUrl, short, solscan } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 const REFRESH_MS = 15_000;
@@ -231,7 +231,7 @@ export function createTokenPage({ api, openModal, isOpen, world, ticker, breathT
     $('tk-vol').textContent = usd(m?.volume24h);
     $('tk-liq').textContent = m?.dex === 'pumpfun' ? 'bonding curve' : usd(m?.liquidity);
     $('tk-txns').innerHTML = m?.buys24h != null ? `<span class="up">${fmt(m.buys24h)}</span> / <span class="down">${fmt(m.sells24h ?? 0)}</span>` : '—';
-    if (m?.image && /^https:/.test(m.image)) $('tk-logo').src = m.image;
+    if (imgSrc(m?.image)) $('tk-logo').src = imgSrc(m.image);
 
     const c = d.curve;
     $('tk-curve-pct').textContent = c ? (c.complete ? 'Graduated' : `${(c.progress * 100).toFixed(1)}%`) : '—';

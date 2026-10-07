@@ -20,7 +20,8 @@ function boot() {
 // Une image (le logo d'un coin, sur l'IPFS) en PNG data: URI, recadrée au carré. null si illisible.
 export async function imageData(url) {
   try {
-    const bmp = await createImageBitmap(await (await fetch(url, { mode: 'cors' })).blob());
+    const cid = /\/ipfs\/([A-Za-z0-9]{46,100})/.exec(String(url))?.[1];
+    const bmp = await createImageBitmap(await (await fetch(cid ? `/api/img?cid=${cid}` : url, { mode: 'cors' })).blob());
     const side = Math.min(bmp.width, bmp.height);
     const c = document.createElement('canvas');
     c.width = c.height = 512;

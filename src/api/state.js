@@ -6,6 +6,7 @@ import { orReady } from '../../lib/openrouter.js';
 import { json, tokenInfo } from '../../lib/http.js';
 import { worldState } from '../../lib/matches.js';
 import { ensureSchema } from '../../lib/schema.js';
+import { getSetting } from '../../lib/settings.js';
 
 export async function state({ request, env }) {
   await ensureSchema(env.DB);
@@ -15,7 +16,8 @@ export async function state({ request, env }) {
   const fees = await feeSummary(env);
   return json({
     ...world,
-    token: tokenInfo(env),
+    // Le CA : celui des réglages, sinon celui que le site a vu au lancement (sur le dev wallet).
+    token: { ...tokenInfo(env), mint: env.TOKEN_MINT || (await getSetting(env.DB, 'launch.detected'))?.mint || null },
     // L'Ignition Fee (50 % burn, 50 % équipe), et celle réduite avec le partage des creator fees
     // (split : créateur / burn / équipe).
     launch: {

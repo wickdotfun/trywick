@@ -320,6 +320,20 @@ function renderToken() {
   $('wick-btn').textContent = `$${t.ticker}`;
   if (t.x) $('x-link').href = t.x;
   if (t.telegram) $('tg-link').href = t.telegram;
+  // Le CA, en haut de toutes les pages : un clic le copie.
+  const bar = $('ca-bar');
+  if (bar && t.mint) {
+    $('ca-tk').textContent = `$${t.ticker}`;
+    $('ca-addr').textContent = t.mint;
+    bar.hidden = false;
+    if (!bar.dataset.bound) {
+      bar.dataset.bound = '1';
+      bar.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(world.token.mint); $('ca-copy').textContent = 'Copied ✓'; } catch { $('ca-copy').textContent = 'Select it'; }
+        setTimeout(() => { $('ca-copy').textContent = 'Copy'; }, 1800);
+      });
+    }
+  }
 }
 
 // Le reçu d'un burn, au-dessus de la bougie : la flamme se ravive, la bougie fond.
